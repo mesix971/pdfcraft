@@ -382,4 +382,29 @@ mod tests {
             assert!(manifest.contains(change), "configChanges lacks {change}");
         }
     }
+
+    /// The unsafe-code exception (AGENTS.md §4) covers two items of the Android app and nothing
+    /// else: every other crate inherits the workspace's `forbid`, which no `allow` can lift.
+    #[test]
+    fn unsafe_code_is_allowed_only_on_the_two_approved_android_items() {
+        let pattern = ["allow", "(unsafe_code)"].concat();
+        let mut found = Vec::new();
+        let mut stack = vec![root().join("crates"), root().join("apps"), root().join("xtask")];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap().flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else if path.extension().is_some_and(|e| e == "rs") {
+                    let text = std::fs::read_to_string(&path).unwrap();
+                    let rel = path.strip_prefix(root()).unwrap().to_string_lossy().replace('\\', "/");
+                    found.extend(std::iter::repeat_n(rel, text.matches(&pattern).count()));
+                }
+            }
+        }
+        found.sort();
+        assert_eq!(found, ["apps/pdfcraft-android/src/jvm.rs", "apps/pdfcraft-android/src/lib.rs"]);
+        let lints = std::fs::read_to_string(root().join("apps/pdfcraft-android/Cargo.toml")).unwrap();
+        assert!(lints.contains("unsafe_code = \"deny\""), "the Android app still denies unsafe code by default");
+    }
 }

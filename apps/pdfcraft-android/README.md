@@ -107,8 +107,9 @@ Rust can't express, each allowed on its own item with its reason:
    android-activity keeps alive, into a `jni` object (`Env::as_cast_raw`, which still checks its type
    at run time).
 
-Every JNI call after that goes through `jni`'s checked API. This is an exception to AGENTS.md §4 and
-needs the owner's sign-off.
+Every JNI call after that goes through `jni`'s checked API. This is an exception to AGENTS.md §4,
+signed off by the repository owner on 2026-10-13 and listed there; nothing else in the crate may
+allow unsafe code.
 
 ## Layout
 
