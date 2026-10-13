@@ -389,11 +389,32 @@ pub fn mode_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                 ui.add_space(6.0);
                 ui.painter().vline(ui.cursor().left(), ui.max_rect().y_range().shrink(12.0), Stroke::new(1.0, t.divider));
                 ui.add_space(10.0);
-                for (mode, label) in
-                    [(Mode::AllTools, "All tools"), (Mode::Read, "Read"), (Mode::Edit, "Edit"), (Mode::Convert, "Convert"), (Mode::Sign, "E-Sign")]
-                {
-                    if widgets::mode_tab(ui, tl!(label), app.mode == mode).clicked() {
+                // A narrow window (a phone held upright) keeps every mode in reach: the search box
+                // becomes its icon, then the tabs one menu of the current mode.
+                let fit = mode_bar_fit(ui);
+                if fit == ModeBarFit::Menu {
+                    let current = MODES.iter().find(|(m, _)| *m == app.mode).map_or("All tools", |(_, label)| *label);
+                    let resp = widgets::mode_tab(ui, &format!("{} \u{25BE}", tl!(current)), true);
+                    let chosen = egui::Popup::menu(&resp)
+                        .show(|ui| {
+                            ui.set_min_width(180.0);
+                            let mut chosen = None;
+                            for (mode, label) in MODES {
+                                if ui.selectable_label(app.mode == mode, tl!(label)).clicked() {
+                                    chosen = Some(mode);
+                                }
+                            }
+                            chosen
+                        })
+                        .and_then(|r| r.inner);
+                    if let Some(mode) = chosen {
                         app.switch_mode(mode, true);
+                    }
+                } else {
+                    for (mode, label) in MODES {
+                        if widgets::mode_tab(ui, tl!(label), app.mode == mode).clicked() {
+                            app.switch_mode(mode, true);
+                        }
                     }
                 }
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -414,12 +435,53 @@ pub fn mode_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                         }
                     });
                     ui.add_space(8.0);
-                    if widgets::search_box(ui, tl!("Find tools and commands"), 260.0).clicked() {
+                    let search = if fit == ModeBarFit::Full {
+                        widgets::search_box(ui, tl!("Find tools and commands"), SEARCH_BOX_WIDTH)
+                    } else {
+                        icons::button(ui, "search", 32.0, false, tl!("Find tools and commands"))
+                    };
+                    if search.clicked() {
                         app.palette_open = true;
                     }
                 });
             });
         });
+}
+
+/// The workspace modes, in the mode bar's order.
+const MODES: [(Mode, &str); 5] =
+    [(Mode::AllTools, "All tools"), (Mode::Read, "Read"), (Mode::Edit, "Edit"), (Mode::Convert, "Convert"), (Mode::Sign, "E-Sign")];
+/// The mode bar's search box, when there is room for it.
+const SEARCH_BOX_WIDTH: f32 = 260.0;
+/// The mode bar's right-hand buttons (Print, Save, Properties) and the gaps around them.
+const MODE_BAR_BUTTONS: f32 = 3.0 * 32.0 + 2.0 * 4.0 + 8.0 + 8.0;
+
+/// How the mode bar fits the room left after the main menu.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ModeBarFit {
+    /// Every tab and the search box.
+    Full,
+    /// Every tab; the search box is its icon.
+    SearchIcon,
+    /// One menu of the current mode, and the search icon.
+    Menu,
+}
+
+/// [`ModeBarFit`] for the room left in `ui`, from the tabs' widths in the interface language.
+fn mode_bar_fit(ui: &egui::Ui) -> ModeBarFit {
+    let font = theme::semibold(13.5);
+    let tabs: f32 = MODES.iter().map(|(_, label)| widgets::text_width(ui, tl!(label), &font) + 22.0 + 2.0).sum();
+    mode_bar_fit_for(ui.available_width(), tabs)
+}
+
+pub(crate) fn mode_bar_fit_for(room: f32, tabs: f32) -> ModeBarFit {
+    if room >= tabs + MODE_BAR_BUTTONS + SEARCH_BOX_WIDTH {
+        ModeBarFit::Full
+    } else if room >= tabs + MODE_BAR_BUTTONS + 32.0 {
+        ModeBarFit::SearchIcon
+    } else {
+        ModeBarFit::Menu
+    }
 }
 
 fn main_menu(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
@@ -527,34 +589,47 @@ pub fn right_rail(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
         .exact_size(48.0)
         .frame(egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin::symmetric(6, 8)).stroke(Stroke::new(1.0, t.divider)))
         .show(ui, |ui| {
-            ui.spacing_mut().item_spacing.y = 4.0;
-            let mut rail_button = |ui: &mut egui::Ui, panel: RightPanel, icon: &str, tip: &str, has: bool| {
-                let selected = app.right == Some(panel) && (app.mode == Mode::Read || app.docking.exposed(crate::docking::Panel::Inspector));
-                let r = icons::button(ui, icon, 34.0, selected, tl!(tip));
-                if has && !selected {
-                    let c = r.rect.right_top() + vec2(-8.0, 8.0);
-                    ui.painter().circle_filled(c, 3.0, t.accent);
+            // The page controls' height, from the last frame: on a short window (a phone held
+            // sideways) the panel buttons scroll in the room they leave, so the two never overlap.
+            let cluster_id = ui.id().with("rail_controls_height");
+            let controls: f32 = ui.ctx().data(|d| d.get_temp(cluster_id)).unwrap_or(0.0);
+            let room = ui.available_height() - controls - 6.0;
+            let buttons = if has_check { 9.0 } else { 8.0 };
+            let mut panels = |ui: &mut egui::Ui| {
+                ui.spacing_mut().item_spacing.y = 4.0;
+                let mut rail_button = |ui: &mut egui::Ui, panel: RightPanel, icon: &str, tip: &str, has: bool| {
+                    let selected = app.right == Some(panel) && (app.mode == Mode::Read || app.docking.exposed(crate::docking::Panel::Inspector));
+                    let r = icons::button(ui, icon, 34.0, selected, tl!(tip));
+                    if has && !selected {
+                        let c = r.rect.right_top() + vec2(-8.0, 8.0);
+                        ui.painter().circle_filled(c, 3.0, t.accent);
+                    }
+                    if r.clicked() {
+                        app.choose_right_panel(if selected { None } else { Some(panel) });
+                    }
+                };
+                rail_button(ui, RightPanel::Comments, "message-square-text", "Comments", has_comments);
+                rail_button(ui, RightPanel::Bookmarks, "bookmark", "Bookmarks", has_outline);
+                rail_button(ui, RightPanel::Pages, "files", "Page thumbnails", false);
+                rail_button(ui, RightPanel::Fields, "text-cursor-input", "Form fields", has_fields);
+                rail_button(ui, RightPanel::Layers, "layers", "Layers", has_layers);
+                rail_button(ui, RightPanel::Attachments, "paperclip", "Attachments", has_files);
+                rail_button(ui, RightPanel::Signatures, "signature", "Signatures", has_signatures);
+                if has_check {
+                    rail_button(ui, RightPanel::Accessibility, "accessibility", "Accessibility Checker", false);
                 }
-                if r.clicked() {
-                    app.choose_right_panel(if selected { None } else { Some(panel) });
-                }
+                rail_button(ui, RightPanel::Tags, "tag", "Tags", false);
             };
-            rail_button(ui, RightPanel::Comments, "message-square-text", "Comments", has_comments);
-            rail_button(ui, RightPanel::Bookmarks, "bookmark", "Bookmarks", has_outline);
-            rail_button(ui, RightPanel::Pages, "files", "Page thumbnails", false);
-            rail_button(ui, RightPanel::Fields, "text-cursor-input", "Form fields", has_fields);
-            rail_button(ui, RightPanel::Layers, "layers", "Layers", has_layers);
-            rail_button(ui, RightPanel::Attachments, "paperclip", "Attachments", has_files);
-            rail_button(ui, RightPanel::Signatures, "signature", "Signatures", has_signatures);
-            if has_check {
-                rail_button(ui, RightPanel::Accessibility, "accessibility", "Accessibility Checker", false);
+            if controls <= 0.0 || room >= buttons * (34.0 + 4.0) {
+                panels(ui);
+            } else {
+                egui::ScrollArea::vertical().id_salt("rail_panels").max_height(room.max(34.0)).auto_shrink([false, true]).show(ui, panels);
             }
-            rail_button(ui, RightPanel::Tags, "tag", "Tags", false);
 
             // Page navigation cluster at the bottom (as in Acrobat's rail).
             let view = &mut app.views[index];
             let mut page_display = None;
-            ui.with_layout(Layout::bottom_up(Align::Center), |ui| {
+            let cluster = ui.with_layout(Layout::bottom_up(Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.y = 2.0;
                 let tip = crate::commands::key_tip(ui.ctx(), tl!("Zoom out ({key})"), crate::commands::ZOOM_OUT);
                 if icons::button(ui, "zoom-out", 32.0, false, &tip).clicked() {
@@ -616,6 +691,8 @@ pub fn right_rail(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                     }
                 }
             });
+            let height = cluster.response.rect.height();
+            ui.ctx().data_mut(|d| d.insert_temp(cluster_id, height));
             if let Some(id) = page_display {
                 app.execute(id);
             }

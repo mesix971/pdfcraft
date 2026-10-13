@@ -2337,3 +2337,22 @@ animation effects	Off	Ki
 	The linked PDF opened, but its named destination was not applied.	A hivatkozott PDF megnyílt, de a nevesített cél nem lett alkalmazva.
 	The linked PDF opened, but its page destination was out of range.	A hivatkozott PDF megnyílt, de a céloldal a tartományon kívül esik.
 	Local cross-PDF links require the desktop app	A PDF-ek közötti helyi hivatkozásokhoz az asztali alkalmazás szükséges
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Belső tárhely
+	Documents	Dokumentumok
+	PdfCraft files	PdfCraft-fájlok
+	SD card {name}	SD-kártya: {name}
+	Couldn't create the folder {name}: {e}	A(z) {name} mappa nem hozható létre: {e}
+	Choose this folder	A mappa kiválasztása
+	{name} already exists. Replace it?	{name} már létezik. Lecseréli?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Ha az eszközön bárhol szeretne fájlokat megnyitni és menteni, engedélyezze, hogy a PdfCraft kezelje az összes fájlt.
+	Allow access	Hozzáférés engedélyezése
+	All files	Minden fájl
+	This folder is empty	Ez a mappa üres
+	New folder	Új mappa
+
+# Printing through another app (Android)
+	Another app	Másik alkalmazás
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	A nyomtatásra kész PDF a választott alkalmazásban nyílik meg, amely a saját példányszám-, kétoldalas és színbeállításaival nyomtatja ki.
+	Couldn't hand {name} to another app: {e}	A(z) {name} nem adható át másik alkalmazásnak: {e}

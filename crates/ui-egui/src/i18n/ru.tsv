@@ -2251,3 +2251,22 @@ animation effects	Off	Выкл
 	The linked PDF opened, but its named destination was not applied.	Связанный PDF открыт, но его именованное назначение не применено.
 	The linked PDF opened, but its page destination was out of range.	Связанный PDF открыт, но страница назначения вне допустимого диапазона.
 	Local cross-PDF links require the desktop app	Локальные ссылки между PDF работают только в настольном приложении
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Внутренняя память
+	Documents	Документы
+	PdfCraft files	Файлы PdfCraft
+	SD card {name}	SD-карта {name}
+	Couldn't create the folder {name}: {e}	Не удалось создать папку {name}: {e}
+	Choose this folder	Выбрать эту папку
+	{name} already exists. Replace it?	{name} уже существует. Заменить?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Чтобы открывать и сохранять файлы в любом месте на этом устройстве, разрешите PdfCraft управлять всеми файлами.
+	Allow access	Разрешить доступ
+	All files	Все файлы
+	This folder is empty	Эта папка пуста
+	New folder	Новая папка
+
+# Printing through another app (Android)
+	Another app	Другое приложение
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Готовый к печати PDF откроется в выбранном вами приложении, которое напечатает его со своими настройками копий, двусторонней печати и цвета.
+	Couldn't hand {name} to another app: {e}	Не удалось передать {name} другому приложению: {e}

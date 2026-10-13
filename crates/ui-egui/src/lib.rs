@@ -74,6 +74,10 @@ pub mod bulk_fields;
 mod dialogs;
 mod edit_text_ui;
 mod editing;
+/// The in-app file browser: every file picker on Android (see the module).
+#[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+pub mod file_browser;
+mod file_dialog;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod file_watch;
 mod files;
@@ -112,6 +116,14 @@ pub(crate) fn date_text(session: &Session, fmt: Option<&str>) -> Result<String, 
 pub(crate) fn date_text_for_pdf(session: &Session) -> Result<String, String> {
     let lang = session.date_language().unwrap_or(i18n::current().code());
     session.today_text_for_pdf(None, Some(lang))
+}
+
+/// The system's locale (`fr_FR`, `en-US`) for hosts whose environment doesn't carry one
+/// (Android): the Auto interface language and the default unit follow it. Call it before the app
+/// is created; later calls change nothing.
+pub fn set_system_locale(tag: &str) {
+    i18n::seed_system_locale(tag);
+    units::Unit::seed_system_locale(tag);
 }
 
 /// The longest author name kept (Preferences ▸ Identity, restored settings).
@@ -380,6 +392,13 @@ pub enum OsEvent {
 /// Returns the [`OsEvent`]s that arrived since it was last called (set by the desktop app).
 pub type OsEventsFn = Box<dyn FnMut() -> Vec<OsEvent>>;
 
+/// Reads the text on the system clipboard, where egui can't (Android).
+pub type ClipboardTextFn = Box<dyn Fn() -> Option<String>>;
+
+/// Hands a print-ready PDF `(file name, bytes)` to an app that prints it, where there is no print
+/// spooler (Android: the user picks the app). `Err` says why it couldn't.
+pub type HostPrintFn = Box<dyn Fn(&str, Vec<u8>) -> Result<(), String>>;
+
 /// Hands a saved PDF to the page embedding PdfCraft (web): `(name, bytes, save_as)`. `save_as`
 /// is `true` for Save As. Set by the web app when a host page (such as a Nextcloud app) asked
 /// for saves; without it the browser downloads the file.
@@ -564,6 +583,15 @@ pub struct PdfCraftApp {
     /// Pick these files instead of showing a picker (tests and automation).
     #[cfg(not(target_arch = "wasm32"))]
     pub pick_override: Option<Vec<String>>,
+    /// The in-app file browser while it shows (Android's pickers; see `file_browser`).
+    #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+    pub(crate) file_browser: Option<file_browser::Browser>,
+    /// Where the in-app browser was last used: the next pick starts there.
+    #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+    pub(crate) file_browser_dir: Option<std::path::PathBuf>,
+    /// Starting points and storage access for the in-app browser (the Android app sets them).
+    #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+    pub file_browser_host: file_browser::Host,
     /// Write exported files (split) here instead of asking (tests and automation).
     pub export_dir_override: Option<String>,
     /// Split dialog settings.
@@ -649,6 +677,11 @@ pub struct PdfCraftApp {
     /// system clipboard as a file when `system_clipboard` is on.
     pub last_copied_file: Option<(String, Vec<u8>)>,
     pub system_clipboard: bool,
+    /// Reads the system clipboard's text where egui can't (Android sets it; Create ▸ Clipboard).
+    pub clipboard_text: Option<ClipboardTextFn>,
+    /// Prints through other apps where there is no spooler (Android sets it): the Print dialog
+    /// lists "Another app" first and hands it the print-ready PDF.
+    pub host_print: Option<HostPrintFn>,
     /// Attach file: the file to attach instead of asking (tests, automation).
     pub attach_override: Option<(String, Vec<u8>)>,
     /// Duplicate Field: which field and onto which pages.
@@ -867,6 +900,12 @@ impl PdfCraftApp {
             pickers: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
             pick_override: None,
+            #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+            file_browser: None,
+            #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+            file_browser_dir: None,
+            #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+            file_browser_host: file_browser::Host::default(),
             export_dir_override: None,
             split_draft: SplitDraft::default(),
             extract_draft: ExtractDraft::default(),
@@ -915,6 +954,8 @@ impl PdfCraftApp {
             last_copied_image: None,
             last_copied_file: None,
             system_clipboard: true,
+            clipboard_text: None,
+            host_print: None,
             attach_override: None,
             duplicate_draft: None,
             form_preview: false,
@@ -1231,7 +1272,7 @@ impl PdfCraftApp {
             }
             (Ok(bytes), false) => {
                 #[cfg(not(target_arch = "wasm32"))]
-                self.ask_one(pickers::Ask::Save(rfd::AsyncFileDialog::new().set_file_name(&att.name)), None, move |app, path| {
+                self.ask_one(pickers::Ask::Save(crate::file_dialog::AsyncFileDialog::new().set_file_name(&att.name)), None, move |app, path| {
                     match crate::editing::write_atomically(&path.to_string_lossy(), &bytes) {
                         Ok(()) => app.notify_fmt("Saved {name}", &[("name", &path.display().to_string())]),
                         Err(e) => app.notify_fmt("Couldn't save: {e}", &[("e", &e.to_string())]),
@@ -1403,8 +1444,10 @@ impl PdfCraftApp {
 
     /// The File ▸ Open picker: PDFs, and images and text that become PDFs.
     #[cfg(not(target_arch = "wasm32"))]
-    fn open_picker() -> rfd::AsyncFileDialog {
-        rfd::AsyncFileDialog::new().add_filter("PDF", &["pdf"]).add_filter(tl!("Images and text (converted to PDF)"), &create_ui::CONVERTIBLE)
+    fn open_picker() -> crate::file_dialog::AsyncFileDialog {
+        crate::file_dialog::AsyncFileDialog::new()
+            .add_filter("PDF", &["pdf"])
+            .add_filter(tl!("Images and text (converted to PDF)"), &create_ui::CONVERTIBLE)
     }
 
     pub fn open_dialog(&mut self) {
@@ -1412,7 +1455,9 @@ impl PdfCraftApp {
         #[cfg(not(target_arch = "wasm32"))]
         self.pick(
             pickers::PickFor::Open,
-            rfd::AsyncFileDialog::new().add_filter("PDF", &["pdf"]).add_filter(tl!("Images and text (converted to PDF)"), &create_ui::CONVERTIBLE),
+            crate::file_dialog::AsyncFileDialog::new()
+                .add_filter("PDF", &["pdf"])
+                .add_filter(tl!("Images and text (converted to PDF)"), &create_ui::CONVERTIBLE),
             true,
         );
         // Browsers pick files asynchronously; the bytes arrive through `inbox`.
@@ -1421,7 +1466,7 @@ impl PdfCraftApp {
             let inbox = self.inbox.clone();
             let ctx = self.ctx.clone();
             wasm_bindgen_futures::spawn_local(async move {
-                if let Some(h) = rfd::AsyncFileDialog::new()
+                if let Some(h) = crate::file_dialog::AsyncFileDialog::new()
                     .add_filter("PDF", &["pdf"])
                     .add_filter(tl!("Images and text"), &create_ui::CONVERTIBLE)
                     .pick_file()
@@ -1475,6 +1520,15 @@ impl PdfCraftApp {
             || self.unlock_prompt.is_some()
             || self.pending_link.is_some()
             || self.updates.open
+            || self.file_browser_open()
+    }
+
+    /// The in-app file browser shows (it is a modal over everything else).
+    fn file_browser_open(&self) -> bool {
+        #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+        return self.file_browser.is_some();
+        #[cfg(not(all(not(target_arch = "wasm32"), any(test, target_os = "android"))))]
+        false
     }
 
     /// Enable the UI control channel on `ctx` (opt-in; see [`control`]). Returns a client that

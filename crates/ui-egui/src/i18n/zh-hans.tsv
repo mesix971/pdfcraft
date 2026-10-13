@@ -2302,3 +2302,22 @@ animation effects	Off	关
 	The linked PDF opened, but its named destination was not applied.	已打开链接的 PDF，但未应用其命名目标。
 	The linked PDF opened, but its page destination was out of range.	已打开链接的 PDF，但其页面目标超出范围。
 	Local cross-PDF links require the desktop app	PDF 之间的本地链接需要桌面应用
+
+# In-app file browser (Android's file pickers)
+	Internal storage	内部存储
+	Documents	文档
+	PdfCraft files	PdfCraft 文件
+	SD card {name}	SD 卡 {name}
+	Couldn't create the folder {name}: {e}	无法创建文件夹 {name}：{e}
+	Choose this folder	选择此文件夹
+	{name} already exists. Replace it?	{name} 已存在。要替换吗？
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	要在此设备上的任意位置打开和保存文件，请允许 PdfCraft 管理所有文件。
+	Allow access	允许访问
+	All files	所有文件
+	This folder is empty	此文件夹为空
+	New folder	新建文件夹
+
+# Printing through another app (Android)
+	Another app	其他应用
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	可打印的 PDF 会在您选择的应用中打开，并按该应用自己的份数、双面和颜色设置打印。
+	Couldn't hand {name} to another app: {e}	无法将 {name} 交给其他应用：{e}

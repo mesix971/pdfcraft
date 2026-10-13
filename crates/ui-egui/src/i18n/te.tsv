@@ -2251,3 +2251,22 @@ animation effects	Off	ఆఫ్
 	Local cross-PDF links require the desktop app	PDFల మధ్య స్థానిక లింక్‌లకు డెస్క్‌టాప్ యాప్ అవసరం
 	The existing action will be preserved.	ఉన్న చర్య అలాగే ఉంచబడుతుంది.
 	This form's scripts are turned off because one ran too long. Reopen the document to run them again.	ఒక స్క్రిప్ట్ చాలా సేపు నడిచినందున ఈ ఫారమ్ స్క్రిప్ట్‌లు ఆపివేయబడ్డాయి. వాటిని మళ్లీ నడపడానికి పత్రాన్ని మళ్లీ తెరవండి.
+
+# In-app file browser (Android's file pickers)
+	Internal storage	అంతర్గత నిల్వ
+	Documents	పత్రాలు
+	PdfCraft files	PdfCraft ఫైళ్లు
+	SD card {name}	SD కార్డ్ {name}
+	Couldn't create the folder {name}: {e}	{name} ఫోల్డర్‌ను సృష్టించలేకపోయాం: {e}
+	Choose this folder	ఈ ఫోల్డర్‌ను ఎంచుకోండి
+	{name} already exists. Replace it?	{name} ఇప్పటికే ఉంది. దాన్ని భర్తీ చేయాలా?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	ఈ పరికరంలో ఎక్కడైనా ఫైళ్లను తెరవడానికి మరియు సేవ్ చేయడానికి, అన్ని ఫైళ్లను నిర్వహించడానికి PdfCraftను అనుమతించండి.
+	Allow access	యాక్సెస్‌ను అనుమతించండి
+	All files	అన్ని ఫైళ్లు
+	This folder is empty	ఈ ఫోల్డర్ ఖాళీగా ఉంది
+	New folder	కొత్త ఫోల్డర్
+
+# Printing through another app (Android)
+	Another app	మరొక యాప్
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	ముద్రణకు సిద్ధమైన PDF మీరు ఎంచుకున్న యాప్‌లో తెరుచుకుంటుంది, అది తన సొంత కాపీలు, రెండు వైపులా మరియు రంగు సెట్టింగ్‌లతో దాన్ని ముద్రిస్తుంది.
+	Couldn't hand {name} to another app: {e}	{name}ను మరొక యాప్‌కు అందించలేకపోయాం: {e}

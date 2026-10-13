@@ -334,8 +334,18 @@ pub fn system_lang() -> Lang {
     if cfg!(test) {
         return Lang::EN;
     }
-    static SYSTEM: OnceLock<Lang> = OnceLock::new();
-    *SYSTEM.get_or_init(detect_system_lang)
+    *SYSTEM_LANG.get_or_init(detect_system_lang)
+}
+
+/// The system language, found once (see [`system_lang`], [`seed_system_locale`]).
+static SYSTEM_LANG: OnceLock<Lang> = OnceLock::new();
+
+/// Tell Auto the system's locale (`fr_FR`, `pt-BR`) where the environment doesn't carry one
+/// (Android). Only counts before the first lookup; a locale without a catalog means English.
+/// Returns whether it was taken.
+pub fn seed_system_locale(tag: &str) -> bool {
+    let lang = lang_from_tag(tag.trim()).unwrap_or(Lang::EN);
+    SYSTEM_LANG.set(lang).is_ok()
 }
 
 #[cfg(not(target_arch = "wasm32"))]

@@ -1,6 +1,6 @@
 # PdfCraft architecture
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** minor (shared print spooler; Windows CI passes) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-12 · **Change:** minor (Android app, preview) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
 
 How PdfCraft is built today. The design rationale and the planned crates live in
 `plan/architecture.md` and `plan/adr/` (local-only); this file describes what is on `main`. Each
@@ -9,7 +9,7 @@ crate's `README.md` has the detail.
 ## Shape
 
 One Cargo workspace (`Cargo.toml`, edition 2024, Rust ≥ 1.95, `MIT OR Apache-2.0`), 31 library
-crates in `crates/`, three binaries in `apps/`, build tooling in `xtask/`, and patched third-party
+crates in `crates/`, three binaries and the Android app in `apps/`, build tooling in `xtask/`, and patched third-party
 crates in `vendor/`. About 152k lines of Rust and 1,765 tests (2026-10-10). Rust only: no
 handwritten JS/TS, in the product or the build.
 
@@ -18,6 +18,7 @@ handwritten JS/TS, in the product or the build.
 | `apps/pdfcraft` | The desktop app (macOS, Windows, Linux, FreeBSD): eframe/egui on wgpu, single instance, Apple events, update check on request |
 | `apps/pdfcraft-cli` | `inspect`, `edit`, `combine`, `extract`, `split`, `run` (any automation tool or a JSON script), `tools`, `ui` (drive the running app), and the opt-in `mcp` server |
 | `apps/pdfcraft-web` | The same egui shell compiled to WebAssembly |
+| `apps/pdfcraft-android` | The same egui shell as an Android library in a `NativeActivity` (preview; `cargo xtask android` packages the APK): start-up intents, storage access, clipboard and soft keyboard through JNI, and the in-app file browser (`ui-egui/src/file_browser.rs`) for every picker |
 
 ## Layers
 
@@ -109,4 +110,5 @@ built by `.github/workflows/release.yml` ([releasing.md](releasing.md)).
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-12 | minor | Android app (`apps/pdfcraft-android`, `xtask android`) and the in-app file browser |
 | 2026-10-10 | major | Created from the code on main (crate list, `xtask/src/layers.rs`, crate READMEs, `vendor/README.md`) |

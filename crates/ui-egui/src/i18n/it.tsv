@@ -2347,3 +2347,22 @@ animation effects	Off	Disattivati
 	The linked PDF opened, but its named destination was not applied.	Il PDF collegato è stato aperto, ma la sua destinazione con nome non è stata applicata.
 	The linked PDF opened, but its page destination was out of range.	Il PDF collegato è stato aperto, ma la pagina di destinazione è fuori intervallo.
 	Local cross-PDF links require the desktop app	I collegamenti locali tra PDF richiedono l'app desktop
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Memoria interna
+	Documents	Documenti
+	PdfCraft files	File di PdfCraft
+	SD card {name}	Scheda SD {name}
+	Couldn't create the folder {name}: {e}	Impossibile creare la cartella {name}: {e}
+	Choose this folder	Scegli questa cartella
+	{name} already exists. Replace it?	{name} esiste già. Sostituirlo?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Per aprire e salvare file ovunque su questo dispositivo, consenti a PdfCraft di gestire tutti i file.
+	Allow access	Consenti l'accesso
+	All files	Tutti i file
+	This folder is empty	Questa cartella è vuota
+	New folder	Nuova cartella
+
+# Printing through another app (Android)
+	Another app	Un'altra app
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Il PDF pronto per la stampa si apre nell'app che scegli, che lo stampa con le proprie impostazioni di copie, fronte-retro e colore.
+	Couldn't hand {name} to another app: {e}	Impossibile passare {name} a un'altra app: {e}

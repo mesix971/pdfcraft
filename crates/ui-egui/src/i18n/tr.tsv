@@ -2334,3 +2334,22 @@ animation effects	Off	Kapalı
 	The linked PDF opened, but its named destination was not applied.	Bağlantılı PDF açıldı, ancak adlandırılmış hedefi uygulanmadı.
 	The linked PDF opened, but its page destination was out of range.	Bağlantılı PDF açıldı, ancak sayfa hedefi aralık dışında.
 	Local cross-PDF links require the desktop app	PDF'ler arası yerel bağlantılar masaüstü uygulamasını gerektirir
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Dahili depolama
+	Documents	Belgeler
+	PdfCraft files	PdfCraft dosyaları
+	SD card {name}	SD kart {name}
+	Couldn't create the folder {name}: {e}	{name} klasörü oluşturulamadı: {e}
+	Choose this folder	Bu klasörü seç
+	{name} already exists. Replace it?	{name} zaten var. Değiştirilsin mi?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Bu cihazın herhangi bir yerinde dosya açıp kaydetmek için PdfCraft'ın tüm dosyaları yönetmesine izin verin.
+	Allow access	Erişime izin ver
+	All files	Tüm dosyalar
+	This folder is empty	Bu klasör boş
+	New folder	Yeni klasör
+
+# Printing through another app (Android)
+	Another app	Başka bir uygulama
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Yazdırmaya hazır PDF seçtiğiniz uygulamada açılır ve o uygulama kendi kopya, çift taraflı ve renk ayarlarıyla yazdırır.
+	Couldn't hand {name} to another app: {e}	{name} başka bir uygulamaya aktarılamadı: {e}

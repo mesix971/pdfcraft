@@ -2412,3 +2412,22 @@ animation effects	Off	Vypnuto
 	The linked PDF opened, but its named destination was not applied.	Odkazovaný PDF se otevřel, ale jeho pojmenovaný cíl nebyl použit.
 	The linked PDF opened, but its page destination was out of range.	Odkazovaný PDF se otevřel, ale cílová stránka je mimo rozsah.
 	Local cross-PDF links require the desktop app	Místní odkazy mezi soubory PDF vyžadují desktopovou aplikaci
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Interní úložiště
+	Documents	Dokumenty
+	PdfCraft files	Soubory PdfCraft
+	SD card {name}	Karta SD {name}
+	Couldn't create the folder {name}: {e}	Složku {name} se nepodařilo vytvořit: {e}
+	Choose this folder	Vybrat tuto složku
+	{name} already exists. Replace it?	{name} již existuje. Nahradit?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Chcete-li otevírat a ukládat soubory kdekoli v tomto zařízení, povolte aplikaci PdfCraft spravovat všechny soubory.
+	Allow access	Povolit přístup
+	All files	Všechny soubory
+	This folder is empty	Tato složka je prázdná
+	New folder	Nová složka
+
+# Printing through another app (Android)
+	Another app	Jiná aplikace
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	PDF připravené k tisku se otevře ve vybrané aplikaci, která ho vytiskne s vlastním nastavením kopií, oboustranného tisku a barev.
+	Couldn't hand {name} to another app: {e}	{name} se nepodařilo předat jiné aplikaci: {e}

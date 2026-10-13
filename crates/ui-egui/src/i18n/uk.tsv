@@ -2360,3 +2360,22 @@ animation effects	Off	Вимкнено
 	The linked PDF opened, but its named destination was not applied.	Пов’язаний PDF відкрито, але його іменоване призначення не застосовано.
 	The linked PDF opened, but its page destination was out of range.	Пов’язаний PDF відкрито, але сторінка призначення поза межами діапазону.
 	Local cross-PDF links require the desktop app	Локальні посилання між PDF працюють лише в настільному застосунку
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Внутрішня пам'ять
+	Documents	Документи
+	PdfCraft files	Файли PdfCraft
+	SD card {name}	SD-картка {name}
+	Couldn't create the folder {name}: {e}	Не вдалося створити папку {name}: {e}
+	Choose this folder	Вибрати цю папку
+	{name} already exists. Replace it?	{name} уже існує. Замінити?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Щоб відкривати й зберігати файли будь-де на цьому пристрої, дозвольте PdfCraft керувати всіма файлами.
+	Allow access	Дозволити доступ
+	All files	Усі файли
+	This folder is empty	Ця папка порожня
+	New folder	Нова папка
+
+# Printing through another app (Android)
+	Another app	Інший застосунок
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Готовий до друку PDF відкриється у вибраному вами застосунку, який надрукує його зі своїми налаштуваннями копій, двобічного друку й кольору.
+	Couldn't hand {name} to another app: {e}	Не вдалося передати {name} іншому застосунку: {e}

@@ -2348,3 +2348,22 @@ animation effects	Off	Ανενεργά
 	Local cross-PDF links require the desktop app	Οι τοπικοί σύνδεσμοι μεταξύ PDF απαιτούν την εφαρμογή υπολογιστή
 	The existing action will be preserved.	Η υπάρχουσα ενέργεια θα διατηρηθεί.
 	This form's scripts are turned off because one ran too long. Reopen the document to run them again.	Τα σενάρια αυτής της φόρμας είναι απενεργοποιημένα, επειδή ένα από αυτά εκτελούνταν για πολύ ώρα. Ανοίξτε ξανά το έγγραφο για να εκτελεστούν ξανά.
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Εσωτερικός χώρος αποθήκευσης
+	Documents	Έγγραφα
+	PdfCraft files	Αρχεία PdfCraft
+	SD card {name}	Κάρτα SD {name}
+	Couldn't create the folder {name}: {e}	Δεν ήταν δυνατή η δημιουργία του φακέλου {name}: {e}
+	Choose this folder	Επιλογή αυτού του φακέλου
+	{name} already exists. Replace it?	Το {name} υπάρχει ήδη. Να αντικατασταθεί;
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Για να ανοίγετε και να αποθηκεύετε αρχεία οπουδήποτε σε αυτήν τη συσκευή, επιτρέψτε στο PdfCraft να διαχειρίζεται όλα τα αρχεία.
+	Allow access	Να επιτρέπεται η πρόσβαση
+	All files	Όλα τα αρχεία
+	This folder is empty	Αυτός ο φάκελος είναι κενός
+	New folder	Νέος φάκελος
+
+# Printing through another app (Android)
+	Another app	Άλλη εφαρμογή
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Το έτοιμο για εκτύπωση PDF ανοίγει στην εφαρμογή που θα επιλέξετε, η οποία το εκτυπώνει με τις δικές της ρυθμίσεις αντιγράφων, διπλής όψης και χρώματος.
+	Couldn't hand {name} to another app: {e}	Δεν ήταν δυνατή η μεταβίβαση του {name} σε άλλη εφαρμογή: {e}

@@ -222,7 +222,23 @@ fn listed_printers() -> Vec<spool::Printer> {
 
 /// A printer's name as the dialog shows it.
 fn printer_label(name: &str) -> String {
-    if name == crate::web_print::BROWSER_PRINTER { crate::web_print::browser_printer_label().to_string() } else { name.to_string() }
+    if name == crate::web_print::BROWSER_PRINTER {
+        crate::web_print::browser_printer_label().to_string()
+    } else if name == HOST_PRINTER {
+        tl!("Another app").to_string()
+    } else {
+        name.to_string()
+    }
+}
+
+/// The printer listed when the host prints through other apps ([`PdfCraftApp::host_print`]). An
+/// id, never shown; the dialog shows "Another app".
+pub(crate) const HOST_PRINTER: &str = "\u{1}host";
+
+/// Whether `printer` prints somewhere that chooses copies, two-sided printing and colour itself:
+/// the browser's print dialog, or the app the host hands the PDF to.
+fn prints_elsewhere(printer: Option<&str>) -> bool {
+    printer.is_some_and(|p| p == crate::web_print::BROWSER_PRINTER || p == HOST_PRINTER)
 }
 
 /// The printer the dialog preselects: the system default, else the first.
@@ -241,6 +257,14 @@ impl PdfCraftApp {
                 (self.print_draft.printers.clone(), true)
             }
             _ => (listed_printers(), false),
+        };
+        // The host's other apps come first, as the default: on Android they are how to print.
+        let printers = if self.host_print.is_some() {
+            let mut all = vec![spool::Printer { name: HOST_PRINTER.to_string(), default: true, two_sided: None }];
+            all.extend(printers.into_iter().filter(|p| p.name != HOST_PRINTER).map(|p| spool::Printer { default: false, ..p }));
+            all
+        } else {
+            printers
         };
         let default = default_printer(&printers);
         let current = self.views[i].current;
@@ -373,8 +397,24 @@ impl PdfCraftApp {
                     }
                 }
             }
+            Some(printer) if printer == HOST_PRINTER => self.print_with_host(&name, bytes),
             Some(printer) => self.send_to_printer(printer, bytes, self.print_draft.job(&name)),
             None => self.save_print_pdf(&name, bytes),
+        }
+    }
+
+    /// Hand the print-ready PDF to the host, which opens it in an app that prints
+    /// ([`PdfCraftApp::host_print`]).
+    fn print_with_host(&mut self, name: &str, bytes: Vec<u8>) -> bool {
+        let Some(print) = &self.host_print else { return false };
+        let stem = name.trim_end_matches(".pdf").trim_end_matches(".PDF");
+        let file = format!("{stem} (print).pdf");
+        match print(&file, bytes) {
+            Ok(()) => true,
+            Err(e) => {
+                self.notify_fmt("Couldn't hand {name} to another app: {e}", &[("name", &file), ("e", &e)]);
+                false
+            }
         }
     }
 
@@ -493,7 +533,7 @@ impl PdfCraftApp {
             Some(p) => write(self, p.into()),
             None => {
                 let stem = name.trim_end_matches(".pdf").trim_end_matches(".PDF");
-                let dialog = rfd::AsyncFileDialog::new().add_filter("PDF", &["pdf"]).set_file_name(format!("{stem} (print).pdf"));
+                let dialog = crate::file_dialog::AsyncFileDialog::new().add_filter("PDF", &["pdf"]).set_file_name(format!("{stem} (print).pdf"));
                 self.ask_one(crate::pickers::Ask::Save(dialog), None, move |app, path| {
                     write(app, path);
                 })
@@ -661,8 +701,9 @@ pub(crate) fn body(
             egui::Grid::new("print-top").num_columns(2).spacing([10.0, 8.0]).show(ui, |ui| {
                 ui.label(tl!("Printer:"));
                 let before = d.printer.clone();
-                // The browser's print dialog sets copies, two-sided printing and colour itself.
-                let browser = d.printer.as_deref() == Some(crate::web_print::BROWSER_PRINTER);
+                // The browser's print dialog (or the app the host hands the PDF to) sets copies,
+                // two-sided printing and colour itself.
+                let browser = prints_elsewhere(d.printer.as_deref());
                 ui.horizontal(|ui| {
                     let shown = d.printer.as_deref().map_or_else(|| tl!("Save as PDF").to_string(), printer_label);
                     egui::ComboBox::from_id_salt("printer").selected_text(shown).width(260.0).show_ui(ui, |ui| {
@@ -671,7 +712,7 @@ pub(crate) fn body(
                         }
                         for p in &d.printers {
                             let name = printer_label(&p.name);
-                            let label = if p.default && p.name != crate::web_print::BROWSER_PRINTER {
+                            let label = if p.default && !prints_elsewhere(Some(&p.name)) {
                                 crate::i18n::fmt(tl!("{name} (default)"), &[("name", &name)])
                             } else {
                                 name
@@ -748,6 +789,16 @@ pub(crate) fn body(
             }
             if d.printer.as_deref() == Some(crate::web_print::BROWSER_PRINTER) {
                 ui.label(egui::RichText::new(tl!("Copies, two-sided printing and colour are chosen in the browser's print dialog.")).small().color(t.text_muted));
+            }
+            if d.printer.as_deref() == Some(HOST_PRINTER) {
+                ui.add(
+                    egui::Label::new(
+                        egui::RichText::new(tl!("The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings."))
+                            .small()
+                            .color(t.text_muted),
+                    )
+                    .wrap(),
+                );
             }
             if let Some(e) = &d.driver_error {
                 ui.label(egui::RichText::new(crate::i18n::fmt(tl!("Couldn't open the printer's preferences: {e}"), &[("e", e)])).small().color(t.text_muted));

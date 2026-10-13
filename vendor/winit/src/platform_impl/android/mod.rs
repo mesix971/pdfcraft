@@ -157,6 +157,16 @@ impl Default for PlatformSpecificEventLoopAttributes {
     }
 }
 
+// PdfCraft patch: Android runs `android_main` again, on a new thread with a new `AndroidApp`,
+// for every new Activity instance in a process (after the previous one finished, or beside it).
+// Each instance needs its own event loop, so dropping one allows the next to be created; without
+// this, relaunching an app whose process Android kept alive failed with `RecreationAttempt`.
+impl<T: 'static> Drop for EventLoop<T> {
+    fn drop(&mut self) {
+        crate::event_loop::EventLoopBuilder::<()>::allow_event_loop_recreation();
+    }
+}
+
 impl<T: 'static> EventLoop<T> {
     pub(crate) fn new(
         attributes: &PlatformSpecificEventLoopAttributes,

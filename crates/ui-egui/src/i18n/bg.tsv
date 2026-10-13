@@ -2301,3 +2301,22 @@ animation effects	Off	Изключени
 	The linked PDF opened, but its named destination was not applied.	Свързаният PDF се отвори, но именуваната му цел не беше приложена.
 	The linked PDF opened, but its page destination was out of range.	Свързаният PDF се отвори, но целевата му страница е извън обхвата.
 	Local cross-PDF links require the desktop app	Локалните връзки между PDF файлове изискват настолното приложение
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Вътрешна памет
+	Documents	Документи
+	PdfCraft files	Файлове на PdfCraft
+	SD card {name}	SD карта {name}
+	Couldn't create the folder {name}: {e}	Папката {name} не може да бъде създадена: {e}
+	Choose this folder	Избиране на тази папка
+	{name} already exists. Replace it?	{name} вече съществува. Да бъде ли заменен?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	За да отваряте и записвате файлове навсякъде на това устройство, разрешете на PdfCraft да управлява всички файлове.
+	Allow access	Разрешаване на достъпа
+	All files	Всички файлове
+	This folder is empty	Тази папка е празна
+	New folder	Нова папка
+
+# Printing through another app (Android)
+	Another app	Друго приложение
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Готовият за печат PDF се отваря в избраното от вас приложение, което го отпечатва със своите настройки за копия, двустранен печат и цвят.
+	Couldn't hand {name} to another app: {e}	{name} не може да бъде предаден на друго приложение: {e}
