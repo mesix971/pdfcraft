@@ -43,6 +43,9 @@ rfd = { workspace = true }
 getrandom = "0.4"
 # Checks that an installed fallback font parses and has the glyphs; the same skrifa egui uses.
 skrifa = "0.44"
+# The optional AI assistant (the user's own Anthropic API key; off until one is set). The web
+# build has no HTTPS client of its own.
+pdfcraft-ai.workspace = true
 
 [target.'cfg(not(any(target_arch = "wasm32", target_os = "android")))'.dependencies]
 # Create ▸ Clipboard (images; already in the tree through egui-winit). arboard has no Android backend.

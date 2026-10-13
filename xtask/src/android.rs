@@ -370,13 +370,17 @@ mod tests {
     }
 
     #[test]
-    fn the_manifest_names_the_library_and_has_no_internet_permission() {
+    fn the_manifest_names_the_library_and_says_why_it_uses_the_network() {
         let manifest = std::fs::read_to_string(root().join("packaging/android/AndroidManifest.xml")).unwrap();
         let lib = LIB.trim_start_matches("lib").trim_end_matches(".so");
         assert!(manifest.contains(&format!("android:value=\"{lib}\"")), "android.app.lib_name must load {LIB}");
         assert!(manifest.contains("android:hasCode=\"false\""));
         assert!(manifest.contains("android.app.NativeActivity"));
-        assert!(!manifest.contains("android.permission.INTERNET"), "PdfCraft sends nothing");
+        // The network is the AI assistant's alone (crates/ai), with the user's own key: the
+        // permission says why, and the crate is the only one in the app that opens a connection.
+        assert!(manifest.contains("The AI assistant only"), "INTERNET is for the user's own AI assistant, nothing else");
+        let ai_only = std::fs::read_to_string(root().join("crates/ai/README.md")).unwrap();
+        assert!(ai_only.contains("Off until asked"), "the assistant sends nothing until the user asks");
         // A document opened while PdfCraft runs reaches it through a second Activity (shell.rs).
         assert!(manifest.contains("android:launchMode=\"standard\""), "singleTask would drop documents opened while PdfCraft runs");
         assert!(manifest.contains("android.permission.REORDER_TASKS"));

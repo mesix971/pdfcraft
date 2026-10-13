@@ -3618,6 +3618,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "pdfcraft-ai"
+version = "0.7.1"
+dependencies = [
+ "base64 0.22.1",
+ "rustls-native-certs",
+ "rustls-pki-types",
+ "serde_json",
+ "thiserror 2.0.21",
+ "ureq",
+]
+
+[[package]]
 name = "pdfcraft-android"
 version = "0.7.1"
 dependencies = [
@@ -4006,6 +4018,7 @@ dependencies = [
  "objc2 0.6.4",
  "objc2-app-kit 0.3.2",
  "objc2-foundation 0.3.2",
+ "pdfcraft-ai",
  "pdfcraft-cos",
  "pdfcraft-engine",
  "pdfcraft-fonts",

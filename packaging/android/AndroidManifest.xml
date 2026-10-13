@@ -16,7 +16,10 @@
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <!-- Bring PdfCraft forward when another app opens a document in it while it runs. -->
     <uses-permission android:name="android.permission.REORDER_TASKS" />
-    <!-- No INTERNET permission: PdfCraft works offline and sends nothing. -->
+    <!-- The AI assistant only (crates/ai): with the user's own Anthropic API key, and only when
+         the user asks a question. Without a key PdfCraft sends nothing; everything else works
+         offline. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- wgpu draws with Vulkan, or OpenGL ES 3 where Vulkan is missing. -->
     <uses-feature android:glEsVersion="0x00030000" android:required="true" />
