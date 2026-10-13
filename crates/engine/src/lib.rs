@@ -3176,21 +3176,29 @@ impl Session {
             check_permission(&edit, &p)?;
         }
         // Rewriting an OCR word (invisible text over a scan) also hides the scanned word: cover it
-        // in the paper's colour and draw the new text in the ink's.
-        let edit = match edit {
+        // in the paper's colour and draw the new text in the ink's. Also inside a batch (the AI
+        // assistant's changes are one), where each paragraph is sampled before the batch runs.
+        let cover = |page: usize, block: usize, style: &mut pdfcraft_edit::BlockStyle| {
+            // Only invisible text is sampled; the blocks are usually cached from opening it.
+            if style.cover.is_none()
+                && let Some(info) = doc.info.pages.get(page)
+                && let Some(b) = editor.text_blocks(page).ok().and_then(|b| b.get(block).filter(|b| b.invisible).cloned())
+                && let Some((paper, ink)) = guard(|| scan_colours::sample(&editor.cos, info, page, &b)).ok().flatten()
+            {
+                style.cover = Some(paper);
+                style.color = style.color.or(Some(ink));
+            }
+        };
+        let covered = |edit: Edit| match edit {
             Edit::EditTextBlock { page, block, text, mut style } => {
-                // Only invisible text is sampled; the blocks are usually cached from opening it.
-                if style.cover.is_none()
-                    && let Some(info) = doc.info.pages.get(page)
-                    && let Some(b) = editor.text_blocks(page).ok().and_then(|b| b.get(block).filter(|b| b.invisible).cloned())
-                    && let Some((paper, ink)) = guard(|| scan_colours::sample(&editor.cos, info, page, &b)).ok().flatten()
-                {
-                    style.cover = Some(paper);
-                    style.color = style.color.or(Some(ink));
-                }
+                cover(page, block, &mut style);
                 Edit::EditTextBlock { page, block, text, style }
             }
             other => other,
+        };
+        let edit = match edit {
+            Edit::Batch { label, edits } => Edit::Batch { label, edits: edits.into_iter().map(covered).collect() },
+            other => covered(other),
         };
         // Nothing to bake: leave undo history and the dirty flag alone.
         if matches!(&edit, Edit::FlattenFillSign) && !pdfcraft_annot::has_visible_fill_sign(&editor.cos) {
