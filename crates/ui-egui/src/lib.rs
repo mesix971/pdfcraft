@@ -24,6 +24,8 @@ macro_rules! tl_ctx {
 
 mod a11y_ui;
 mod actions_ui;
+#[cfg(not(target_arch = "wasm32"))]
+mod ai_ui;
 mod appearance;
 pub mod canvas;
 mod chrome;
@@ -93,6 +95,8 @@ mod page_selection_ui;
 mod pageboxes;
 mod palette;
 mod panels;
+pub mod phone;
+pub mod phone_home;
 #[cfg(not(target_arch = "wasm32"))]
 mod pickers;
 pub mod prepare;
@@ -137,6 +141,7 @@ pub mod scroll_speed;
 mod system_fonts;
 mod tab_context;
 pub mod theme;
+pub mod touch;
 pub mod ui_scale;
 pub mod updates;
 mod wheel_pager;
@@ -482,6 +487,15 @@ pub struct PdfCraftApp {
     /// The user closed the Comments panel, so picking a comment tool leaves it closed until they
     /// open it again (#225). Remembered across restarts.
     pub comments_panel_closed: bool,
+    /// The profile photo Home shows: a small square PNG (signature_image::profile_picture).
+    pub profile_photo: Option<std::sync::Arc<Vec<u8>>>,
+    /// The files starred on Home, newest first.
+    pub starred: Vec<String>,
+    /// Where Home looks for the device's PDFs; empty: the in-app browser's Download, Documents
+    /// and PdfCraft's own folder (Android).
+    pub device_folders: Vec<std::path::PathBuf>,
+    /// The tips Home no longer shows (dismissed).
+    pub home_tips_dismissed: Vec<String>,
     pub quick_tool: QuickTool,
     /// The tool to go back to when Space, held for a temporary Hand, is released.
     space_hand: Option<QuickTool>,
@@ -511,8 +525,21 @@ pub struct PdfCraftApp {
     /// The desktop's text scaling (GNOME's text scaling factor), which the desktop app reads at
     /// launch. 1.0 elsewhere, so tests and screenshots don't depend on the machine.
     pub system_text_scale: f32,
+    /// Which shell draws the window: the desktop one, the phone one (`phone.rs`), or the one
+    /// that suits the screen ([`Self::phone_screen`]).
+    pub shell: phone::ShellPref,
+    /// The screen is a phone's (the Android app sets it). With the layout on Auto it gets the
+    /// phone shell.
+    pub phone_screen: bool,
+    /// The phone shell's own state: its bars, sheets and tool mode.
+    pub(crate) phone: phone::PhoneState,
+    /// The AI assistant: the user's own API key, its settings and conversations.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub ai: ai_ui::AiState,
     /// The interface size last given to egui ([`ui_scale::sync`]).
     ui_scale_applied: Option<f32>,
+    /// A finger lifted last frame: its `PointerGone` is delivered this frame ([`touch`]).
+    pointer_gone_pending: bool,
     /// Preferences: bake Fill & Sign marks into the page when saving. Off, so a normal save stays editable.
     pub flatten_fill_sign_on_save: bool,
     /// Point size for new Fill & Sign text and dates, kept across launches.
@@ -843,6 +870,10 @@ impl PdfCraftApp {
             right: None,
             right_before_read: None,
             comments_panel_closed: false,
+            profile_photo: None,
+            starred: Vec::new(),
+            device_folders: Vec::new(),
+            home_tips_dismissed: Vec::new(),
             quick_tool: QuickTool::Select,
             space_hand: None,
             comment_prefs: Default::default(),
@@ -859,7 +890,13 @@ impl PdfCraftApp {
             language: i18n::AUTO.to_string(),
             ui_scale: None,
             system_text_scale: 1.0,
+            shell: phone::ShellPref::Auto,
+            phone_screen: false,
+            phone: phone::PhoneState::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            ai: ai_ui::AiState::default(),
             ui_scale_applied: None,
+            pointer_gone_pending: false,
             flatten_fill_sign_on_save: false,
             fill_text_size: fill_sign::TEXT_SIZE,
             dialog: None,
@@ -1009,7 +1046,14 @@ impl PdfCraftApp {
     /// Fields are being edited (Prepare a form is open or a field tool is picked), unless the
     /// form is being previewed.
     pub fn is_preparing(&self) -> bool {
-        ((self.left_open && self.left == LeftPanel::Tool("form")) || matches!(self.quick_tool, QuickTool::Field(_))) && !self.form_preview
+        (self.tool_panel_shows("form") || matches!(self.quick_tool, QuickTool::Field(_))) && !self.form_preview
+    }
+
+    /// Whether the tool panel is open on tool group `id`. The phone layout shows it in its tool
+    /// drawer, so a panel left open in the desktop layout changes nothing there.
+    pub(crate) fn tool_panel_shows(&self, id: &str) -> bool {
+        let open = if self.phone_layout() { self.phone_drawer() } else { self.left_open };
+        open && self.left_open && matches!(self.left, LeftPanel::Tool(t) if t == id)
     }
 
     /// Open a document the way it asks to be opened: navigation panel, layout, magnification,
@@ -1799,7 +1843,9 @@ impl PdfCraftApp {
     /// Serialize the user's persistent state (recent files, theme). Local only.
     pub fn persist(&self) -> String {
         let trusted: Vec<String> = self.session.trusted_certificates().iter().map(pdfcraft_engine::sign::x509::to_pem).collect();
-        serde_json::json!({
+        // The web build adds nothing to it.
+        #[cfg_attr(target_arch = "wasm32", allow(unused_mut))]
+        let mut settings = serde_json::json!({
             "docking": self.docking,
             "docking_left_open": self.left_open,
             "docking_right": self.right,
@@ -1821,6 +1867,7 @@ impl PdfCraftApp {
             "reading_colors": self.reading_colors,
             // Null follows the system's text scaling.
             "ui_scale": self.ui_scale,
+            "shell": self.shell,
             "flatten_fill_sign": self.flatten_fill_sign_on_save,
             "fill_text_size": self.fill_text_size,
             "date_format": self.session.date_format(),
@@ -1856,8 +1903,24 @@ impl PdfCraftApp {
             "combine_view": self.combine_view.as_str(),
             "combine_zoom": self.combine_zoom,
             "comments_panel_closed": self.comments_panel_closed,
-        })
-        .to_string()
+        });
+        // Home: starred files, dismissed tips, and the profile photo (a small PNG, as signature images are).
+        if let Some(map) = settings.as_object_mut() {
+            use base64::Engine as _;
+            map.insert("starred".into(), serde_json::json!(self.starred));
+            map.insert("home_tips_dismissed".into(), serde_json::json!(self.home_tips_dismissed));
+            let photo = self.profile_photo.as_ref().map(|png| base64::engine::general_purpose::STANDARD.encode(png.as_slice()));
+            map.insert("profile_photo".into(), serde_json::json!(photo));
+        }
+        // The AI assistant: the user's own key, kept with the other settings (app-private storage on
+        // Android, the user's settings file elsewhere).
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(map) = settings.as_object_mut() {
+            map.insert("ai_key".into(), self.ai.key.clone().into());
+            map.insert("ai_model".into(), self.ai.model.id().into());
+            map.insert("ai_max_pages".into(), self.ai.max_pages.into());
+        }
+        settings.to_string()
     }
 
     /// Restore state written by `persist`. Unknown or malformed data is ignored.
@@ -1914,8 +1977,47 @@ impl PdfCraftApp {
         if let Some(on) = v["highlight_fields"].as_bool() {
             self.view_defaults.highlight_fields = on;
         }
+        // Settings are untrusted: a key that isn't one line of plain characters is dropped, and the
+        // page limit is kept within what the API reads.
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if let Some(key) = v["ai_key"].as_str().map(str::trim).filter(|k| k.len() <= 512 && k.bytes().all(|b| b.is_ascii_graphic())) {
+                self.ai.key = key.to_owned();
+            }
+            if let Some(model) = v["ai_model"].as_str().and_then(pdfcraft_ai::Model::from_id) {
+                self.ai.model = model;
+            }
+            if let Some(pages) = v["ai_max_pages"].as_u64().and_then(|p| usize::try_from(p).ok()) {
+                self.ai.max_pages = pages.clamp(1, pdfcraft_ai::API_MAX_PAGES);
+            }
+        }
         if let Some(closed) = v["comments_panel_closed"].as_bool() {
             self.comments_panel_closed = closed;
+        }
+        // Settings are untrusted: lists are capped, and a photo is kept only if it reads as one.
+        if let Some(starred) = v["starred"].as_array() {
+            // Files only ("doc:" names a document without one, never kept), each once. A file
+            // not found now stays: shared storage reads as empty until access is allowed.
+            let mut seen = std::collections::HashSet::new();
+            self.starred = starred
+                .iter()
+                .filter_map(serde_json::Value::as_str)
+                .filter(|p| !p.is_empty() && p.len() <= 4096 && !p.starts_with("doc:") && seen.insert(*p))
+                .take(phone_home::MAX_STARRED)
+                .map(str::to_owned)
+                .collect();
+        }
+        if let Some(tips) = v["home_tips_dismissed"].as_array() {
+            self.home_tips_dismissed =
+                tips.iter().filter_map(serde_json::Value::as_str).filter(|t| t.len() <= 64).take(32).map(str::to_owned).collect();
+        }
+        if let Some(encoded) = v["profile_photo"].as_str() {
+            use base64::Engine as _;
+            self.profile_photo = base64::engine::general_purpose::STANDARD
+                .decode(encoded)
+                .ok()
+                .filter(|png| pdfcraft_engine::signature_image::profile_picture_pixels(png).is_some())
+                .map(std::sync::Arc::new);
         }
         if let Some(defaults) = v["default_zoom"].as_str().and_then(|zoom| self.view_defaults.with_zoom(zoom)) {
             self.view_defaults = defaults;
@@ -1936,6 +2038,8 @@ impl PdfCraftApp {
         }
         // Settings are untrusted: a size out of range follows the system instead.
         self.ui_scale = v["ui_scale"].as_f64().and_then(ui_scale::valid);
+        // An unknown layout keeps Auto.
+        self.shell = serde_json::from_value(v["shell"].clone()).unwrap_or_default();
         // Settings are untrusted: an unusable pattern keeps the default.
         if let Some(f) = v["date_format"].as_str() {
             let _ = self.session.set_date_format(f);
@@ -2071,7 +2175,14 @@ impl PdfCraftApp {
                 self.select_tool(g.id);
             }
             ("left", _) => self.left_open = value != "closed",
+            ("shell", _) => self.shell = phone::ShellPref::parse(value).ok_or("shell must be auto or phone")?,
             ("home", _) => self.active = None,
+            ("home_tab", _) => {
+                // A wrong value changes nothing, not even the document shown.
+                let tab = phone_home::HomeTab::parse(value).ok_or("home_tab must be home, files, create or tools")?;
+                self.active = None;
+                self.phone.home.tab = tab;
+            }
             ("dialog", _) => {
                 self.dialog = match value {
                     "properties" => Some(Dialog::Properties(PropsTab::Description)),
@@ -2428,6 +2539,13 @@ impl eframe::App for PdfCraftApp {
     /// would keep the place the pointer entered at: tell it where the pointer really is, so the
     /// page grid can show (and use) the gap under it.
     fn raw_input_hook(&mut self, ctx: &egui::Context, raw: &mut egui::RawInput) {
+        // A tap's position must outlive its release frame, or links and fields never see it.
+        touch::defer_pointer_gone(raw, &mut self.pointer_gone_pending);
+        if self.pointer_gone_pending {
+            // Deliver it next frame even when nothing else asks for one, or the finger's last
+            // place keeps showing as a hover.
+            ctx.request_repaint();
+        }
         // Before egui reads this frame's wheel input.
         self.scroll_speed.apply(ctx, raw);
         if raw.hovered_files.is_empty() && raw.dropped_files.is_empty() {
@@ -2467,7 +2585,9 @@ impl eframe::App for PdfCraftApp {
         }
         self.sync_theme(ctx);
         let native = ctx.native_pixels_per_point().unwrap_or(1.0);
-        ui_scale::sync(ctx, ui_scale::zoom(self.ui_scale, self.system_text_scale, native), &mut self.ui_scale_applied);
+        ui_scale::sync(ctx, ui_scale::zoom(self.ui_scale, self.auto_text_scale(), native), &mut self.ui_scale_applied);
+        // The phone layout shows dialogs as screens of their own.
+        widgets::set_phone_dialogs(ctx, self.phone_layout());
         // Remember user work even if its tab is subsequently closed or Home is selected.
         self.startup_superseded |= !self.views.is_empty() || self.combine_showing() || self.dialog.is_some() || self.password_prompt.is_some();
         // Also done in `raw_input_hook`, before input; here for hosts that don't call the hook.
@@ -2557,6 +2677,10 @@ impl eframe::App for PdfCraftApp {
         self.poll_print();
         // Shortcuts deferred last frame: the text field has taken that frame's typing since.
         let deferred = std::mem::take(&mut self.deferred_commands);
+        // The phone layout's Back first: it takes the Escape it uses.
+        if self.phone_layout() {
+            phone::back_key(self, ctx);
+        }
         self.shortcuts(ctx);
         // Scrolling and group-drag previews are transient: never resume after changing tabs,
         // opening a modal/palette, or returning to a window that lost focus.
@@ -2579,6 +2703,8 @@ impl eframe::App for PdfCraftApp {
         }
         self.poll_export();
         self.poll_ocr();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.poll_ai();
         self.poll_optimize();
         self.poll_action();
         self.process_file_requests();
@@ -2607,6 +2733,18 @@ impl eframe::App for PdfCraftApp {
         if title != self.window_title {
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
             self.window_title = title;
+        }
+        if self.phone_layout() {
+            // The phone shell: its own bars and sheets around the same page view. Its reader hides
+            // the bars at a tap, so it has no separate full screen.
+            phone::show(self, ui);
+            self.process_pending_edits();
+            palette::show(self, &ctx);
+            dialogs::show(self, &ctx);
+            self.show_progress(&ctx);
+            widgets::toast(self, &ctx);
+            self.finish_render_frame(&ctx);
+            return;
         }
         if self.full_screen && self.active.is_some() {
             // Full screen: the page, nothing else (Esc or ⌘L to leave).

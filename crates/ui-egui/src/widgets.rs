@@ -23,19 +23,153 @@ fn dialog_frame(ctx: &egui::Context) -> egui::Frame {
         .shadow(ctx.global_style().visuals.window_shadow)
 }
 
-/// A modal with the card fill, a 10-point corner and room around its contents.
-pub fn modal(ctx: &egui::Context, id: impl std::hash::Hash + std::fmt::Debug) -> egui::Modal {
-    egui::Modal::new(egui::Id::new(id)).frame(dialog_frame(ctx))
+/// Whether dialogs show as phone screens: the phone layout says so every frame
+/// ([`set_phone_dialogs`]).
+fn phone_dialogs_id() -> egui::Id {
+    egui::Id::new("pdfcraft-phone-dialogs")
 }
 
-/// Show [`modal`], outline its controls, and remember the card rect for layout checks.
+/// The widest a dialog may be: the phone screen's width in the phone layout, unlimited elsewhere.
+fn dialog_max_width_id() -> egui::Id {
+    egui::Id::new("pdfcraft-dialog-max-width")
+}
+
+/// Show every dialog as a phone screen (true in the phone layout): the whole screen, scrolling,
+/// no wider than the phone.
+pub fn set_phone_dialogs(ctx: &egui::Context, on: bool) {
+    ctx.data_mut(|d| d.insert_temp(phone_dialogs_id(), on));
+}
+
+/// Whether dialogs are phone screens (the phone layout).
+pub(crate) fn phone_dialogs(ctx: &egui::Context) -> bool {
+    ctx.data(|d| d.get_temp::<bool>(phone_dialogs_id())).unwrap_or(false)
+}
+
+/// In a dialog [`row`]: on a phone, go on to the next line (before a ComboBox or another child
+/// that can't move there by itself, or to keep a group of controls together).
+pub fn line_break(ui: &mut egui::Ui) {
+    if phone_dialogs(ui.ctx()) && ui.layout().main_wrap() {
+        ui.end_row();
+    }
+}
+
+/// The width for a `width`-wide ComboBox in a dialog row: on a phone, at most the line's (going on
+/// to the next line first when this one hasn't room for it).
+pub fn combo_width(ui: &mut egui::Ui, width: f32) -> f32 {
+    if !phone_dialogs(ui.ctx()) {
+        return width;
+    }
+    // What is left of this line (`available_width` is a wrapping line's whole width).
+    if ui.available_size_before_wrap().x < width {
+        line_break(ui);
+    }
+    width.min(ui.available_size_before_wrap().x).max(60.0)
+}
+
+/// How a dialog ComboBox shows a choice too long for it: on a phone it wraps (the box can't grow
+/// past the screen); elsewhere as the layout has it.
+pub fn combo_text(ui: &egui::Ui) -> egui::TextWrapMode {
+    if phone_dialogs(ui.ctx()) { egui::TextWrapMode::Wrap } else { ui.wrap_mode() }
+}
+
+/// A dialog's buttons, from the right: on a phone they go on to more lines when they don't fit.
+pub fn buttons_row<R>(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui) -> R) -> egui::InnerResponse<R> {
+    let wrap = phone_dialogs(ui.ctx());
+    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center).with_main_wrap(wrap), add)
+}
+
+/// Controls that share a row on a wide window and stack on a phone, where a long label (a
+/// checkbox's) then wraps in the screen's width.
+pub fn row_or_stack<R>(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui) -> R) -> egui::InnerResponse<R> {
+    if phone_dialogs(ui.ctx()) { ui.vertical(add) } else { ui.horizontal(add) }
+}
+
+/// After a label in a two-column dialog grid: on a phone the controls go on the next row, under
+/// the label, so they get the screen's whole width (a grid can't wrap).
+pub fn grid_break(ui: &mut egui::Ui) {
+    if phone_dialogs(ui.ctx()) {
+        ui.end_row();
+    }
+}
+
+/// A row of controls in a dialog: one line on a wide window; on a phone it wraps whole controls
+/// onto the next line instead of running past the screen's edge.
+pub fn row<R>(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui) -> R) -> egui::InnerResponse<R> {
+    if phone_dialogs(ui.ctx()) {
+        ui.horizontal_wrapped(|ui| {
+            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
+            add(ui)
+        })
+    } else {
+        ui.horizontal(add)
+    }
+}
+
+/// A setting in a dialog: its label, then its controls, which get the label's response (to be
+/// `labelled_by` it). On a wide window they share a row; on a phone the controls go under the
+/// label and wrap whole, never in the middle of a word.
+pub fn setting_row<R>(ui: &mut egui::Ui, label: &str, controls: impl FnOnce(&mut egui::Ui, &Response) -> R) -> R {
+    if phone_dialogs(ui.ctx()) {
+        ui.add_space(4.0);
+        let label = ui.label(label);
+        ui.horizontal_wrapped(|ui| {
+            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
+            controls(ui, &label)
+        })
+        .inner
+    } else {
+        ui.horizontal(|ui| {
+            let label = ui.label(label);
+            controls(ui, &label)
+        })
+        .inner
+    }
+}
+
+/// Set a dialog's width: `width`, or the phone screen's when that is narrower.
+pub fn set_dialog_width(ui: &mut egui::Ui, width: f32) {
+    let max = ui.ctx().data(|d| d.get_temp::<f32>(dialog_max_width_id())).unwrap_or(f32::INFINITY);
+    ui.set_width(width.min(max));
+}
+
+/// A modal with the card fill, a 10-point corner and room around its contents. In the phone
+/// layout it is a screen of its own instead: the whole content area, square, without a border.
+pub fn modal(ctx: &egui::Context, id: impl std::hash::Hash + std::fmt::Debug) -> egui::Modal {
+    let id = egui::Id::new(id);
+    if !phone_dialogs(ctx) {
+        return egui::Modal::new(id).frame(dialog_frame(ctx));
+    }
+    let t = Tokens::get(ctx);
+    let frame = egui::Frame::new().fill(t.card).inner_margin(egui::Margin::symmetric(PHONE_PAD_X, PHONE_PAD_Y));
+    // Anchored to the content area's top-left corner (the area under the system bars).
+    let area = egui::Modal::default_area(id.with("area")).anchor(Align2::LEFT_TOP, egui::Vec2::ZERO);
+    egui::Modal::new(id).frame(frame).area(area)
+}
+
+/// Padding inside a dialog shown as a phone screen.
+const PHONE_PAD_X: i8 = 16;
+const PHONE_PAD_Y: i8 = 14;
+
+/// Show [`modal`], outline its controls, and remember the card rect for layout checks. In the
+/// phone layout the dialog fills the screen and scrolls, and [`set_dialog_width`] keeps it on it.
 pub fn show_modal<R>(ctx: &egui::Context, id: &str, content: impl FnOnce(&mut egui::Ui) -> R) -> egui::ModalResponse<R> {
     let stored = egui::Id::new(id);
+    let phone = phone_dialogs(ctx);
+    let screen = ctx.content_rect();
+    let (width, height) = (screen.width() - 2.0 * f32::from(PHONE_PAD_X), screen.height() - 2.0 * f32::from(PHONE_PAD_Y));
+    ctx.data_mut(|d| d.insert_temp(dialog_max_width_id(), if phone { width.max(1.0) } else { f32::INFINITY }));
     modal(ctx, id).show(ctx, |ui| {
         begin_dialog(ui);
-        let inner = content(ui);
+        let inner = if phone {
+            ui.set_width(width.max(1.0));
+            ui.set_min_height(height.max(1.0));
+            egui::ScrollArea::vertical().id_salt(stored.with("scroll")).max_height(height.max(1.0)).auto_shrink([false, true]).show(ui, content).inner
+        } else {
+            content(ui)
+        };
         // The frame's stroke sits outside this content rect; the stored card is the fill.
-        let card = ui.min_rect().expand2(egui::vec2(f32::from(DIALOG_PAD_X), f32::from(DIALOG_PAD_Y)));
+        let (pad_x, pad_y) = if phone { (PHONE_PAD_X, PHONE_PAD_Y) } else { (DIALOG_PAD_X, DIALOG_PAD_Y) };
+        let card = ui.min_rect().expand2(egui::vec2(f32::from(pad_x), f32::from(pad_y)));
         ui.ctx().data_mut(|d| d.insert_temp(stored.with("card"), card));
         inner
     })
@@ -245,26 +379,28 @@ pub fn radio_value<'a, V: PartialEq>(ui: &mut egui::Ui, current: &mut V, alterna
 /// - for a checkbox, a corner radius small enough to keep the box square.
 fn toggle<'a>(widget: impl egui::Widget + 'a, radius: Option<u8>) -> impl egui::Widget + 'a {
     move |ui: &mut egui::Ui| {
-        ui.scope(|ui| {
-            let t = Tokens::get(ui.ctx());
-            let w = &mut ui.visuals_mut().widgets;
-            if let Some(radius) = radius {
-                for v in [&mut w.noninteractive, &mut w.inactive, &mut w.hovered, &mut w.active, &mut w.open] {
-                    v.corner_radius = CornerRadius::same(radius);
-                }
+        // Styled in place and put back after, not in a `scope`: a scoped widget never moves to
+        // the next row of a wrapping layout, so a phone dialog's options would run off the screen.
+        let t = Tokens::get(ui.ctx());
+        let saved = ui.visuals().widgets.clone();
+        let w = &mut ui.visuals_mut().widgets;
+        if let Some(radius) = radius {
+            for v in [&mut w.noninteractive, &mut w.inactive, &mut w.hovered, &mut w.active, &mut w.open] {
+                v.corner_radius = CornerRadius::same(radius);
             }
-            if !t.dark() && w.inactive.bg_fill == t.field {
-                w.inactive.bg_fill = t.hover;
-            }
-            if w.inactive.bg_stroke.is_empty() {
-                w.inactive.bg_stroke = Stroke::new(1.0, t.border);
-            }
-            if w.hovered.bg_stroke.is_empty() {
-                w.hovered.bg_stroke = Stroke::new(1.0, t.text_muted);
-            }
-            ui.add(widget)
-        })
-        .inner
+        }
+        if !t.dark() && w.inactive.bg_fill == t.field {
+            w.inactive.bg_fill = t.hover;
+        }
+        if w.inactive.bg_stroke.is_empty() {
+            w.inactive.bg_stroke = Stroke::new(1.0, t.border);
+        }
+        if w.hovered.bg_stroke.is_empty() {
+            w.hovered.bg_stroke = Stroke::new(1.0, t.text_muted);
+        }
+        let response = ui.add(widget);
+        ui.visuals_mut().widgets = saved;
+        response
     }
 }
 

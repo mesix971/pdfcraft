@@ -2355,3 +2355,81 @@ animation effects	Off	Өшірулі
 	Another app	Басқа қолданба
 	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Басып шығаруға дайын PDF сіз таңдаған қолданбада ашылады, ол оны өз көшірме, екі жақты және түс параметрлерімен басып шығарады.
 	Couldn't hand {name} to another app: {e}	{name} басқа қолданбаға берілмеді: {e}
+phone bar	Edit	Өңдеу
+	Send	Жіберу
+	Thinking…	Ойлануда…
+	Anthropic API key	Anthropic API кілті
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	Сұрағыңыз бен ашық құжат өз API кілтіңізбен Anthropic (Claude) қызметіне тек сіз сұрағанда жіберіледі. Сұраулардың ақысы Anthropic тіркелгіңізден алынады.
+	Most pages sent per question	Бір сұраққа жіберілетін ең көп бет
+	Translate page {n}	{n}-бетті аудару
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} токен
+	The answer stopped at its length limit.	Жауап ең үлкен ұзындығында үзілді.
+	Add your Anthropic API key to use the assistant.	Көмекшіні пайдалану үшін Anthropic API кілтіңізді қосыңыз.
+	The API key was refused. Check it in the assistant's settings.	API кілті қабылданбады. Оны көмекші баптауларынан тексеріңіз.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	Бұл құжатта {pages} бет бар; көмекші ең көбі {max} бет оқиды. Шектеуді көмекші баптауларында арттырыңыз.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	Бұл құжат көмекші үшін тым үлкен ({mb} МБ, ең көбі {max} МБ).
+	Too many requests right now. Try again in a moment.	Қазір сұраулар тым көп. Біраздан кейін қайталап көріңіз.
+	The request was declined ({reason}).	Сұрау қабылданбады ({reason}).
+	Couldn't reach the AI service: {error}	ЖИ қызметіне қосылу мүмкін болмады: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	API кілті жарамсыз: оны көмекші баптауларына қайта қойыңыз.
+	The assistant gave no answer. Try asking differently.	Көмекші жауап бермеді. Сұрақты басқаша қойып көріңіз.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Anthropic тіркелгіңіз бұл модельді пайдалана алмайды немесе кредиті таусылды: {error}
+	The AI service answered: {error}	ЖИ қызметі жауап берді: {error}
+	{tokens} tokens	{tokens} токен
+	New conversation	Жаңа әңгіме
+	Proposed changes	Ұсынылған өзгерістер
+	Applied	Қолданылды
+	Discarded	Бас тартылды
+	The document has no page {page}.	Құжатта {page}-бет жоқ.
+	The passage wasn't found on page {page}.	Үзінді {page}-беттен табылмады.
+	The document refused the change.	Құжат өзгерісті қабылдамады.
+	Applied as one step: Undo takes them all back.	Бір қадаммен қолданылады: «Болдырмау» бәрін қайтарады.
+	The passage appears more than once on page {page}.	Үзінді {page}-бетте бірнеше рет кездеседі.
+	It overlaps another proposed change.	Ол басқа ұсынылған өзгеріспен қабаттасады.
+	A PDF on this device.	Осы құрылғыдағы PDF.
+	Add my name	Атымды қосу
+	Add to Starred	Таңдаулыларға қосу
+	Add your name and a photo. Your name also signs your comments.	Атыңыз бен фотоңызды қосыңыз. Атыңыз пікірлеріңізге де қол қояды.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Файлдарыңызға қол жеткізуге рұқсат беріңіз, сонда PdfCraft осы құрылғыдағы PDF файлдарын көрсетеді.
+	An empty page to start from.	Бастау үшін бос бет.
+	Change its text and pictures.	Мәтіні мен суреттерін өзгерту.
+	Choose a photo	Фото таңдау
+	Files	Файлдар
+	Fill in a form and sign it.	Пішінді толтырып, қол қою.
+	From photos, scans or other files.	Фотолардан, сканерлерден немесе басқа файлдардан.
+	Hello, {name}	Сәлеметсіз бе, {name}
+	It shows on Home and signs your comments.	Ол басты бетте көрсетіледі және пікірлеріңізге қол қояды.
+	Make PdfCraft yours	PdfCraft-ты өзіңізге бейімдеңіз
+	More for {name}	{name} үшін тағы
+	No PDFs found.	PDF табылмады.
+	No files match.	Сәйкес файлдар жоқ.
+	No recent files yet.	Әзірге соңғы файлдар жоқ.
+	No starred files.	Таңдаулы файлдар жоқ.
+	On this device	Осы құрылғыда
+	Open another file…	Басқа файлды ашу…
+	PDFs on this device	Осы құрылғыдағы PDF
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft «Жүктеулер», «Құжаттар» және өз қалтасынан іздейді.
+	Photos and scans become the pages of a new PDF.	Фотолар мен сканерлер жаңа PDF беттеріне айналады.
+	Pictures	Суреттер
+	Places	Орындар
+	Profile	Профиль
+	Remove from Starred	Таңдаулылардан алып тастау
+	Remove the photo	Фотоны алып тастау
+	Search files	Файлдарды іздеу
+	See your PDFs	PDF файлдарыңызды көріңіз
+	Set up	Баптау
+	Several PDFs and pictures in one document.	Бір құжатта бірнеше PDF және сурет.
+	Star a file from its menu to find it here.	Файлды осы жерден табу үшін оның мәзірінен таңдаулыларға қосыңыз.
+	Starred	Таңдаулылар
+	Summarize, ask and translate.	Түйіндеу, сұрау, аудару.
+	Summarize, question and correct your PDFs with Claude, with your own key.	PDF файлдарыңызды өз кілтіңізбен Claude арқылы түйіндеп, сұрап, түзетіңіз.
+	Text, pictures and other files, converted to PDF.	PDF-ке түрлендірілген мәтін, суреттер және басқа файлдар.
+	The files you open show here.	Сіз ашқан файлдар осында көрсетіледі.
+	What would you like to do?	Не істегіңіз келеді?
+	Which document?	Қай құжат?
+	Your AI assistant	Сіздің ЖИ көмекшіңіз
+file state	Open	Ашық
+	Choose a PNG or JPEG picture.	PNG немесе JPEG суретін таңдаңыз.
+	This picture is too large.	Бұл сурет тым үлкен.
+	Couldn't use this picture: {e}	Бұл суретті пайдалану мүмкін болмады: {e}
+	Couldn't use this picture.	Бұл суретті пайдалану мүмкін болмады.

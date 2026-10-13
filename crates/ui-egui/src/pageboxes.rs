@@ -3,7 +3,7 @@
 //! Choose a box (crop, trim, bleed, art, media), margins from the media box in points, inches,
 //! millimetres or centimetres, and the pages. A preview shows the current page's media box and the new box.
 
-use egui::{Align, Color32, CornerRadius, Layout, Rect, Stroke, pos2, vec2};
+use egui::{Color32, CornerRadius, Rect, Stroke, pos2, vec2};
 use pdfcraft_engine::{BoxSpec, Edit, PageBox};
 
 use crate::theme::{self, Tokens};
@@ -90,7 +90,10 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
     }
     ui.label(egui::RichText::new(tl!("Set Page Boxes")).font(theme::semibold(18.0)));
     ui.add_space(8.0);
-    ui.horizontal_top(|ui| {
+    // The settings beside the preview; on a phone, above it.
+    let layout =
+        if widgets::phone_dialogs(ui.ctx()) { egui::Layout::top_down(egui::Align::Min) } else { egui::Layout::left_to_right(egui::Align::Min) };
+    ui.with_layout(layout, |ui| {
         ui.vertical(|ui| {
             egui::Grid::new("boxes-grid").num_columns(2).spacing([12.0, 8.0]).show(ui, |ui| {
                 ui.label(tl!("Box"));
@@ -188,7 +191,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
     });
     ui.add_space(12.0);
     let (mut apply, mut cancel) = (false, false);
-    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+    widgets::buttons_row(ui, |ui| {
         if widgets::pill_button(ui, tl!("OK"), true).clicked() {
             apply = true;
         }

@@ -18,9 +18,6 @@ use crate::storage;
 const STORAGE_KEY: &str = "pdfcraft";
 /// Below this smallest width (in dp) the screen is a phone's.
 const PHONE_DP: i32 = 600;
-/// The interface size `Auto` gives a phone, so more of the desktop layout fits on its screen.
-const PHONE_SCALE: f32 = 0.8;
-
 /// Start PdfCraft in `android`'s activity. Returns when the activity is destroyed.
 pub fn run(android: AndroidApp) {
     android_logger::init_once(android_logger::Config::default().with_max_level(log::LevelFilter::Info).with_tag("PdfCraft"));
@@ -58,7 +55,8 @@ pub fn run(android: AndroidApp) {
             None => {}
         }
         if phone {
-            app.system_text_scale = PHONE_SCALE;
+            // Always the phone layout: it has every tool, and draws at the phone's own points.
+            app.phone_screen = true;
         }
         app.file_browser_host = browser_host(&android);
         let clipboard = android.clone();

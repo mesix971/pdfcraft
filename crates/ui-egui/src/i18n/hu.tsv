@@ -2356,3 +2356,81 @@ animation effects	Off	Ki
 	Another app	Másik alkalmazás
 	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	A nyomtatásra kész PDF a választott alkalmazásban nyílik meg, amely a saját példányszám-, kétoldalas és színbeállításaival nyomtatja ki.
 	Couldn't hand {name} to another app: {e}	A(z) {name} nem adható át másik alkalmazásnak: {e}
+phone bar	Edit	Szerkesztés
+	Send	Küldés
+	Thinking…	Gondolkodik…
+	Anthropic API key	Anthropic API-kulcs
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	A kérdésed és a megnyitott dokumentum a saját API-kulcsoddal kerül az Anthropichoz (Claude), csak amikor kéred. A kérések díját az Anthropic-fiókod fizeti.
+	Most pages sent per question	Kérdésenként legfeljebb elküldött oldalak
+	Translate page {n}	{n}. oldal fordítása
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} token
+	The answer stopped at its length limit.	A válasz a legnagyobb hosszánál megszakadt.
+	Add your Anthropic API key to use the assistant.	Add meg az Anthropic API-kulcsodat az asszisztens használatához.
+	The API key was refused. Check it in the assistant's settings.	Az API-kulcsot elutasították. Ellenőrizd az asszisztens beállításaiban.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	A dokumentum {pages} oldalas; az asszisztens legfeljebb {max} oldalt olvas. Növeld a korlátot az asszisztens beállításaiban.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	A dokumentum túl nagy az asszisztensnek ({mb} MB, legfeljebb {max} MB).
+	Too many requests right now. Try again in a moment.	Most túl sok a kérés. Próbáld újra egy pillanat múlva.
+	The request was declined ({reason}).	A kérést elutasították ({reason}).
+	Couldn't reach the AI service: {error}	Nem érhető el az MI-szolgáltatás: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	Az API-kulcs érvénytelen: illeszd be újra az asszisztens beállításaiban.
+	The assistant gave no answer. Try asking differently.	Az asszisztens nem adott választ. Próbáld másképp megfogalmazni a kérdést.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Az Anthropic-fiókod nem használhatja ezt a modellt, vagy elfogyott a kreditje: {error}
+	The AI service answered: {error}	Az MI-szolgáltatás válasza: {error}
+	{tokens} tokens	{tokens} token
+	New conversation	Új beszélgetés
+	Proposed changes	Javasolt módosítások
+	Applied	Alkalmazva
+	Discarded	Elvetve
+	The document has no page {page}.	A dokumentumnak nincs {page}. oldala.
+	The passage wasn't found on page {page}.	A szakasz nem található a(z) {page}. oldalon.
+	The document refused the change.	A dokumentum elutasította a módosítást.
+	Applied as one step: Undo takes them all back.	Egy lépésben alkalmazva: a Visszavonás mindet visszavonja.
+	The passage appears more than once on page {page}.	A szakasz többször is előfordul a(z) {page}. oldalon.
+	It overlaps another proposed change.	Átfedésben van egy másik javasolt módosítással.
+	A PDF on this device.	Egy PDF ezen az eszközön.
+	Add my name	Nevem megadása
+	Add to Starred	Hozzáadás a kedvencekhez
+	Add your name and a photo. Your name also signs your comments.	Add meg a neved és egy fényképet. A neved a megjegyzéseidet is aláírja.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Engedélyezd a hozzáférést a fájljaidhoz, és a PdfCraft listázza az eszközön lévő PDF-eket.
+	An empty page to start from.	Egy üres oldal a kezdéshez.
+	Change its text and pictures.	A szöveg és a képek módosítása.
+	Choose a photo	Fénykép kiválasztása
+	Files	Fájlok
+	Fill in a form and sign it.	Űrlap kitöltése és aláírása.
+	From photos, scans or other files.	Fényképekből, szkennelt képekből vagy más fájlokból.
+	Hello, {name}	Szia, {name}
+	It shows on Home and signs your comments.	A kezdőlapon jelenik meg, és aláírja a megjegyzéseidet.
+	Make PdfCraft yours	Szabd magadra a PdfCraftot
+	More for {name}	Továbbiak: {name}
+	No PDFs found.	Nem található PDF.
+	No files match.	Nincs egyező fájl.
+	No recent files yet.	Még nincsenek legutóbbi fájlok.
+	No starred files.	Nincsenek kedvenc fájlok.
+	On this device	Ezen az eszközön
+	Open another file…	Másik fájl megnyitása…
+	PDFs on this device	PDF-ek ezen az eszközön
+	PdfCraft looks in Download, Documents and its own folder.	A PdfCraft a Letöltések, a Dokumentumok és a saját mappájában keres.
+	Photos and scans become the pages of a new PDF.	A fényképekből és szkennelt képekből egy új PDF oldalai lesznek.
+	Pictures	Képek
+	Places	Helyek
+	Profile	Profil
+	Remove from Starred	Eltávolítás a kedvencek közül
+	Remove the photo	Fénykép eltávolítása
+	Search files	Fájlok keresése
+	See your PDFs	Lásd a PDF-jeidet
+	Set up	Beállítás
+	Several PDFs and pictures in one document.	Több PDF és kép egyetlen dokumentumban.
+	Star a file from its menu to find it here.	Jelölj meg egy fájlt kedvencként a menüjében, hogy itt megtaláld.
+	Starred	Kedvencek
+	Summarize, ask and translate.	Összefoglalás, kérdések, fordítás.
+	Summarize, question and correct your PDFs with Claude, with your own key.	Foglald össze, kérdezd ki és javítsd a PDF-jeidet a Claude-dal, a saját kulcsoddal.
+	Text, pictures and other files, converted to PDF.	Szöveg, képek és más fájlok PDF-be alakítva.
+	The files you open show here.	Az általad megnyitott fájlok itt jelennek meg.
+	What would you like to do?	Mit szeretnél tenni?
+	Which document?	Melyik dokumentum?
+	Your AI assistant	A MI-asszisztensed
+file state	Open	Megnyitva
+	Choose a PNG or JPEG picture.	Válassz PNG vagy JPEG képet.
+	This picture is too large.	Ez a kép túl nagy.
+	Couldn't use this picture: {e}	Ezt a képet nem sikerült használni: {e}
+	Couldn't use this picture.	Ezt a képet nem sikerült használni.

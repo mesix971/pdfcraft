@@ -2431,3 +2431,81 @@ animation effects	Off	Vypnuto
 	Another app	Jiná aplikace
 	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	PDF připravené k tisku se otevře ve vybrané aplikaci, která ho vytiskne s vlastním nastavením kopií, oboustranného tisku a barev.
 	Couldn't hand {name} to another app: {e}	{name} se nepodařilo předat jiné aplikaci: {e}
+phone bar	Edit	Upravit
+	Send	Odeslat
+	Thinking…	Přemýšlím…
+	Anthropic API key	Klíč API Anthropic
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	Vaše otázka a otevřený dokument se odešlou společnosti Anthropic (Claude) s vaším vlastním klíčem API, jen když o to požádáte. Požadavky se účtují na váš účet Anthropic.
+	Most pages sent per question	Nejvýše odeslaných stran na otázku
+	Translate page {n}	Přeložit stranu {n}
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} tokenů
+	The answer stopped at its length limit.	Odpověď skončila na své maximální délce.
+	Add your Anthropic API key to use the assistant.	Pro použití asistenta přidejte svůj klíč API Anthropic.
+	The API key was refused. Check it in the assistant's settings.	Klíč API byl odmítnut. Zkontrolujte ho v nastavení asistenta.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	Tento dokument má {pages} stran; asistent čte nejvýše {max}. Zvyšte limit v nastavení asistenta.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	Tento dokument je pro asistenta příliš velký ({mb} MB, nejvýše {max} MB).
+	Too many requests right now. Try again in a moment.	Právě je příliš mnoho požadavků. Zkuste to za chvíli znovu.
+	The request was declined ({reason}).	Požadavek byl odmítnut ({reason}).
+	Couldn't reach the AI service: {error}	Nelze se spojit se službou AI: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	Klíč API není platný: vložte ho znovu v nastavení asistenta.
+	The assistant gave no answer. Try asking differently.	Asistent nedal žádnou odpověď. Zkuste se zeptat jinak.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Váš účet Anthropic nemůže tento model používat, nebo už nemá žádný kredit: {error}
+	The AI service answered: {error}	Služba AI odpověděla: {error}
+	{tokens} tokens	{tokens} tokenů
+	New conversation	Nová konverzace
+	Proposed changes	Navrhované změny
+	Applied	Použito
+	Discarded	Zahozeno
+	The document has no page {page}.	Dokument nemá stránku {page}.
+	The passage wasn't found on page {page}.	Pasáž nebyla na stránce {page} nalezena.
+	The document refused the change.	Dokument změnu odmítl.
+	Applied as one step: Undo takes them all back.	Použijí se v jednom kroku: Zpět je vrátí všechny.
+	The passage appears more than once on page {page}.	Pasáž se na stránce {page} vyskytuje vícekrát.
+	It overlaps another proposed change.	Překrývá se s jinou navrhovanou změnou.
+	A PDF on this device.	PDF v tomto zařízení.
+	Add my name	Přidat své jméno
+	Add to Starred	Přidat k oblíbeným
+	Add your name and a photo. Your name also signs your comments.	Přidejte své jméno a fotku. Vaše jméno také podepisuje vaše komentáře.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Povolte přístup k souborům a PdfCraft zobrazí PDF v tomto zařízení.
+	An empty page to start from.	Prázdná stránka na začátek.
+	Change its text and pictures.	Změňte jeho text a obrázky.
+	Choose a photo	Vybrat fotku
+	Files	Soubory
+	Fill in a form and sign it.	Vyplňte formulář a podepište ho.
+	From photos, scans or other files.	Z fotek, skenů nebo jiných souborů.
+	Hello, {name}	Dobrý den, {name}
+	It shows on Home and signs your comments.	Zobrazuje se na úvodní stránce a podepisuje vaše komentáře.
+	Make PdfCraft yours	Přizpůsobte si PdfCraft
+	More for {name}	Další pro {name}
+	No PDFs found.	Nebyly nalezeny žádné PDF.
+	No files match.	Žádné soubory neodpovídají.
+	No recent files yet.	Zatím žádné nedávné soubory.
+	No starred files.	Žádné oblíbené soubory.
+	On this device	V tomto zařízení
+	Open another file…	Otevřít jiný soubor…
+	PDFs on this device	PDF v tomto zařízení
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft hledá ve složkách Stažené, Dokumenty a ve své vlastní složce.
+	Photos and scans become the pages of a new PDF.	Z fotek a skenů se stanou stránky nového PDF.
+	Pictures	Obrázky
+	Places	Umístění
+	Profile	Profil
+	Remove from Starred	Odebrat z oblíbených
+	Remove the photo	Odebrat fotku
+	Search files	Hledat soubory
+	See your PDFs	Zobrazte své PDF
+	Set up	Nastavit
+	Several PDFs and pictures in one document.	Více PDF a obrázků v jednom dokumentu.
+	Star a file from its menu to find it here.	Přidejte soubor k oblíbeným v jeho nabídce a najdete ho zde.
+	Starred	Oblíbené
+	Summarize, ask and translate.	Shrnout, zeptat se, přeložit.
+	Summarize, question and correct your PDFs with Claude, with your own key.	Shrnujte, ptejte se a opravujte své PDF s Claudem, s vlastním klíčem.
+	Text, pictures and other files, converted to PDF.	Text, obrázky a jiné soubory převedené do PDF.
+	The files you open show here.	Soubory, které otevřete, se zobrazí zde.
+	What would you like to do?	Co chcete udělat?
+	Which document?	Který dokument?
+	Your AI assistant	Váš asistent AI
+file state	Open	Otevřeno
+	Choose a PNG or JPEG picture.	Vyberte obrázek PNG nebo JPEG.
+	This picture is too large.	Tento obrázek je příliš velký.
+	Couldn't use this picture: {e}	Tento obrázek nelze použít: {e}
+	Couldn't use this picture.	Tento obrázek nelze použít.

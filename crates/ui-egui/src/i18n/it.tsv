@@ -2366,3 +2366,82 @@ animation effects	Off	Disattivati
 	Another app	Un'altra app
 	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Il PDF pronto per la stampa si apre nell'app che scegli, che lo stampa con le proprie impostazioni di copie, fronte-retro e colore.
 	Couldn't hand {name} to another app: {e}	Impossibile passare {name} a un'altra app: {e}
+	Tools	Strumenti
+phone bar	Edit	Modifica
+	Send	Invia
+	Thinking…	Sto pensando…
+	Anthropic API key	Chiave API Anthropic
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	La tua domanda e il documento aperto vengono inviati ad Anthropic (Claude) con la tua chiave API, solo quando lo chiedi. Le richieste sono addebitate sul tuo account Anthropic.
+	Most pages sent per question	Pagine inviate al massimo per domanda
+	Translate page {n}	Traduci la pagina {n}
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} token
+	The answer stopped at its length limit.	La risposta si è fermata alla lunghezza massima.
+	Add your Anthropic API key to use the assistant.	Aggiungi la tua chiave API Anthropic per usare l'assistente.
+	The API key was refused. Check it in the assistant's settings.	La chiave API è stata rifiutata. Controllala nelle impostazioni dell'assistente.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	Questo documento ha {pages} pagine; l'assistente ne legge al massimo {max}. Alza il limite nelle impostazioni dell'assistente.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	Questo documento è troppo grande per l'assistente ({mb} MB, al massimo {max} MB).
+	Too many requests right now. Try again in a moment.	Troppe richieste in questo momento. Riprova tra poco.
+	The request was declined ({reason}).	La richiesta è stata rifiutata ({reason}).
+	Couldn't reach the AI service: {error}	Impossibile raggiungere il servizio di IA: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	La chiave API non è valida: incollala di nuovo nelle impostazioni dell'assistente.
+	The assistant gave no answer. Try asking differently.	L'assistente non ha dato alcuna risposta. Prova a chiedere in un altro modo.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Il tuo account Anthropic non può usare questo modello, o non ha più credito: {error}
+	The AI service answered: {error}	Il servizio di IA ha risposto: {error}
+	{tokens} tokens	{tokens} token
+	New conversation	Nuova conversazione
+	Proposed changes	Modifiche proposte
+	Applied	Applicata
+	Discarded	Scartata
+	The document has no page {page}.	Il documento non ha una pagina {page}.
+	The passage wasn't found on page {page}.	Il passaggio non è stato trovato a pagina {page}.
+	The document refused the change.	Il documento ha rifiutato la modifica.
+	Applied as one step: Undo takes them all back.	Applicate in un solo passaggio: Annulla le ripristina tutte.
+	The passage appears more than once on page {page}.	Il passaggio compare più volte a pagina {page}.
+	It overlaps another proposed change.	Si sovrappone a un'altra modifica proposta.
+	A PDF on this device.	Un PDF su questo dispositivo.
+	Add my name	Aggiungi il mio nome
+	Add to Starred	Aggiungi ai preferiti
+	Add your name and a photo. Your name also signs your comments.	Aggiungi il tuo nome e una foto. Il tuo nome firma anche i tuoi commenti.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Consenti l'accesso ai tuoi file e PdfCraft elencherà i PDF su questo dispositivo.
+	An empty page to start from.	Una pagina vuota da cui partire.
+	Change its text and pictures.	Modificane testo e immagini.
+	Choose a photo	Scegli una foto
+	Files	File
+	Fill in a form and sign it.	Compila un modulo e firmalo.
+	From photos, scans or other files.	Da foto, scansioni o altri file.
+	Hello, {name}	Ciao, {name}
+	It shows on Home and signs your comments.	Compare nella Home e firma i tuoi commenti.
+	Make PdfCraft yours	Personalizza PdfCraft
+	More for {name}	Altro per {name}
+	No PDFs found.	Nessun PDF trovato.
+	No files match.	Nessun file corrisponde.
+	No recent files yet.	Ancora nessun file recente.
+	No starred files.	Nessun file preferito.
+	On this device	Su questo dispositivo
+	Open another file…	Apri un altro file…
+	PDFs on this device	PDF su questo dispositivo
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft cerca in Download, Documenti e nella propria cartella.
+	Photos and scans become the pages of a new PDF.	Foto e scansioni diventano le pagine di un nuovo PDF.
+	Pictures	Immagini
+	Places	Posizioni
+	Profile	Profilo
+	Remove from Starred	Rimuovi dai preferiti
+	Remove the photo	Rimuovi la foto
+	Search files	Cerca file
+	See your PDFs	Vedi i tuoi PDF
+	Set up	Configura
+	Several PDFs and pictures in one document.	Più PDF e immagini in un unico documento.
+	Star a file from its menu to find it here.	Aggiungi un file ai preferiti dal suo menu per trovarlo qui.
+	Starred	Preferiti
+	Summarize, ask and translate.	Riassumi, chiedi e traduci.
+	Summarize, question and correct your PDFs with Claude, with your own key.	Riassumi, interroga e correggi i tuoi PDF con Claude, con la tua chiave.
+	Text, pictures and other files, converted to PDF.	Testo, immagini e altri file, convertiti in PDF.
+	The files you open show here.	I file che apri compaiono qui.
+	What would you like to do?	Cosa vuoi fare?
+	Which document?	Quale documento?
+	Your AI assistant	Il tuo assistente IA
+file state	Open	Aperto
+	Choose a PNG or JPEG picture.	Scegli un'immagine PNG o JPEG.
+	This picture is too large.	Questa immagine è troppo grande.
+	Couldn't use this picture: {e}	Impossibile usare questa immagine: {e}
+	Couldn't use this picture.	Impossibile usare questa immagine.

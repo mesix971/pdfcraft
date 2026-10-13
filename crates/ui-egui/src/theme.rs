@@ -1,5 +1,9 @@
 //! Design tokens and egui style (plan/acrobat/02-ui-ux.md §1: neutral chrome, white panels,
-//! one blue accent; Dark Gray keeps pages white). Every custom widget reads `Tokens::get`.
+//! one accent; Dark Gray keeps pages white). Every custom widget reads `Tokens::get`.
+//!
+//! The accent is the green of PdfCraft's own icon (`assets/app-icon`, #12A58A), deepened where
+//! white text sits on it so that text keeps a 4.5:1 contrast; [`Tokens::brand`] is the icon's
+//! green itself, for large surfaces.
 
 use std::sync::Arc;
 
@@ -65,6 +69,9 @@ pub struct Tokens {
     pub badge_new: Color32,
     pub page_shadow: Color32,
     pub radius: u8,
+    /// The icon's green, for large surfaces (the phone's Home header); `on_brand` is the text on it.
+    pub brand: Color32,
+    pub on_brand: Color32,
 }
 
 impl Tokens {
@@ -85,14 +92,16 @@ impl Tokens {
                 icon: Color32::from_rgb(0x44, 0x44, 0x4B),
                 hover: Color32::from_rgb(0xF0, 0xF0, 0xF3),
                 pressed: Color32::from_rgb(0xE4, 0xE4, 0xE9),
-                selected: Color32::from_rgb(0xE6, 0xEE, 0xFD),
-                accent: Color32::from_rgb(0x1B, 0x63, 0xE0),
-                accent_text: Color32::from_rgb(0x17, 0x55, 0xC4),
-                accent_soft: Color32::from_rgb(0xE3, 0xEC, 0xFD),
+                selected: Color32::from_rgb(0xD9, 0xF0, 0xEA),
+                accent: Color32::from_rgb(0x0E, 0x7F, 0x6A),
+                accent_text: Color32::from_rgb(0x0B, 0x6E, 0x5C),
+                accent_soft: Color32::from_rgb(0xE2, 0xF4, 0xEF),
                 field: Color32::from_rgb(0xFF, 0xFF, 0xFF),
-                badge_new: Color32::from_rgb(0x1B, 0x63, 0xE0),
+                badge_new: Color32::from_rgb(0x0E, 0x7F, 0x6A),
                 page_shadow: Color32::from_black_alpha(34),
                 radius: 6,
+                brand: Color32::from_rgb(0x12, 0xA5, 0x8A),
+                on_brand: Color32::WHITE,
             },
             ThemeKind::Dark => Self {
                 kind,
@@ -109,14 +118,16 @@ impl Tokens {
                 icon: Color32::from_rgb(0xD4, 0xD4, 0xDA),
                 hover: Color32::from_rgb(0x34, 0x34, 0x3A),
                 pressed: Color32::from_rgb(0x3E, 0x3E, 0x45),
-                selected: Color32::from_rgb(0x23, 0x3A, 0x63),
-                accent: Color32::from_rgb(0x4B, 0x8B, 0xF5),
-                accent_text: Color32::from_rgb(0x8C, 0xB6, 0xFA),
-                accent_soft: Color32::from_rgb(0x24, 0x36, 0x57),
+                selected: Color32::from_rgb(0x1B, 0x45, 0x3D),
+                accent: Color32::from_rgb(0x0E, 0x80, 0x6B),
+                accent_text: Color32::from_rgb(0x5F, 0xD6, 0xBD),
+                accent_soft: Color32::from_rgb(0x1A, 0x3A, 0x34),
                 field: Color32::from_rgb(0x1E, 0x1E, 0x22),
-                badge_new: Color32::from_rgb(0x3D, 0x7D, 0xEE),
+                badge_new: Color32::from_rgb(0x0E, 0x80, 0x6B),
                 page_shadow: Color32::from_black_alpha(120),
                 radius: 6,
+                brand: Color32::from_rgb(0x0F, 0x86, 0x70),
+                on_brand: Color32::WHITE,
             },
         }
     }

@@ -1,0 +1,905 @@
+//! The phone layout (`phone.rs`) in the real shell: Home, the reader's bars and gestures, tool
+//! modes, the tool drawer, Back, sheets and dialogs.
+
+use egui::accesskit::Role;
+use egui::{Event, Key, Modifiers, PointerButton, Pos2, pos2, vec2};
+use egui_kittest::Harness;
+use egui_kittest::kittest::{NodeT, Queryable};
+use pdfcraft_ui_egui::canvas::Fit;
+use pdfcraft_ui_egui::phone::{Sheet, ToolMode};
+use pdfcraft_ui_egui::{PdfCraftApp, QuickTool};
+
+/// Three 300×400 pages of Helvetica text: taller than the window together, so they scroll.
+const FIXTURE: &[u8] = b"%PDF-1.7
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R 4 0 R 5 0 R] /Count 3 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] /Contents 6 0 R /Resources << /Font << /F1 7 0 R >> >> >> endobj
+4 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] /Contents 6 0 R /Resources << /Font << /F1 7 0 R >> >> >> endobj
+5 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] /Contents 6 0 R /Resources << /Font << /F1 7 0 R >> >> >> endobj
+6 0 obj << /Length 50 >> stream
+BT /F1 14 Tf 20 250 Td (The quick brown fox) Tj ET
+endstream endobj
+7 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj
+trailer << /Root 1 0 R >>
+%%EOF";
+
+/// The same three pages, the first with a link to the third over its top half.
+const LINK_FIXTURE: &[u8] = b"%PDF-1.7
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R 4 0 R 5 0 R] /Count 3 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] /Contents 6 0 R /Resources << /Font << /F1 7 0 R >> >> /Annots [8 0 R] >> endobj
+4 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] /Contents 6 0 R /Resources << /Font << /F1 7 0 R >> >> >> endobj
+5 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] /Contents 6 0 R /Resources << /Font << /F1 7 0 R >> >> >> endobj
+6 0 obj << /Length 50 >> stream
+BT /F1 14 Tf 20 250 Td (The quick brown fox) Tj ET
+endstream endobj
+7 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj
+8 0 obj << /Type /Annot /Subtype /Link /Rect [20 300 280 380] /Border [0 0 0] /Dest [5 0 R /Fit] >> endobj
+trailer << /Root 1 0 R >>
+%%EOF";
+
+/// A phone held upright (412 points wide, Material's common width), in the phone layout. Steps
+/// are 50 ms, so two taps can make a double tap.
+fn harness(open: bool) -> Harness<'static, PdfCraftApp> {
+    harness_with(open.then_some(FIXTURE), |_| {})
+}
+
+fn harness_with(pdf: Option<&'static [u8]>, setup: impl FnOnce(&mut PdfCraftApp) + 'static) -> Harness<'static, PdfCraftApp> {
+    let mut h = Harness::builder().with_size(vec2(412.0, 892.0)).with_step_dt(0.05).build_eframe(move |_| {
+        let mut app = PdfCraftApp::new();
+        app.set_option("language", "en").unwrap();
+        app.set_option("shell", "phone").unwrap();
+        if let Some(bytes) = pdf {
+            app.open_bytes("text.pdf", None, bytes.to_vec()).unwrap();
+        }
+        setup(&mut app);
+        app
+    });
+    h.run_steps(4);
+    for _ in 0..200 {
+        h.run_steps(2);
+        if !h.state().render_pending() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    h.run_steps(4);
+    h
+}
+
+/// A point on page `page` in PDF user space → screen (MediaBox 300×400).
+fn at(h: &Harness<'static, PdfCraftApp>, page: usize, x: f32, y: f32) -> Pos2 {
+    let r = h.state().views[0].page_screen_rect(page).expect("page on screen");
+    pos2(r.left() + x / 300.0 * r.width(), r.top() + (400.0 - y) / 400.0 * r.height())
+}
+
+fn press(h: &Harness<'static, PdfCraftApp>, p: Pos2, pressed: bool) {
+    h.event(Event::PointerButton { pos: p, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE });
+}
+
+/// One tap, then long enough for it not to be the start of a double tap.
+fn tap(h: &mut Harness<'static, PdfCraftApp>, p: Pos2) {
+    h.hover_at(p);
+    h.run_steps(1);
+    press(h, p, true);
+    h.run_steps(1);
+    press(h, p, false);
+    h.run_steps(12);
+}
+
+fn back(h: &mut Harness<'static, PdfCraftApp>) {
+    h.key_press(Key::Escape);
+    h.run_steps(3);
+}
+
+fn click(h: &mut Harness<'static, PdfCraftApp>, label: &str) {
+    h.get_by_label(label).click();
+    h.run_steps(4);
+}
+
+/// A finger drawn from `from` to `to` in a few moves.
+fn finger_drag(h: &mut Harness<'static, PdfCraftApp>, from: Pos2, to: Pos2) {
+    h.hover_at(from);
+    h.run_steps(1);
+    press(h, from, true);
+    h.run_steps(1);
+    for k in 1..=6 {
+        h.hover_at(from + (to - from) * (k as f32 / 6.0));
+        h.run_steps(1);
+    }
+    press(h, to, false);
+    h.run_steps(4);
+}
+
+#[test]
+fn a_signature_drawn_with_a_finger_can_be_applied() {
+    let mut h = harness(true);
+    click(&mut h, "Fill & Sign");
+    click(&mut h, "Fill & Sign: sign");
+    assert_eq!(h.state().dialog, Some(pdfcraft_ui_egui::Dialog::Signature), "no signature yet: the pad opens");
+    click(&mut h, "Draw");
+    let hint = h.get_by_label("Draw your signature below.").rect();
+    let width = 412.0;
+    // The pad is just below its hint, as wide as the dialog.
+    let y = hint.bottom() + 60.0;
+    finger_drag(&mut h, pos2(80.0, y), pos2(300.0, y + 20.0));
+    assert!(h.state().signature_draft.strokes.iter().any(|s| s.len() > 1), "the finger drew");
+    let apply = h.get_by_label("Apply");
+    let r = apply.rect();
+    assert!(r.right() <= width && r.left() >= 0.0, "Apply is on screen: {r:?}");
+    apply.click();
+    h.run_steps(4);
+    assert_eq!(h.state().dialog, None, "Apply closes the pad");
+    assert!(h.state().signature.is_some(), "and keeps the signature");
+    // A tap on the page signs there.
+    let annotations = |h: &Harness<'static, PdfCraftApp>| h.state().session.docs().first().map_or(0, |d| d.info.annotations.len());
+    assert_eq!(annotations(&h), 0);
+    let p = at(&h, 0, 150.0, 150.0);
+    tap(&mut h, p);
+    assert_eq!(annotations(&h), 1, "the signature is on the page");
+}
+
+/// Every dialog keeps its controls on a phone's screen: a dialog scrolls down, never sideways, so
+/// a button past the right edge can't be reached at all (the signature pad's Apply was).
+#[test]
+fn every_dialog_keeps_its_controls_on_a_phone_screen() {
+    use pdfcraft_engine::MarkKind;
+    use pdfcraft_ui_egui::{Dialog, PropsTab};
+    let mut dialogs = vec![
+        Dialog::CreateImages,
+        Dialog::About,
+        Dialog::Shortcuts,
+        Dialog::Split,
+        Dialog::NumberPages,
+        Dialog::Protect,
+        Dialog::PageBoxes,
+        Dialog::Signature,
+        Dialog::RedactPages,
+        Dialog::RedactSearch,
+        Dialog::RedactProps,
+        Dialog::Print,
+        Dialog::Revert,
+        Dialog::Extract,
+        Dialog::RotatePages,
+        Dialog::RemoveHidden,
+        Dialog::Sanitize,
+        Dialog::SummarizeComments,
+        Dialog::Optimize,
+        Dialog::AccessibilityOptions,
+        Dialog::RecognizeText,
+        Dialog::JsConsole,
+        Dialog::DocumentJs,
+        Dialog::Preferences,
+        Dialog::CompareFiles,
+        Dialog::ActionWizard,
+        Dialog::PdfA,
+        Dialog::CreateStamp,
+        Dialog::AuditSpace,
+    ];
+    for tab in [PropsTab::Description, PropsTab::InitialView, PropsTab::Security, PropsTab::Fonts, PropsTab::Advanced] {
+        dialogs.push(Dialog::Properties(tab));
+    }
+    for kind in [MarkKind::HeaderFooter, MarkKind::Watermark, MarkKind::Background] {
+        dialogs.push(Dialog::Marks(kind));
+    }
+    // Opened the way the menus open them first: a command seeds the dialog's draft (the
+    // editable fields Properties shows, the page range), which a bare dialog doesn't have.
+    // (Revert and Summarize comments open only for a changed file and one with comments; they
+    // are in the list above.)
+    let commands = [
+        "file.properties",
+        "protect.properties",
+        "page.number",
+        "edit.header_footer",
+        "edit.watermark",
+        "edit.background",
+        "export.image",
+        "export.text",
+        "export.all_images",
+        "ocr.recognize",
+        "tools.js_console",
+        "tools.document_js",
+        "app.preferences",
+        "a11y.reading_options",
+        "redact.pages",
+        "redact.search",
+        "redact.properties",
+        "redact.sanitize",
+        "optimize.advanced",
+        "doc.compare",
+        "standards.pdfa",
+        "sign.fill.signature",
+        "page.rotate_dialog",
+        "page.split",
+        "help.shortcuts",
+        "help.about",
+    ];
+    // Controls, and text too: a line too long to wrap is cut off, and widens the whole dialog,
+    // which pushes its buttons off the screen.
+    // Controls, and text too: a line too long to wrap is cut off, and widens the whole dialog,
+    // which pushes its buttons off the screen.
+    let containers = [Role::Window, Role::GenericContainer, Role::ScrollView, Role::Group, Role::Unknown, Role::ScrollBar];
+    // The narrowest common phone (360 points), in languages whose words run long.
+    const WIDTH: f32 = 360.0;
+    let mut off_screen = Vec::new();
+    let mut silent = Vec::new();
+    let mut checked = 0;
+    for lang in ["en", "fr", "de", "ru"] {
+        let mut h = Harness::builder().with_size(vec2(WIDTH, 780.0)).with_step_dt(0.05).build_eframe(move |_| {
+            let mut app = PdfCraftApp::new();
+            app.set_option("language", lang).unwrap();
+            app.set_option("shell", "phone").unwrap();
+            app.open_bytes("text.pdf", None, FIXTURE.to_vec()).unwrap();
+            app
+        });
+        h.run_steps(8);
+        let mut check = |h: &mut Harness<'static, PdfCraftApp>, what: &str| {
+            checked += 1;
+            for node in h.query_all_by(|n| !containers.contains(&n.role())) {
+                let r = node.rect();
+                if r.right() > WIDTH + 0.5 || r.left() < -0.5 {
+                    let n = node.accesskit_node();
+                    let name = n.label().or_else(|| n.value()).unwrap_or_default();
+                    off_screen.push(format!("{lang} {what}: {:?} “{name}” at x {:.0}–{:.0}", n.role(), r.left(), r.right()));
+                }
+            }
+        };
+        for id in commands {
+            h.state_mut().execute(id);
+            h.run_steps(6);
+            let Some(dialog) = h.state().dialog else {
+                silent.push(id);
+                continue;
+            };
+            check(&mut h, &format!("{id} ({dialog:?})"));
+            if let Dialog::Properties(_) = dialog {
+                // Its other tabs, as the tab row switches to them.
+                for tab in [PropsTab::Description, PropsTab::InitialView, PropsTab::Security, PropsTab::Fonts, PropsTab::Advanced] {
+                    h.state_mut().dialog = Some(Dialog::Properties(tab));
+                    h.run_steps(4);
+                    check(&mut h, &format!("{id} ({tab:?})"));
+                }
+            }
+            h.state_mut().dialog = None;
+            h.run_steps(3);
+        }
+        for dialog in dialogs.iter().copied() {
+            h.state_mut().dialog = Some(dialog);
+            h.run_steps(6);
+            if h.state().dialog != Some(dialog) {
+                // Closed itself: it needs something this document hasn't got.
+                continue;
+            }
+            check(&mut h, &format!("{dialog:?}"));
+            h.state_mut().dialog = None;
+            h.run_steps(3);
+        }
+    }
+    assert!(off_screen.is_empty(), "controls past the screen's edge:\n{}", off_screen.join("\n"));
+    assert!(silent.is_empty(), "commands that opened no dialog: {silent:?}");
+    // Every command's dialog and most of the bare ones were looked at, in every language.
+    assert!(checked >= 4 * (commands.len() + 20), "only {checked} dialogs checked");
+}
+
+#[test]
+fn home_offers_open_files_and_lists_open_documents() {
+    let mut h = harness(false);
+    // Nothing opened yet: Open file on the page itself, and in the "+" sheet.
+    assert_eq!(h.query_all_by_label("Open file").count(), 1);
+    click(&mut h, "Open…");
+    assert_eq!(h.state().phone_sheet(), Some(Sheet::New));
+    assert_eq!(h.query_all_by_label("Open file").count(), 2);
+    back(&mut h);
+    assert_eq!(h.state().phone_sheet(), None, "Back closes the sheet");
+
+    let mut h = harness(true);
+    assert_eq!(h.state().active, Some(0), "an opened document shows in the reader");
+    click(&mut h, "Back");
+    assert_eq!(h.state().active, None, "Back goes Home");
+    assert_eq!(h.state().views.len(), 1, "and keeps the document open there");
+    click(&mut h, "text.pdf");
+    assert_eq!(h.state().active, Some(0));
+}
+
+#[test]
+fn a_tap_hides_the_bars_and_another_shows_them() {
+    let mut h = harness(true);
+    assert!(h.state().phone_bars_shown());
+    h.get_by_label("Menu");
+    let p = at(&h, 0, 150.0, 120.0);
+    tap(&mut h, p);
+    assert!(!h.state().phone_bars_shown());
+    assert!(h.query_by_label("Menu").is_none(), "hidden bars aren't drawn");
+    tap(&mut h, p);
+    assert!(h.state().phone_bars_shown());
+    h.get_by_label("Menu");
+}
+
+#[test]
+fn a_finger_drag_scrolls_the_pages_instead_of_selecting_text() {
+    let mut h = harness(true);
+    let before = h.state().views[0].page_screen_rect(0).unwrap();
+    let from = at(&h, 0, 60.0, 254.0);
+    let to = from - vec2(0.0, 300.0);
+    h.hover_at(from);
+    h.run_steps(1);
+    press(&h, from, true);
+    h.run_steps(1);
+    for k in 1..=6 {
+        h.hover_at(from + (to - from) * (k as f32 / 6.0));
+        h.run_steps(1);
+    }
+    press(&h, to, false);
+    h.run_steps(12);
+    let after = h.state().views[0].page_screen_rect(0).unwrap();
+    assert!(before.top() - after.top() > 200.0, "the pages followed the finger: {before:?} → {after:?}");
+    assert_eq!(h.state().views[0].selected_text(), None, "no text was selected");
+    assert!(h.state().phone_bars_shown(), "a drag isn't a tap");
+}
+
+#[test]
+fn a_double_tap_zooms_in_and_another_goes_back_to_the_page_width() {
+    let mut h = harness(true);
+    let fit_zoom = h.state().views[0].zoom;
+    assert_eq!(h.state().views[0].fit, Fit::Width);
+    let p = at(&h, 0, 150.0, 120.0);
+    let double = |h: &mut Harness<'static, PdfCraftApp>| {
+        h.hover_at(p);
+        h.run_steps(1);
+        for _ in 0..2 {
+            press(h, p, true);
+            h.run_steps(1);
+            press(h, p, false);
+            h.run_steps(1);
+        }
+        h.run_steps(12);
+    };
+    double(&mut h);
+    let v = &h.state().views[0];
+    assert_eq!(v.fit, Fit::None);
+    assert!(v.zoom > fit_zoom * 2.0, "{} after {fit_zoom}", v.zoom);
+    assert!(h.state().phone_bars_shown(), "the double tap's first tap doesn't hide the bars");
+    double(&mut h);
+    let v = &h.state().views[0];
+    assert_eq!(v.fit, Fit::Width);
+    assert!((v.zoom - fit_zoom).abs() < 1e-3, "{} instead of {fit_zoom}", v.zoom);
+}
+
+#[test]
+fn a_double_tap_on_text_zooms_without_selecting_it() {
+    let mut h = harness(true);
+    let p = at(&h, 0, 60.0, 254.0);
+    h.hover_at(p);
+    h.run_steps(1);
+    for _ in 0..2 {
+        press(&h, p, true);
+        h.run_steps(1);
+        press(&h, p, false);
+        h.run_steps(1);
+    }
+    h.run_steps(12);
+    assert_eq!(h.state().views[0].fit, Fit::None, "zoomed in");
+    assert_eq!(h.state().views[0].selected_text(), None, "the word isn't selected as a desktop double click would");
+}
+
+#[test]
+fn a_long_press_selects_the_word_under_the_finger() {
+    let mut h = harness(true);
+    let p = at(&h, 0, 60.0, 254.0);
+    let touch = |h: &Harness<'static, PdfCraftApp>, phase| {
+        h.event(Event::Touch { device_id: egui::TouchDeviceId(1), id: egui::TouchId(1), phase, pos: p, force: None });
+    };
+    h.hover_at(p);
+    touch(&h, egui::TouchPhase::Start);
+    press(&h, p, true);
+    h.run_steps(24);
+    press(&h, p, false);
+    touch(&h, egui::TouchPhase::End);
+    h.run_steps(4);
+    assert_eq!(h.state().views[0].selected_text().as_deref(), Some("quick"));
+}
+
+#[test]
+fn a_tool_mode_keeps_its_tool_until_done() {
+    let mut h = harness(true);
+    assert!(!h.state().comment_prefs.pinned);
+    click(&mut h, "Comments");
+    assert_eq!(h.state().phone_tool(), Some(ToolMode::Comment));
+    assert_eq!(h.state().quick_tool, QuickTool::Comment(pdfcraft_ui_egui::comments::CommentTool::Highlight), "highlighting comes first");
+    assert!(h.state().comment_prefs.pinned, "a mode keeps its tool after each use");
+    assert_eq!(h.state().right, None, "no Comments panel covers the page the tool is for");
+    click(&mut h, "Underline");
+    assert_eq!(h.state().quick_tool, QuickTool::Comment(pdfcraft_ui_egui::comments::CommentTool::Underline));
+    assert_eq!(h.state().right, None, "nor after another tool");
+    click(&mut h, "Done");
+    assert_eq!(h.state().phone_tool(), None);
+    assert_eq!(h.state().quick_tool, QuickTool::Select);
+    assert!(!h.state().comment_prefs.pinned, "Done gives the pin back");
+}
+
+#[test]
+fn back_closes_one_thing_at_a_time_and_never_leaves_home() {
+    let mut h = harness(true);
+    click(&mut h, "Menu");
+    assert_eq!(h.state().phone_sheet(), Some(Sheet::Menu));
+    back(&mut h);
+    assert_eq!(h.state().phone_sheet(), None);
+    assert_eq!(h.state().active, Some(0));
+    click(&mut h, "Draw");
+    assert_eq!(h.state().phone_tool(), Some(ToolMode::Draw));
+    back(&mut h);
+    assert_eq!(h.state().phone_tool(), None);
+    assert_eq!(h.state().quick_tool, QuickTool::Select);
+    assert_eq!(h.state().active, Some(0));
+    click(&mut h, "Edit");
+    assert!(h.state().phone_drawer());
+    back(&mut h);
+    assert!(!h.state().phone_drawer(), "Back closes the tool drawer");
+    assert_eq!(h.state().active, Some(0));
+    click(&mut h, "Search");
+    back(&mut h);
+    assert!(h.state().views[0].find.is_none(), "Back closes the search");
+    assert_eq!(h.state().active, Some(0));
+    back(&mut h);
+    assert_eq!(h.state().active, None, "then goes Home");
+    back(&mut h);
+    assert_eq!(h.state().active, None);
+    assert_eq!(h.state().views.len(), 1);
+}
+
+#[test]
+fn the_page_pill_goes_to_a_page() {
+    let mut h = harness(true);
+    click(&mut h, "Page 1 of 3");
+    assert_eq!(h.state().phone_sheet(), Some(Sheet::GoTo));
+    h.get_by_role(Role::TextInput).click();
+    h.run_steps(2);
+    h.event(Event::Key { key: Key::A, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::COMMAND });
+    h.event(Event::Text("3".into()));
+    h.run_steps(2);
+    click(&mut h, "OK");
+    h.run_steps(6);
+    assert_eq!(h.state().phone_sheet(), None);
+    assert_eq!(h.state().views[0].current, 2);
+}
+
+#[test]
+fn every_tool_opens_in_the_drawer_under_the_page() {
+    let mut h = harness(true);
+    h.state_mut().phone_screen = true;
+    click(&mut h, "Tools");
+    assert_eq!(h.state().phone_sheet(), Some(Sheet::Tools));
+    click(&mut h, "Protect a PDF");
+    assert!(h.state().phone_drawer());
+    assert!(h.state().phone_layout(), "a phone never gets the desktop layout");
+    h.get_by_label("Protect with password");
+    let pages = h.state().views[0].viewport_rect();
+    assert!(pages.bottom() < 892.0 * 0.7, "the pages stay above the drawer: {pages:?}");
+    click(&mut h, "Done");
+    assert!(!h.state().phone_drawer());
+    assert_eq!(h.state().quick_tool, QuickTool::Select);
+}
+
+#[test]
+fn edit_puts_the_edit_tools_under_the_page() {
+    let mut h = harness(true);
+    click(&mut h, "Edit");
+    assert!(h.state().phone_drawer());
+    click(&mut h, "Edit text & images");
+    assert_eq!(h.state().quick_tool, QuickTool::EditText);
+    assert!(h.state().phone_drawer(), "the drawer stays while the tool works on the page");
+    click(&mut h, "Done");
+    assert_eq!(h.state().quick_tool, QuickTool::Select);
+}
+
+#[test]
+fn a_dialog_is_a_screen_of_its_own_on_a_phone() {
+    let mut h = harness(true);
+    assert!(h.state_mut().execute("app.preferences"));
+    h.run_steps(4);
+    let card: egui::Rect = h.ctx.data(|d| d.get_temp(egui::Id::new("dialog").with("card"))).expect("the dialog's card");
+    assert!(card.left() >= -0.5 && card.right() <= 412.5, "{card:?} stays on a 412-point screen");
+    assert!(card.height() > 892.0 * 0.8, "{card:?} takes the screen");
+}
+/// A finger's tap as Android delivers it: the release and `PointerGone` in one frame, through
+/// the app's raw-input step. kittest runs neither that step nor two queued events in one frame
+/// (`Harness::event` gives each its own), so the frames are built here.
+fn finger_tap(h: &mut Harness<'static, PdfCraftApp>, p: Pos2) {
+    let button = |pressed| Event::PointerButton { pos: p, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE };
+    let mut pending = false;
+    for events in [vec![Event::PointerMoved(p), button(true)], vec![button(false), Event::PointerGone], Vec::new()] {
+        let mut raw = egui::RawInput { events, ..Default::default() };
+        pdfcraft_ui_egui::touch::defer_pointer_gone(&mut raw, &mut pending);
+        h.input_mut().events.extend(raw.events);
+        h.run_steps(1);
+    }
+    h.run_steps(12);
+}
+
+#[test]
+fn a_finger_tap_on_a_link_follows_it() {
+    let mut h = harness_with(Some(LINK_FIXTURE), |_| {});
+    assert_eq!(h.state().views[0].current, 0);
+    let p = at(&h, 0, 150.0, 340.0);
+    finger_tap(&mut h, p);
+    h.run_steps(6);
+    assert_eq!(h.state().views[0].current, 2, "the link went to page 3");
+    assert!(h.state().phone_bars_shown(), "a tap on a link doesn't hide the bars");
+}
+
+#[test]
+fn back_after_a_long_press_only_clears_the_selection() {
+    let mut h = harness(true);
+    h.state_mut().views[0].select_text(0, 4, 8);
+    h.run_steps(2);
+    assert!(h.state().views[0].selected_text().is_some());
+    back(&mut h);
+    assert_eq!(h.state().views[0].selected_text(), None);
+    assert_eq!(h.state().active, Some(0), "one press, one thing: the document stays open");
+}
+
+#[test]
+fn a_notice_shows_below_the_top_bar_and_takes_its_taps() {
+    let mut h = harness(true);
+    h.state_mut().views[0].disk_changed = true;
+    h.run_steps(4);
+    let notice = h.get_by_label_contains("This file changed on disk").rect();
+    assert!(notice.top() >= 56.0 - 0.5, "{notice:?} is under the top bar");
+    let dismiss = h.get_by_label("Dismiss").rect();
+    assert!(dismiss.right() <= 412.0, "{dismiss:?} is on screen: the message wraps beside it");
+    h.get_by_label("Dismiss").click();
+    h.run_steps(4);
+    assert!(!h.state().views[0].disk_changed, "the bar didn't take the tap");
+}
+
+#[test]
+fn a_tool_panel_left_open_in_the_desktop_layout_doesnt_stop_scrolling() {
+    let mut h = harness_with(Some(FIXTURE), |app| app.set_option("tool", "edit").unwrap());
+    let before = h.state().views[0].page_screen_rect(0).unwrap();
+    let from = at(&h, 0, 150.0, 120.0);
+    let to = from - vec2(0.0, 300.0);
+    h.hover_at(from);
+    h.run_steps(1);
+    press(&h, from, true);
+    h.run_steps(1);
+    for k in 1..=6 {
+        h.hover_at(from + (to - from) * (k as f32 / 6.0));
+        h.run_steps(1);
+    }
+    press(&h, to, false);
+    h.run_steps(12);
+    let after = h.state().views[0].page_screen_rect(0).unwrap();
+    assert!(before.top() - after.top() > 200.0, "the pages followed the finger: {before:?} → {after:?}");
+}
+
+/// Whether some text on screen contains `part`.
+fn shows(h: &Harness<'static, PdfCraftApp>, part: &str) -> bool {
+    h.query_all_by(|n| n.value().is_some_and(|v| v.contains(part))).next().is_some()
+}
+
+/// The assistant asks for a key first, and refuses what it can't send before sending anything:
+/// this test never reaches the network (a 3-page document over a 1-page limit).
+#[test]
+fn the_assistant_asks_for_a_key_and_says_why_it_cant_answer() {
+    let mut h = harness(true);
+    click(&mut h, "AI assistant");
+    h.get_by_label("Save");
+    assert!(shows(&h, "with your own API key"), "it says what is sent, and to whom, before any key");
+    h.state_mut().ai.key = "sk-ant-test".into();
+    h.state_mut().ai.max_pages = 1;
+    h.run_steps(2);
+    click(&mut h, "Summarize");
+    for _ in 0..200 {
+        h.run_steps(1);
+        if !h.state().ai.busy() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    h.run_steps(2);
+    assert!(!h.state().ai.busy());
+    assert!(shows(&h, "the assistant reads at most 1"), "why it couldn't, with the way out");
+    back(&mut h);
+    assert_eq!(h.state().active, Some(0), "Back closes the assistant, not the document");
+    h.get_by_label("Menu");
+}
+
+// ---------------------------------------------------------------------------------------------
+// Home
+
+/// A folder of its own for a test's files, emptied first.
+fn folder(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("pdfcraft-home-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+/// Run frames until `done`, for at most five seconds (a worker thread's answer).
+fn wait(h: &mut Harness<'static, PdfCraftApp>, done: impl Fn(&PdfCraftApp) -> bool) {
+    for _ in 0..500 {
+        h.run_steps(1);
+        if done(h.state()) {
+            h.run_steps(2);
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    panic!("timed out");
+}
+
+#[test]
+fn home_greets_by_name_and_the_profile_sets_it() {
+    let mut h = harness_with(None, |app| app.comment_prefs.author = "Guest".into());
+    // "Guest" is the system's default, not a name: the field starts empty.
+    assert!(shows(&h, "Welcome to PdfCraft"), "no name yet");
+    assert!(shows(&h, "Make PdfCraft yours"), "a tip offers to add it");
+    click(&mut h, "Profile");
+    let field = h.get_by_role_and_label(Role::TextInput, "Your name");
+    field.focus();
+    // A frame between the words: the space typed last stays in the field (the name kept is
+    // trimmed, the field isn't).
+    field.type_text("Ana ");
+    h.run_steps(2);
+    h.get_by_role_and_label(Role::TextInput, "Your name").type_text("Diaz ");
+    h.run_steps(2);
+    back(&mut h);
+    back(&mut h);
+    assert!(shows(&h, "Hello, Ana Diaz"));
+    assert!(!shows(&h, "Make PdfCraft yours"), "the tip has done its job");
+    assert_eq!(h.state().comment_prefs.author, "Ana Diaz", "the same name signs comments");
+}
+
+#[test]
+fn a_tip_can_be_dismissed_for_good() {
+    let mut h = harness(false);
+    assert!(shows(&h, "Your AI assistant"));
+    // Each ✕ says which tip it dismisses.
+    let dismiss = |h: &Harness<'static, PdfCraftApp>| h.query_all_by(|n| n.label().is_some_and(|l| l.starts_with("Dismiss · "))).count();
+    let before = dismiss(&h);
+    h.get_by_label("Dismiss · Your AI assistant").click();
+    h.run_steps(3);
+    assert_eq!(dismiss(&h), before - 1);
+    assert!(h.state().home_tips_dismissed.iter().any(|t| t == "ai"));
+    // And it stays dismissed after a restart.
+    let saved = h.state().persist();
+    let mut again = PdfCraftApp::new();
+    again.restore(&saved);
+    assert_eq!(again.home_tips_dismissed, h.state().home_tips_dismissed);
+}
+
+#[test]
+fn a_quick_action_opens_a_file_then_its_tool() {
+    let dir = folder("quick");
+    let path = dir.join("form.pdf");
+    std::fs::write(&path, FIXTURE).unwrap();
+    let file = path.to_string_lossy().into_owned();
+    let mut h = harness_with(None, move |app| app.pick_override = Some(vec![file]));
+    click(&mut h, "Edit a PDF");
+    wait(&mut h, |app| app.active.is_some());
+    assert!(h.state().phone_drawer(), "the file opens with Edit under the page");
+    // With a document open, an action asks which one first.
+    back(&mut h);
+    back(&mut h);
+    assert_eq!(h.state().active, None);
+    click(&mut h, "Fill & Sign");
+    assert_eq!(h.state().phone_sheet(), Some(Sheet::Pick));
+    // The sheet's row (Home's list has one too, under the sheet).
+    h.query_all_by_label("form.pdf").last().unwrap().click();
+    h.run_steps(4);
+    assert_eq!(h.state().active, Some(0));
+    assert_eq!(h.state().phone_tool(), Some(ToolMode::FillSign));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn files_are_starred_listed_from_the_device_and_previewed() {
+    let dir = folder("files");
+    std::fs::write(dir.join("first.pdf"), FIXTURE).unwrap();
+    std::fs::create_dir_all(dir.join("Reports")).unwrap();
+    std::fs::write(dir.join("Reports").join("second.pdf"), FIXTURE).unwrap();
+    std::fs::write(dir.join("notes.txt"), b"not a pdf").unwrap();
+    let first = dir.join("first.pdf").to_string_lossy().into_owned();
+    let folders = vec![dir.clone()];
+    let opened = first.clone();
+    let mut h = harness_with(None, move |app| {
+        app.device_folders = folders;
+        app.open_path(&opened);
+    });
+    click(&mut h, "Back");
+    assert_eq!(h.state().active, None);
+    // Its first page is previewed.
+    let previewed = first.clone();
+    wait(&mut h, move |app| app.home_thumbnail_ready(&previewed));
+    // Starred from its ⋮ menu.
+    click(&mut h, "More for first.pdf");
+    assert_eq!(h.state().phone_sheet(), Some(Sheet::Item));
+    click(&mut h, "Add to Starred");
+    assert_eq!(h.state().starred, vec![first.clone()]);
+    click(&mut h, "Starred");
+    assert!(h.query_by_label("first.pdf").is_some(), "listed under Starred");
+    // The device's PDFs, the subfolder's too, nothing else.
+    click(&mut h, "On this device");
+    wait(&mut h, |app| app.home_device_files().len() == 2);
+    assert!(h.query_by_label("second.pdf").is_some());
+    assert!(h.query_by_label("notes.txt").is_none());
+    // A file from the list opens.
+    click(&mut h, "second.pdf");
+    assert_eq!(h.state().views.len(), 2);
+    assert!(h.state().active.is_some());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn the_tabs_along_the_bottom_switch_and_back_returns_home() {
+    let mut h = harness(false);
+    click(&mut h, "Files");
+    assert!(shows(&h, "PDFs on this device"));
+    click(&mut h, "Create");
+    assert!(h.query_by_label("Combine files").is_some(), "what can be created");
+    click(&mut h, "Tools");
+    assert!(h.query_by_label("Edit a PDF").is_some(), "every tool group");
+    back(&mut h);
+    assert!(shows(&h, "What would you like to do?"), "Back goes to Home's first tab");
+    back(&mut h);
+    assert!(shows(&h, "What would you like to do?"), "and never leaves Home");
+}
+
+#[test]
+fn search_finds_files_by_name() {
+    let mut h = harness(true);
+    click(&mut h, "Back");
+    click(&mut h, "Search");
+    let field = h.get_by_role_and_label(Role::TextInput, "Search files");
+    field.focus();
+    field.type_text("TEXT");
+    h.run_steps(3);
+    assert!(h.query_by_label("text.pdf").is_some(), "found whatever the case");
+    h.get_by_role_and_label(Role::TextInput, "Search files").type_text("zzz");
+    h.run_steps(3);
+    assert!(h.query_by_label("text.pdf").is_none());
+    assert!(shows(&h, "No files match."));
+    // The first Back leaves the field (as Android's closes the keyboard), the next ends the search.
+    back(&mut h);
+    back(&mut h);
+    assert!(shows(&h, "What would you like to do?"), "Back ends the search");
+}
+
+#[test]
+fn the_profile_photo_is_kept_with_the_settings() {
+    let mut picture = std::io::Cursor::new(Vec::new());
+    image::RgbaImage::from_pixel(400, 300, image::Rgba([10, 120, 90, 255])).write_to(&mut picture, image::ImageFormat::Png).unwrap();
+    let png = pdfcraft_engine::signature_image::profile_picture(picture.get_ref()).unwrap();
+    let mut app = PdfCraftApp::new();
+    app.profile_photo = Some(std::sync::Arc::new(png.clone()));
+    app.starred = vec!["/docs/a.pdf".into()];
+    let mut again = PdfCraftApp::new();
+    again.restore(&app.persist());
+    assert_eq!(again.profile_photo.as_deref(), Some(&png));
+    assert_eq!(again.starred, app.starred);
+    // Settings are untrusted: what isn't a photo is dropped, and only files are starred, once.
+    let mut tampered = PdfCraftApp::new();
+    tampered.restore(r#"{"profile_photo": "bm90IGEgcGljdHVyZQ==", "starred": ["doc:0", "/a.pdf", "", "/a.pdf", 7]}"#);
+    assert_eq!(tampered.profile_photo, None);
+    assert_eq!(tampered.starred, ["/a.pdf"]);
+}
+
+#[test]
+fn a_photo_is_chosen_from_a_picture_and_a_wrong_file_says_why() {
+    let dir = folder("photo");
+    let picture = dir.join("me.png");
+    image::RgbaImage::from_pixel(640, 480, image::Rgba([200, 40, 40, 255])).save(&picture).unwrap();
+    let chosen = picture.to_string_lossy().into_owned();
+    let mut h = harness_with(None, move |app| app.pick_override = Some(vec![chosen]));
+    click(&mut h, "Profile");
+    h.query_all_by_label("Choose a photo").last().unwrap().click();
+    // Made small on a thread: the screen goes on meanwhile.
+    wait(&mut h, |app| app.profile_photo.is_some());
+    assert_eq!(
+        pdfcraft_engine::signature_image::profile_picture_pixels(h.state().profile_photo.as_ref().unwrap()).map(|(w, h, _)| (w, h)),
+        Some((256, 256))
+    );
+    // A file that isn't a picture is refused in plain words, and the photo stays.
+    let text = dir.join("notes.png");
+    std::fs::write(&text, b"not a picture").unwrap();
+    h.state_mut().pick_override = Some(vec![text.to_string_lossy().into_owned()]);
+    h.query_all_by_label("Choose a photo").last().unwrap().click();
+    wait(&mut h, |app| app.toast.is_some());
+    assert_eq!(h.state().toast.as_ref().map(|t| t.0.as_str()), Some("Choose a PNG or JPEG picture."));
+    assert!(h.state().profile_photo.is_some());
+    // A damaged picture says what's wrong with it, not with a "signature image".
+    let damaged = dir.join("damaged.png");
+    std::fs::write(&damaged, b"\x89PNG\r\n\x1a\n and then nothing that decodes").unwrap();
+    h.state_mut().toast = None;
+    h.state_mut().pick_override = Some(vec![damaged.to_string_lossy().into_owned()]);
+    h.query_all_by_label("Choose a photo").last().unwrap().click();
+    wait(&mut h, |app| app.toast.is_some());
+    let said = h.state().toast.as_ref().map(|t| t.0.clone()).unwrap_or_default();
+    assert!(said.starts_with("Couldn't use this picture") && !said.contains("signature"), "{said}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn back_from_the_assistants_settings_shows_what_was_under_them() {
+    let mut h = harness_with(Some(FIXTURE), |app| app.ai.key = "sk-ant-test".into());
+    click(&mut h, "Back");
+    // From the profile: Back shows the profile again, then Home.
+    click(&mut h, "Profile");
+    click(&mut h, "AI assistant");
+    h.get_by_label("Save");
+    back(&mut h);
+    assert!(h.query_by_role_and_label(Role::TextInput, "Your name").is_some(), "the profile, under the settings");
+    back(&mut h);
+    assert!(shows(&h, "What would you like to do?"));
+    // The settings closed for the assistant too: in the document, it shows the conversation.
+    click(&mut h, "text.pdf");
+    click(&mut h, "AI assistant");
+    assert!(h.query_by_label("Summarize").is_some(), "the conversation, not the settings left open");
+    assert!(h.query_by_label("Save").is_none());
+    // Its settings over the conversation: its own ‹ closes them first, as Back does.
+    click(&mut h, "Settings");
+    h.get_by_label("Save");
+    click(&mut h, "Back");
+    assert!(h.query_by_label("Summarize").is_some(), "back to the conversation");
+    click(&mut h, "Settings");
+    back(&mut h);
+    assert!(h.query_by_label("Summarize").is_some(), "Back does the same");
+    back(&mut h);
+    assert_eq!(h.state().active, Some(0));
+    h.get_by_label("Menu");
+}
+
+#[test]
+fn only_the_rows_on_screen_are_previewed() {
+    let dir = folder("many");
+    let files: Vec<String> = (0..30)
+        .map(|i| {
+            let path = dir.join(format!("file{i:02}.pdf"));
+            std::fs::write(&path, FIXTURE).unwrap();
+            path.to_string_lossy().into_owned()
+        })
+        .collect();
+    let folders = vec![dir.clone()];
+    let mut h = harness_with(None, move |app| app.device_folders = folders);
+    click(&mut h, "Files");
+    wait(&mut h, |app| app.home_device_files().len() == 30);
+    h.run_steps(3);
+    let asked = |app: &PdfCraftApp| files.iter().filter(|f| app.home_preview_asked(f)).cloned().collect::<Vec<_>>();
+    let first = asked(h.state());
+    assert!((1..=12).contains(&first.len()), "{} previews asked for about ten rows on screen", first.len());
+    // Scrolled down, the rows coming into view ask for theirs.
+    h.hover_at(pos2(200.0, 600.0));
+    for _ in 0..12 {
+        h.event(Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Point,
+            delta: vec2(0.0, -300.0),
+            phase: egui::TouchPhase::Move,
+            modifiers: Modifiers::NONE,
+        });
+        h.run_steps(2);
+    }
+    assert!(asked(h.state()).iter().any(|f| !first.contains(f)), "rows scrolled into view are previewed");
+    // And previews come back from the worker (for rows on screen: the ones scrolled past left
+    // the queue).
+    wait(&mut h, move |app| files.iter().any(|f| app.home_thumbnail_ready(f)));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn the_profile_shows_a_name_changed_elsewhere() {
+    let mut h = harness_with(None, |app| app.comment_prefs.author = "Ana Diaz".into());
+    click(&mut h, "Profile");
+    let name = |h: &Harness<'static, PdfCraftApp>| h.get_by_role_and_label(Role::TextInput, "Your name").value().map(|v| v.to_string());
+    assert_eq!(name(&h).as_deref(), Some("Ana Diaz"));
+    // Changed in Preferences while the profile is open.
+    h.state_mut().comment_prefs.author = "Bea Cruz".into();
+    h.run_steps(2);
+    assert_eq!(name(&h).as_deref(), Some("Bea Cruz"));
+}
+
+#[test]
+fn a_wrong_home_tab_leaves_the_document_shown() {
+    let mut h = harness(true);
+    assert!(h.state_mut().set_option("home_tab", "nowhere").is_err());
+    assert_eq!(h.state().active, Some(0));
+}

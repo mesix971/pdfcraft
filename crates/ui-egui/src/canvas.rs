@@ -21,6 +21,8 @@ const GAP: f32 = 14.0;
 const MARGIN: f32 = 28.0;
 /// Horizontal gutter that keeps pages clear of the floating quick-action bar.
 const SIDE: f32 = 70.0;
+/// The phone layout's gutter: it has no floating bar, and a phone screen has no room to spare.
+const PHONE_SIDE: f32 = 6.0;
 const THUMB_TAG: u64 = 1 << 63;
 const TEXT_TAG: u64 = 1 << 62;
 /// A page rendered for the organize grid at the size it is drawn there.
@@ -473,6 +475,15 @@ pub struct DocView {
     /// Pages whose raster proved slow (see `SLOW_MILLIS`): only these get the zoom/pan
     /// settle holds. Fast pages render straight through, with no added latency.
     slow_pages: HashSet<usize>,
+    /// The horizontal gutter beside the pages, as last drawn ([`SIDE`], or [`PHONE_SIDE`] in the
+    /// phone layout).
+    side: f32,
+    /// Room kept clear above the first page and below the last, as last drawn: the phone
+    /// layout's bars float over the pages there.
+    pad: (f32, f32),
+    /// Reading in the phone layout: a tap on the page (where, egui time), held until it can't
+    /// be the first half of a double tap. The phone shell takes it to show or hide its bars.
+    pub(crate) tap: Option<(Pos2, f64)>,
 }
 
 /// The page grid's zoom range and the step of its buttons and keys.
@@ -671,6 +682,9 @@ impl DocView {
             fill_text: None,
             fill_signature_page: None,
             signature_drag: Default::default(),
+            side: SIDE,
+            pad: (0.0, 0.0),
+            tap: None,
         }
     }
 
@@ -1032,7 +1046,7 @@ impl DocView {
         let point = |x: Option<f32>, y: Option<f32>| p.dest_fraction(x, y, self.rotation);
         // The window's top-left as far as pages go: its left edge is the gutter that keeps them
         // clear of the floating quick-action bar, so `left` 0 shows the page's edge beside it.
-        let corner = vec2(SIDE, 0.0);
+        let corner = vec2(self.side, 0.0);
         let (fx, fy, rel) = match dest {
             DestView::Top => return,
             DestView::Xyz { left, top, zoom } => {
@@ -1295,6 +1309,33 @@ impl DocView {
             // Nothing on screen yet (e.g. a launch option): align the current page instead.
             None => self.goto = Some((self.current, 0.0)),
         }
+    }
+
+    /// The phone reader's double tap: while the pages fit the window, zoom in on `screen_pos`;
+    /// zoomed by hand, back to the page width.
+    pub fn double_tap_zoom(&mut self, screen_pos: Pos2) {
+        if self.fit == Fit::None {
+            self.fit = Fit::Width;
+        } else {
+            self.zoom_at(self.zoom * 2.5, screen_pos);
+        }
+    }
+
+    /// Select the word under `screen_pos` (the phone reader's long press). `false` when no text
+    /// is within a fingertip of it, or the page's text isn't read yet.
+    pub(crate) fn select_word_at(&mut self, screen_pos: Pos2) -> bool {
+        // A fingertip covers a few points of text: forgive a press just beside a glyph.
+        const REACH: f32 = 4.0;
+        let Some((page, xf)) = self.screen_xforms.iter().find(|(_, xf)| xf.rect.contains(screen_pos)).copied() else { return false };
+        let Some(text) = self.texts.get(&page) else { return false };
+        let (vx, vy) = xf.screen_to_view(screen_pos);
+        let near = |g: &[f32; 4]| vx >= g[0] - REACH && vx <= g[2] + REACH && vy >= g[1] - REACH && vy <= g[3] + REACH;
+        if !text.glyphs.iter().any(|g| near(&g.rect)) {
+            return false;
+        }
+        let Some((first, last)) = text.nearest(vx, vy).and_then(|a| text.word_at(a)) else { return false };
+        self.selection = Some(Selection::run(page, first, last));
+        true
     }
 
     /// Standard zoom steps (as in Acrobat's zoom menu).
@@ -1667,16 +1708,16 @@ impl DocView {
         } else {
             (max_w, largest(|s| s.1))
         };
-        let avail_w = (self.viewport_w - 2.0 * SIDE).max(100.0);
+        let avail_w = (self.viewport_w - 2.0 * self.side).max(100.0);
         let per_row = if self.layout == PageLayout::TwoUp { 2.0 } else { 1.0 };
         match self.fit {
             Fit::Width => self.zoom = (avail_w - GAP * (per_row - 1.0)) / (w * PT * per_row),
             Fit::Page => {
                 let zw = (avail_w - GAP * (per_row - 1.0)) / (w * PT * per_row);
-                let zh = (self.viewport_h - 2.0 * MARGIN) / (h * PT);
+                let zh = (self.viewport_h - 2.0 * MARGIN - self.pad.0 - self.pad.1) / (h * PT);
                 self.zoom = zw.min(zh);
             }
-            Fit::Height => self.zoom = (self.viewport_h - 2.0 * MARGIN) / (h * PT),
+            Fit::Height => self.zoom = (self.viewport_h - 2.0 * MARGIN - self.pad.0 - self.pad.1) / (h * PT),
             Fit::None => {}
         }
         self.zoom = self.zoom.clamp(0.08, 64.0);
@@ -1689,20 +1730,20 @@ impl DocView {
         let shown = info.pages.iter().enumerate().filter(|&(i, _)| single.is_none_or(|c| c == i));
         let max_w = shown.map(|(_, p)| self.display_size(p).0).fold(0.0, f32::max);
         let per_row = if self.layout == PageLayout::TwoUp { 2.0 } else { 1.0 };
-        (max_w * self.zoom * PT * per_row + 2.0 * SIDE).max(avail_w)
+        (max_w * self.zoom * PT * per_row + 2.0 * self.side).max(avail_w)
     }
 
     /// Page rects in content coordinates (origin at the scroll content's top-left).
     fn layout(&self, info: &DocInfo, content_w: f32) -> Vec<Rect> {
         let s = self.zoom * PT;
         let mut rects = Vec::with_capacity(info.pages.len());
-        let mut y = MARGIN;
+        let mut y = MARGIN + self.pad.0;
         match self.layout {
             PageLayout::Single => {
                 for p in &info.pages {
                     let (w, h) = self.display_size(p);
                     let size = vec2(w * s, h * s);
-                    rects.push(Rect::from_min_size(pos2(((content_w - size.x) / 2.0).max(SIDE), y), size));
+                    rects.push(Rect::from_min_size(pos2(((content_w - size.x) / 2.0).max(self.side), y), size));
                     y += size.y + GAP;
                 }
             }
@@ -1717,7 +1758,8 @@ impl DocView {
                     let sizes: Vec<Vec2> = pair.iter().map(|p| self.display_size(p)).map(|(w, h)| vec2(w * s, h * s)).collect();
                     let row_w: f32 = sizes.iter().map(|v| v.x).sum::<f32>() + GAP * (sizes.len() as f32 - 1.0);
                     let row_h = sizes.iter().map(|v| v.y).fold(0.0, f32::max);
-                    let mut x = if self.cover && ri == 0 { (content_w / 2.0 + GAP / 2.0).max(SIDE) } else { ((content_w - row_w) / 2.0).max(SIDE) };
+                    let mut x =
+                        if self.cover && ri == 0 { (content_w / 2.0 + GAP / 2.0).max(self.side) } else { ((content_w - row_w) / 2.0).max(self.side) };
                     for size in sizes {
                         rects.push(Rect::from_min_size(pos2(x, y + (row_h - size.y) / 2.0), size));
                         x += size.x + GAP;
@@ -2054,14 +2096,36 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     // The Prepare a form panel is open (or a field tool is picked): fields are edited, not filled.
     let preparing = app.is_preparing();
     // Edit a PDF: added text and images can be selected, moved and edited.
-    let editing_content =
-        (app.left_open && app.left == crate::LeftPanel::Tool("edit")) || matches!(app.quick_tool, QuickTool::AddText | QuickTool::EditText);
+    let editing_content = app.tool_panel_shows("edit") || matches!(app.quick_tool, QuickTool::AddText | QuickTool::EditText);
+    // Reading in the phone layout (no tool picked): a finger scrolls the pages instead of
+    // selecting text, a tap shows or hides the bars, a double tap zooms and a long press selects
+    // a word, as phone readers do (`phone.rs`).
+    let phone = app.phone_layout();
+    let touch_view = phone && app.quick_tool == QuickTool::Select && !preparing && !editing_content;
+    // The phone layout's bars float over the top of the page view: its notices go below them.
+    let notice_top = if phone && app.phone_bars_shown() { crate::phone::PAGE_PAD.0 } else { 0.0 };
     let text_style = app.text_style.clone();
     let view = &mut app.views[index];
     // Opened without the owner password and something is restricted.
     let secured = doc.security_summary().is_some_and(|s| !(s.owner || (s.permissions.modify() && s.permissions.assemble())));
     let repaired = !doc.repair_log().is_empty();
-    match notices(view, doc, secured, repaired, crate::sign_ui::banner(&doc.signatures), ui, &t) {
+    let banner = crate::sign_ui::banner(&doc.signatures);
+    let notice = if phone {
+        // Over the pages, like the bars, so showing or hiding them never moves the pages.
+        let at = ui.available_rect_before_wrap();
+        egui::Area::new(egui::Id::new("phone-notices"))
+            .order(egui::Order::Middle)
+            .fixed_pos(at.min + vec2(0.0, notice_top))
+            .constrain(false)
+            .show(ui.ctx(), |ui| {
+                ui.set_width(at.width());
+                notices(view, doc, secured, repaired, banner, ui, &t)
+            })
+            .inner
+    } else {
+        notices(view, doc, secured, repaired, banner, ui, &t)
+    };
+    match notice {
         #[cfg(not(target_arch = "wasm32"))]
         Some(Notice::Reload) => app.watch.reload_request = Some(view.id),
         #[cfg(target_arch = "wasm32")]
@@ -2078,6 +2142,10 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     let unobstructed = !app.modal_open() && !app.palette_open;
     let view = &mut app.views[index];
     if view.organize {
+        // Below the phone layout's top bar.
+        if phone {
+            ui.add_space(crate::phone::PAGE_PAD.0);
+        }
         organize_grid(view, info, doc.allows_assembly(), doc.dirty, unobstructed, ui, &t);
         return;
     }
@@ -2085,6 +2153,8 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     let avail = ui.available_rect_before_wrap();
     view.viewport_w = avail.width();
     view.viewport_h = avail.height();
+    view.side = if phone { PHONE_SIDE } else { SIDE };
+    view.pad = if phone { crate::phone::PAGE_PAD } else { (0.0, 0.0) };
     let old_zoom = view.zoom;
     view.fit_zoom(info);
     if view.shown && view.zoom_anchor.is_none() && view.goto.is_none() && view.goto_point.is_none() && (view.zoom - old_zoom).abs() > 1e-4 {
@@ -2114,7 +2184,8 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     let navigation_enabled = app.dialog.is_none() && app.close_request.is_none() && !app.palette_open && ui.is_enabled() && ui.input(|i| i.focused);
     if zoom_delta.is_finite() && zoom_delta > 0.0 && zoom_delta != 1.0 && navigation_enabled && ui.rect_contains_pointer(navigation_rect) {
         let z = view.zoom * zoom_delta;
-        match ui.input(|i| i.pointer.hover_pos()) {
+        // Two fingers zoom about the point between them, not about the first finger.
+        match ui.input(|i| i.multi_touch().map(|m| m.center_pos).or(i.pointer.hover_pos())) {
             Some(p) => view.zoom_at(z, p),
             None => view.set_zoom(z),
         }
@@ -2218,11 +2289,11 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     }
     let visible_pages: Vec<usize> = if view.continuous { (0..rects.len()).collect() } else { row.clone() };
     let (y_shift, content_h) = if view.continuous {
-        (0.0, rects.last().map(|r| r.bottom() + MARGIN).unwrap_or(0.0))
+        (0.0, rects.last().map(|r| r.bottom() + MARGIN + view.pad.1).unwrap_or(0.0))
     } else {
         // Only the current row scrolls into view; the content is its bounding box plus margins.
         match row.iter().filter_map(|&i| rects.get(i)).copied().reduce(Rect::union) {
-            Some(r) => (r.top() - MARGIN, r.height() + 2.0 * MARGIN),
+            Some(r) => (r.top() - MARGIN - view.pad.0, r.height() + 2.0 * MARGIN + view.pad.0 + view.pad.1),
             None => (0.0, 0.0),
         }
     };
@@ -2230,7 +2301,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     let mut scroll = egui::ScrollArea::both().auto_shrink([false, false]).scroll_source(egui::scroll_area::ScrollSource {
         drag: if middle_gesture {
             egui::scroll_area::DragScroll::Never
-        } else if app.quick_tool == QuickTool::Hand {
+        } else if app.quick_tool == QuickTool::Hand || touch_view {
             egui::scroll_area::DragScroll::Always
         } else {
             egui::scroll_area::DragScroll::OnTouch
@@ -2252,7 +2323,8 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     } else if let Some((page, frac)) = view.goto.take() {
         let page = page.min(rects.len() - 1);
         let r = rects[page];
-        scroll = scroll.vertical_scroll_offset((r.top() - y_shift - GAP + frac * r.height()).max(0.0));
+        // Below the room kept clear for bars floating over the pages.
+        scroll = scroll.vertical_scroll_offset((r.top() - y_shift - GAP - view.pad.0 + frac * r.height()).max(0.0));
     }
     let ppp = ui.ctx().pixels_per_point();
     let scale = view.render_scale(ppp);
@@ -2275,7 +2347,8 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     // Text selection runs for the Select tool and for the markup tools (highlight…).
     let selects_text = match tool {
         QuickTool::Comment(t) => t.markup().is_some() || t == comments::CommentTool::ReplaceText,
-        QuickTool::Select => !preparing,
+        // Reading on a phone a long press selects instead, and a double tap zooms (below).
+        QuickTool::Select => !preparing && !touch_view,
         QuickTool::Redact | QuickTool::ColumnSelect => true,
         QuickTool::Hand
         | QuickTool::Measure(_)
@@ -2376,7 +2449,14 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         if delta != Vec2::ZERO {
             ui.scroll_with_delta_animation(delta, egui::style::ScrollAnimation::none());
         }
-        let (resp_rect, resp) = ui.allocate_exact_size(vec2(content_w, content_h), Sense::click_and_drag());
+        // Two fingers pan the pages while a tool takes one finger's drags (drawing, editing,
+        // placing fields); when reading, the scroll area already follows the finger.
+        if !touch_view && let Some(touch) = ui.input(|i| i.multi_touch()) {
+            ui.scroll_with_delta_animation(touch.translation_delta, egui::style::ScrollAnimation::none());
+        }
+        // Reading on a phone the pages take taps only, so a drag reaches the scroll area under them.
+        let sense = if touch_view { Sense::click() } else { Sense::click_and_drag() };
+        let (resp_rect, resp) = ui.allocate_exact_size(vec2(content_w, content_h), sense);
         // The Hand tool pans: the content widget takes every drag, so scroll by its delta.
         if hand {
             if resp.dragged() {
@@ -2401,6 +2481,11 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         let mut current_overlap = -1.0f32;
         let mut current_height = f32::INFINITY;
         let pointer = ui.input(|i| i.pointer.hover_pos());
+        // A field, comment or other page object took this frame's pointer (so a tap is not the
+        // reader's "show or hide the bars").
+        let mut page_consumed = false;
+        // A tap that clears a selection only clears it.
+        let had_selection = view.selection.is_some();
         if resp.secondary_clicked() {
             // Set again below when the right-click lands on a link.
             view.links.context = None;
@@ -2711,6 +2796,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                 view.links.context = Some((i, l.index));
             }
             let consumed = on_objects || on_edit_text || on_link || on_content || boxing || on_field || comments::page_input(ui, &resp, &pcx, view);
+            page_consumed |= consumed;
 
             let preview_target =
                 (matches!(tool, QuickTool::Select | QuickTool::Fill(_)) && !comments_hidden).then_some(view.comments.selected).flatten();
@@ -2967,10 +3053,11 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                 if age < 1.6 {
                     let a = ((1.6 - age) / 1.6 * 255.0) as u8;
                     let sr = xf.user_rect(info, i, fr).expand(4.0);
+                    let [r, g, b, _] = crate::theme::Tokens::get(ui.ctx()).accent.to_array();
                     painter.rect_stroke(
                         sr,
                         CornerRadius::same(3),
-                        Stroke::new(2.5, Color32::from_rgba_unmultiplied(0x1B, 0x63, 0xE0, a)),
+                        Stroke::new(2.5, Color32::from_rgba_unmultiplied(r, g, b, a)),
                         egui::StrokeKind::Outside,
                     );
                     ui.ctx().request_repaint();
@@ -2993,105 +3080,129 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                 view.page_input = (current + 1).to_string();
             }
         }
-        resp.context_menu(|ui| {
-            // Preparing a form: the selected field's menu.
-            if preparing && let Some((name, wi)) = view.prepare.selected.clone() {
-                // Several fields: Align, Center, Distribute, Set Fields to Same Size.
-                if !view.prepare.also.is_empty() {
-                    use crate::prepare::Arrange as A;
-                    let others = view.prepare.also.clone();
-                    let anchor = (name.clone(), wi);
-                    let mut pick = |ui: &mut egui::Ui, op: A, label: &str| {
-                        if ui.add_enabled(can_modify, egui::Button::new(tl!(label))).clicked() {
-                            view.pending_edit = crate::prepare::arrange(&form, &anchor, &others, op);
-                            ui.close();
+        // Reading on a phone: a double tap zooms in on the point or back out to the page width,
+        // a lone tap is held for the phone shell (`tap`), and a long press selects the word under
+        // the finger, whose actions then show beside it, instead of opening the page menu.
+        let mut word_pressed = false;
+        if touch_view {
+            let at = ui.input(|i| i.pointer.interact_pos());
+            if resp.double_clicked() {
+                view.tap = None;
+                if let Some(p) = at {
+                    view.double_tap_zoom(p);
+                }
+            } else if resp.clicked() && had_selection {
+                view.selection = None;
+            } else if resp.clicked() && !page_consumed && clicked_link.is_none() {
+                view.tap = at.map(|p| (p, ui.input(|i| i.time)));
+            }
+            if resp.long_touched()
+                && let Some(p) = at
+            {
+                word_pressed = view.select_word_at(p);
+            }
+        }
+        if !word_pressed {
+            resp.context_menu(|ui| {
+                // Preparing a form: the selected field's menu.
+                if preparing && let Some((name, wi)) = view.prepare.selected.clone() {
+                    // Several fields: Align, Center, Distribute, Set Fields to Same Size.
+                    if !view.prepare.also.is_empty() {
+                        use crate::prepare::Arrange as A;
+                        let others = view.prepare.also.clone();
+                        let anchor = (name.clone(), wi);
+                        let mut pick = |ui: &mut egui::Ui, op: A, label: &str| {
+                            if ui.add_enabled(can_modify, egui::Button::new(tl!(label))).clicked() {
+                                view.pending_edit = crate::prepare::arrange(&form, &anchor, &others, op);
+                                ui.close();
+                            }
+                        };
+                        ui.menu_button(tl!("Align"), |ui| {
+                            pick(ui, A::AlignLeft, "Left");
+                            pick(ui, A::AlignRight, "Right");
+                            pick(ui, A::AlignTop, "Top");
+                            pick(ui, A::AlignBottom, "Bottom");
+                            pick(ui, A::AlignCenterV, "Center vertically");
+                            pick(ui, A::AlignCenterH, "Center horizontally");
+                        });
+                        ui.menu_button(tl!("Distribute"), |ui| {
+                            pick(ui, A::DistributeH, "Horizontally");
+                            pick(ui, A::DistributeV, "Vertically");
+                        });
+                        ui.menu_button(tl!("Set Fields to Same Size"), |ui| {
+                            pick(ui, A::SameHeight, "Height");
+                            pick(ui, A::SameWidth, "Width");
+                            pick(ui, A::SameSize, "Both");
+                        });
+                        ui.separator();
+                    }
+                    if ui.button(tl!("Properties…")).clicked() {
+                        field_menu = Some(FieldMenu::Properties);
+                        ui.close();
+                    }
+                    if ui.add_enabled(can_modify, egui::Button::new(tl!("Duplicate…"))).clicked() {
+                        field_menu = Some(FieldMenu::Duplicate(name.clone()));
+                        ui.close();
+                    }
+                    ui.separator();
+                    let delete = if view.prepare.also.is_empty() { "Delete" } else { "Delete selected fields" };
+                    if ui.add_enabled(can_modify, egui::Button::new(tl!(delete))).clicked() {
+                        view.pending_edit = crate::prepare::delete_selected(view);
+                        ui.close();
+                    }
+                    return;
+                }
+                if let Some((page, index)) = view.links.context {
+                    if ui.button(tl!("Properties…")).clicked() {
+                        view.links.open_existing = Some((page, index));
+                        ui.close();
+                    }
+                    if ui.add_enabled(can_modify, egui::Button::new(tl!("Delete"))).clicked() {
+                        view.pending_edit = Some(Edit::DeleteLink { page, index });
+                        view.links.selected = None;
+                        view.links.context = None;
+                        ui.close();
+                    }
+                    ui.separator();
+                    if ui.add_enabled(can_modify, egui::Button::new(tl!("Remove all links"))).clicked() {
+                        view.pending_edit = Some(Edit::RemoveLinks { pages: None });
+                        view.links.selected = None;
+                        view.links.context = None;
+                        ui.close();
+                    }
+                    return;
+                }
+                // Over a picture (and no comment): Copy Image, as in Acrobat's page menu.
+                let mut copy_image = None;
+                if view.comments.selected.is_none()
+                    && let Some((page, at)) = view.comments.context_at
+                {
+                    // The page's content is parsed once per right-click, not on every frame the menu is open.
+                    let key = egui::Id::new("copy-image-under-menu");
+                    let cached = ui.data(|d| d.get_temp::<(usize, [f64; 2], Option<usize>)>(key)).filter(|c| c.0 == page && c.1 == at);
+                    let hit = match cached {
+                        Some(c) => c.2,
+                        None => {
+                            let hit = doc.page_image_at(page, at);
+                            ui.data_mut(|d| d.insert_temp(key, (page, at, hit)));
+                            hit
                         }
                     };
-                    ui.menu_button(tl!("Align"), |ui| {
-                        pick(ui, A::AlignLeft, "Left");
-                        pick(ui, A::AlignRight, "Right");
-                        pick(ui, A::AlignTop, "Top");
-                        pick(ui, A::AlignBottom, "Bottom");
-                        pick(ui, A::AlignCenterV, "Center vertically");
-                        pick(ui, A::AlignCenterH, "Center horizontally");
-                    });
-                    ui.menu_button(tl!("Distribute"), |ui| {
-                        pick(ui, A::DistributeH, "Horizontally");
-                        pick(ui, A::DistributeV, "Vertically");
-                    });
-                    ui.menu_button(tl!("Set Fields to Same Size"), |ui| {
-                        pick(ui, A::SameHeight, "Height");
-                        pick(ui, A::SameWidth, "Width");
-                        pick(ui, A::SameSize, "Both");
-                    });
-                    ui.separator();
-                }
-                if ui.button(tl!("Properties…")).clicked() {
-                    field_menu = Some(FieldMenu::Properties);
-                    ui.close();
-                }
-                if ui.add_enabled(can_modify, egui::Button::new(tl!("Duplicate…"))).clicked() {
-                    field_menu = Some(FieldMenu::Duplicate(name.clone()));
-                    ui.close();
-                }
-                ui.separator();
-                let delete = if view.prepare.also.is_empty() { "Delete" } else { "Delete selected fields" };
-                if ui.add_enabled(can_modify, egui::Button::new(tl!(delete))).clicked() {
-                    view.pending_edit = crate::prepare::delete_selected(view);
-                    ui.close();
-                }
-                return;
-            }
-            if let Some((page, index)) = view.links.context {
-                if ui.button(tl!("Properties…")).clicked() {
-                    view.links.open_existing = Some((page, index));
-                    ui.close();
-                }
-                if ui.add_enabled(can_modify, egui::Button::new(tl!("Delete"))).clicked() {
-                    view.pending_edit = Some(Edit::DeleteLink { page, index });
-                    view.links.selected = None;
-                    view.links.context = None;
-                    ui.close();
-                }
-                ui.separator();
-                if ui.add_enabled(can_modify, egui::Button::new(tl!("Remove all links"))).clicked() {
-                    view.pending_edit = Some(Edit::RemoveLinks { pages: None });
-                    view.links.selected = None;
-                    view.links.context = None;
-                    ui.close();
-                }
-                return;
-            }
-            // Over a picture (and no comment): Copy Image, as in Acrobat's page menu.
-            let mut copy_image = None;
-            if view.comments.selected.is_none()
-                && let Some((page, at)) = view.comments.context_at
-            {
-                // The page's content is parsed once per right-click, not on every frame the menu is open.
-                let key = egui::Id::new("copy-image-under-menu");
-                let cached = ui.data(|d| d.get_temp::<(usize, [f64; 2], Option<usize>)>(key)).filter(|c| c.0 == page && c.1 == at);
-                let hit = match cached {
-                    Some(c) => c.2,
-                    None => {
-                        let hit = doc.page_image_at(page, at);
-                        ui.data_mut(|d| d.insert_temp(key, (page, at, hit)));
-                        hit
+                    if let Some(image) = hit {
+                        if ui.button(tl!("Copy Image")).clicked() {
+                            copy_image = Some(comments::CanvasAction::CopyImage(page, image));
+                            ui.close();
+                        }
+                        if ui.button(tl!("Copy Image in Original Format")).clicked() {
+                            copy_image = Some(comments::CanvasAction::CopyImageFile(page, image));
+                            ui.close();
+                        }
+                        ui.separator();
                     }
-                };
-                if let Some(image) = hit {
-                    if ui.button(tl!("Copy Image")).clicked() {
-                        copy_image = Some(comments::CanvasAction::CopyImage(page, image));
-                        ui.close();
-                    }
-                    if ui.button(tl!("Copy Image in Original Format")).clicked() {
-                        copy_image = Some(comments::CanvasAction::CopyImageFile(page, image));
-                        ui.close();
-                    }
-                    ui.separator();
                 }
-            }
-            canvas_action = comments::context_menu(ui, view, info, prefs, allowed).or(copy_image);
-        });
+                canvas_action = comments::context_menu(ui, view, info, prefs, allowed).or(copy_image);
+            });
+        }
         (wanted, visible_now)
     });
     view.single_edges = visible_pages.first().copied().filter(|_| !view.continuous).map(|page| {
@@ -3209,7 +3320,10 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
             });
         });
     }
-    find_bar(view, info.pages.len(), avail, ui, &t);
+    // The phone layout searches from its own top bar.
+    if !phone {
+        find_bar(view, info.pages.len(), avail, ui, &t);
+    }
     if tool == QuickTool::EnhanceCamera {
         crate::camera_ui::bar(ui.ctx(), view, avail, &t, can_modify);
     }
@@ -3377,7 +3491,10 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     if let Some((name, action)) = app.views[index].forms.button.take() {
         run_button(app, index, &name, action);
     }
-    quick_bar(app, avail, ui);
+    // The phone layout's tools are in its bottom bar.
+    if !phone {
+        quick_bar(app, avail, ui);
+    }
     if let Some((source, file, destination)) = remote_open {
         app.open_remote_link(source, file, destination);
     }
@@ -3692,20 +3809,14 @@ fn notices(
     // replacing it, ahead of every other notice.
     if view.disk_changed {
         let mut reload = false;
-        egui::Frame::NONE.fill(t.accent_soft).inner_margin(egui::Margin::symmetric(14, 7)).show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.add(icons::image("rotate-cw", 16.0, t.accent_text));
-                ui.label(
-                    egui::RichText::new(tl!("This file changed on disk. Reload it to see the new version; your unsaved changes will be lost."))
-                        .color(t.text),
-                );
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if icons::button(ui, "x", 22.0, false, tl!("Dismiss")).clicked() {
-                        view.disk_changed = false;
-                    }
-                    reload = crate::widgets::pill_button(ui, tl!("Reload"), false).clicked();
-                });
-            });
+        // The shared bar: its message wraps beside the buttons, so on a narrow (phone) window the
+        // buttons stay on screen.
+        let text = tl!("This file changed on disk. Reload it to see the new version; your unsaved changes will be lost.").to_string();
+        notice_bar(ui, t, "rotate-cw", t.accent_text, text, |ui| {
+            if icons::button(ui, "x", 22.0, false, tl!("Dismiss")).clicked() {
+                view.disk_changed = false;
+            }
+            reload = crate::widgets::pill_button(ui, tl!("Reload"), false).clicked();
         });
         return reload.then_some(Notice::Reload);
     }

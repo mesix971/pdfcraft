@@ -2,7 +2,7 @@
 //! dialog snapshots d13, d14, d12d). Each has the shared Page Range Options and a schematic
 //! preview of the current page. "Update" opens the same dialog in replace mode.
 
-use egui::{Align, Color32, CornerRadius, Layout, Rect, Stroke, pos2, vec2};
+use egui::{Color32, CornerRadius, Rect, Stroke, pos2, vec2};
 use pdfcraft_engine::{Background, Edit, HeaderFooter, MarkKind, Watermark};
 
 use crate::theme::{self, Tokens};
@@ -48,7 +48,7 @@ impl PageRange {
     }
 
     pub(crate) fn ui(&mut self, ui: &mut egui::Ui, count: usize) {
-        ui.horizontal(|ui| {
+        widgets::row(ui, |ui| {
             widgets::radio_value(ui, &mut self.all, true, tl!("All pages"));
             widgets::radio_value(ui, &mut self.all, false, tl!("Pages from"));
             ui.add_enabled(!self.all, egui::DragValue::new(&mut self.from).range(1..=count.max(1)));
@@ -57,6 +57,10 @@ impl PageRange {
                 self.to = count.max(1);
             }
             ui.add_enabled(!self.all, egui::DragValue::new(&mut self.to).range(1..=count.max(1)));
+            if widgets::phone_dialogs(ui.ctx()) {
+                // The list can't wrap by itself: start it on its own line.
+                ui.end_row();
+            }
             ui.label(tl!("Subset"));
             let label = match self.subset {
                 Subset::All => tl!("All pages in range"),
@@ -160,7 +164,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
     ui.add_space(8.0);
     match kind {
         MarkKind::HeaderFooter => {
-            ui.horizontal(|ui| {
+            widgets::row(ui, |ui| {
                 ui.label(tl!("Font: Helvetica"));
                 ui.label(tl!("Size"));
                 ui.add(egui::DragValue::new(&mut d.hf.font_size).range(4.0..=72.0).speed(0.5));
@@ -180,23 +184,34 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
                 }
             });
             ui.add_space(8.0);
-            egui::Grid::new("hf-boxes").num_columns(3).spacing([10.0, 4.0]).show(ui, |ui| {
-                for row in 0..2 {
-                    for col in 0..3 {
-                        ui.label(egui::RichText::new(tl!(BOX_NAMES[row * 3 + col])).small());
+            if widgets::phone_dialogs(ui.ctx()) {
+                // One box under another, as wide as the screen.
+                for (k, name) in BOX_NAMES.into_iter().enumerate() {
+                    ui.label(egui::RichText::new(tl!(name)).small());
+                    let r = ui.add(crate::widgets::block(&mut d.hf.text[k]).desired_rows(2).desired_width(f32::INFINITY).id_salt(("hf-box", k)));
+                    if r.gained_focus() || r.has_focus() {
+                        d.focused_box = k;
                     }
-                    ui.end_row();
-                    for col in 0..3 {
-                        let k = row * 3 + col;
-                        let r = ui.add_sized([220.0, 40.0], crate::widgets::block(&mut d.hf.text[k]).desired_rows(2).id_salt(("hf-box", k)));
-                        if r.gained_focus() || r.has_focus() {
-                            d.focused_box = k;
-                        }
-                    }
-                    ui.end_row();
                 }
-            });
-            ui.horizontal(|ui| {
+            } else {
+                egui::Grid::new("hf-boxes").num_columns(3).spacing([10.0, 4.0]).show(ui, |ui| {
+                    for row in 0..2 {
+                        for col in 0..3 {
+                            ui.label(egui::RichText::new(tl!(BOX_NAMES[row * 3 + col])).small());
+                        }
+                        ui.end_row();
+                        for col in 0..3 {
+                            let k = row * 3 + col;
+                            let r = ui.add_sized([220.0, 40.0], crate::widgets::block(&mut d.hf.text[k]).desired_rows(2).id_salt(("hf-box", k)));
+                            if r.gained_focus() || r.has_focus() {
+                                d.focused_box = k;
+                            }
+                        }
+                        ui.end_row();
+                    }
+                });
+            }
+            widgets::row(ui, |ui| {
                 egui::ComboBox::from_id_salt("hf-page-format").selected_text(PAGE_FORMATS[d.page_format].trim_matches(['<', '>'])).show_ui(
                     ui,
                     |ui| {
@@ -209,6 +224,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
                     d.hf.text[d.focused_box].push_str(PAGE_FORMATS[d.page_format]);
                 }
                 ui.add_space(12.0);
+                widgets::line_break(ui);
                 egui::ComboBox::from_id_salt("hf-date-format").selected_text(DATE_FORMATS[d.date_format].trim_matches(['<', '>'])).show_ui(
                     ui,
                     |ui| {
@@ -221,12 +237,13 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
                     d.hf.text[d.focused_box].push_str(DATE_FORMATS[d.date_format]);
                 }
                 ui.add_space(12.0);
+                widgets::line_break(ui);
                 ui.label(tl!("Start page number"));
                 ui.add(egui::DragValue::new(&mut d.hf.start_number).range(1..=999_999));
             });
         }
         MarkKind::Watermark => {
-            ui.horizontal(|ui| {
+            widgets::row(ui, |ui| {
                 ui.label(tl!("Source"));
                 widgets::radio_value(ui, &mut d.use_file, false, tl!("Text"));
                 widgets::radio_value(ui, &mut d.use_file, true, tl!("File"));
@@ -242,7 +259,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
                             crate::widgets::block(&mut d.wm.text).desired_rows(2).desired_width(320.0).hint_text("CONFIDENTIAL").id_salt("wm-text"),
                         );
                     });
-                    ui.horizontal(|ui| {
+                    widgets::row(ui, |ui| {
                         ui.add_enabled_ui(!d.use_file, |ui| ui.add(widgets::checkbox(&mut d.fit, tl!("Fit to page"))));
                         ui.add_enabled_ui(!d.fit, |ui| {
                             ui.label(tl!("Size"));
@@ -253,26 +270,26 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
                         });
                         color_button(ui, &mut d.wm.color);
                     });
-                    ui.horizontal(|ui| {
+                    widgets::row(ui, |ui| {
                         ui.label(tl!("Rotation"));
                         for r in [-45.0, 0.0, 45.0] {
                             widgets::radio_value(ui, &mut d.wm.rotation, r, if r == 0.0 { tl!("None").to_string() } else { format!("{r}°") });
                         }
                         ui.add(egui::DragValue::new(&mut d.wm.rotation).range(-180.0..=180.0).suffix("°"));
                     });
-                    ui.horizontal(|ui| {
+                    widgets::row(ui, |ui| {
                         ui.label(tl!("Opacity"));
                         let mut pct = d.wm.opacity * 100.0;
                         if ui.add(egui::Slider::new(&mut pct, 0.0..=100.0).suffix("%")).changed() {
                             d.wm.opacity = pct / 100.0;
                         }
                     });
-                    ui.horizontal(|ui| {
+                    widgets::row(ui, |ui| {
                         ui.label(tl!("Location"));
                         widgets::radio_value(ui, &mut d.wm.behind, true, tl!("Appear behind page"));
                         widgets::radio_value(ui, &mut d.wm.behind, false, tl!("Appear on top of page"));
                     });
-                    ui.horizontal(|ui| {
+                    widgets::row(ui, |ui| {
                         ui.label(tl!("Offset from centre"));
                         ui.label(tl!("Horizontal"));
                         ui.add(egui::DragValue::new(&mut d.wm.offset[0]).range(-MAX_OFFSET..=MAX_OFFSET).suffix(" pt"));
@@ -283,7 +300,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
             });
         }
         MarkKind::Background => {
-            ui.horizontal(|ui| {
+            widgets::row(ui, |ui| {
                 widgets::radio_value(ui, &mut d.use_file, false, tl!("From colour"));
                 ui.add_enabled_ui(!d.use_file, |ui| color_button(ui, &mut d.bg.color));
                 ui.add_space(12.0);
@@ -292,7 +309,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
             if d.use_file {
                 browse |= file_source(ui, d, MarkKind::Background);
             }
-            ui.horizontal(|ui| {
+            widgets::row(ui, |ui| {
                 ui.label(tl!("Opacity"));
                 let mut pct = d.bg.opacity * 100.0;
                 if ui.add(egui::Slider::new(&mut pct, 0.0..=100.0).suffix("%")).changed() {
@@ -309,7 +326,8 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
     let hf = d.hf.clone();
     let (wm, bg, fit) = (d.wm.clone(), d.bg.clone(), d.fit);
     let file_name = d.use_file.then(|| d.file.as_ref().map(|f| f.0.clone())).flatten();
-    ui.horizontal(|ui| {
+    // The preview beside what it shows; on a phone, above it.
+    widgets::row_or_stack(ui, |ui| {
         preview(ui, t, page, |p, r, s| match kind {
             MarkKind::HeaderFooter => {
                 for (k, text) in hf.text.iter().enumerate() {
@@ -386,7 +404,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
     });
     ui.add_space(10.0);
     let (mut apply, mut cancel) = (false, false);
-    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+    widgets::buttons_row(ui, |ui| {
         let ready = match kind {
             MarkKind::HeaderFooter => d.hf.text.iter().any(|x| !x.trim().is_empty()),
             MarkKind::Watermark => {
@@ -436,7 +454,7 @@ fn file_source(ui: &mut egui::Ui, d: &mut MarksDraft, kind: MarkKind) -> bool {
     // Browse… is desktop-only.
     #[cfg_attr(target_arch = "wasm32", allow(unused_mut))]
     let mut browse = false;
-    ui.horizontal(|ui| {
+    widgets::row(ui, |ui| {
         #[cfg(not(target_arch = "wasm32"))]
         if ui.button(tl!("Browse…")).clicked() {
             browse = true;
@@ -447,7 +465,7 @@ fn file_source(ui: &mut egui::Ui, d: &mut MarksDraft, kind: MarkKind) -> bool {
             ui.add(egui::DragValue::new(&mut d.file_page).range(1..=9999));
         }
     });
-    ui.horizontal(|ui| {
+    widgets::row(ui, |ui| {
         ui.label(tl!("Scale relative to target page"));
         let scale = if kind == MarkKind::Background { &mut d.bg.scale } else { &mut d.wm.scale };
         let mut pct = *scale * 100.0;

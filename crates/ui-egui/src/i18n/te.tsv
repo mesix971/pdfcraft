@@ -2270,3 +2270,81 @@ animation effects	Off	ఆఫ్
 	Another app	మరొక యాప్
 	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	ముద్రణకు సిద్ధమైన PDF మీరు ఎంచుకున్న యాప్‌లో తెరుచుకుంటుంది, అది తన సొంత కాపీలు, రెండు వైపులా మరియు రంగు సెట్టింగ్‌లతో దాన్ని ముద్రిస్తుంది.
 	Couldn't hand {name} to another app: {e}	{name}ను మరొక యాప్‌కు అందించలేకపోయాం: {e}
+phone bar	Edit	సవరించు
+	Send	పంపు
+	Thinking…	ఆలోచిస్తోంది…
+	Anthropic API key	Anthropic API కీ
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	మీరు అడిగినప్పుడు మాత్రమే, మీ ప్రశ్న మరియు తెరిచిన పత్రం మీ స్వంత API కీతో Anthropic (Claude)కి పంపబడతాయి. అభ్యర్థనల రుసుము మీ Anthropic ఖాతా నుండి వసూలు చేయబడుతుంది.
+	Most pages sent per question	ఒక్కో ప్రశ్నకు పంపే గరిష్ఠ పేజీలు
+	Translate page {n}	పేజీ {n}ని అనువదించు
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} టోకెన్లు
+	The answer stopped at its length limit.	సమాధానం దాని గరిష్ఠ పొడవు వద్ద ఆగిపోయింది.
+	Add your Anthropic API key to use the assistant.	సహాయకుడిని ఉపయోగించడానికి మీ Anthropic API కీని జోడించండి.
+	The API key was refused. Check it in the assistant's settings.	API కీ తిరస్కరించబడింది. సహాయకుడి సెట్టింగ్‌లలో దాన్ని తనిఖీ చేయండి.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	ఈ పత్రంలో {pages} పేజీలు ఉన్నాయి; సహాయకుడు గరిష్ఠంగా {max} చదువుతుంది. సహాయకుడి సెట్టింగ్‌లలో పరిమితిని పెంచండి.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	ఈ పత్రం సహాయకుడికి చాలా పెద్దది ({mb} MB, గరిష్ఠంగా {max} MB).
+	Too many requests right now. Try again in a moment.	ప్రస్తుతం అభ్యర్థనలు చాలా ఎక్కువగా ఉన్నాయి. కాసేపట్లో మళ్లీ ప్రయత్నించండి.
+	The request was declined ({reason}).	అభ్యర్థన తిరస్కరించబడింది ({reason}).
+	Couldn't reach the AI service: {error}	AI సేవను చేరుకోలేకపోయాం: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	API కీ చెల్లదు: సహాయకుడి సెట్టింగ్‌లలో దాన్ని మళ్లీ అతికించండి.
+	The assistant gave no answer. Try asking differently.	సహాయకుడు సమాధానం ఇవ్వలేదు. వేరే విధంగా అడిగి చూడండి.
+	Your Anthropic account can't use this model, or has no credit left: {error}	మీ Anthropic ఖాతా ఈ మోడల్‌ను ఉపయోగించలేదు, లేదా దానిలో క్రెడిట్ మిగల్లేదు: {error}
+	The AI service answered: {error}	AI సేవ ఇలా సమాధానమిచ్చింది: {error}
+	{tokens} tokens	{tokens} టోకెన్లు
+	New conversation	కొత్త సంభాషణ
+	Proposed changes	ప్రతిపాదిత మార్పులు
+	Applied	వర్తింపజేయబడింది
+	Discarded	విస్మరించబడింది
+	The document has no page {page}.	పత్రంలో {page}వ పేజీ లేదు.
+	The passage wasn't found on page {page}.	{page}వ పేజీలో ఆ భాగం కనబడలేదు.
+	The document refused the change.	పత్రం మార్పును తిరస్కరించింది.
+	Applied as one step: Undo takes them all back.	ఒకే దశలో వర్తిస్తాయి: "రద్దు చేయి" అన్నింటినీ వెనక్కి తీసుకుంటుంది.
+	The passage appears more than once on page {page}.	{page}వ పేజీలో ఆ భాగం ఒకటి కంటే ఎక్కువసార్లు ఉంది.
+	It overlaps another proposed change.	ఇది మరో ప్రతిపాదిత మార్పుతో అతివ్యాప్తి చెందుతోంది.
+	A PDF on this device.	ఈ పరికరంలోని PDF.
+	Add my name	నా పేరు జోడించు
+	Add to Starred	ఇష్టమైనవాటికి జోడించు
+	Add your name and a photo. Your name also signs your comments.	మీ పేరు మరియు ఫోటో జోడించండి. మీ పేరు మీ వ్యాఖ్యలకు సంతకం కూడా చేస్తుంది.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	మీ ఫైల్‌లకు యాక్సెస్ అనుమతించండి, అప్పుడు PdfCraft ఈ పరికరంలోని PDFలను చూపిస్తుంది.
+	An empty page to start from.	ప్రారంభించడానికి ఖాళీ పేజీ.
+	Change its text and pictures.	దాని వచనం మరియు చిత్రాలను మార్చండి.
+	Choose a photo	ఫోటో ఎంచుకోండి
+	Files	ఫైల్‌లు
+	Fill in a form and sign it.	ఫారమ్‌ను పూరించి సంతకం చేయండి.
+	From photos, scans or other files.	ఫోటోలు, స్కాన్‌లు లేదా ఇతర ఫైల్‌ల నుండి.
+	Hello, {name}	నమస్కారం, {name}
+	It shows on Home and signs your comments.	ఇది హోమ్‌లో కనిపిస్తుంది మరియు మీ వ్యాఖ్యలకు సంతకం చేస్తుంది.
+	Make PdfCraft yours	PdfCraftను మీదిగా చేసుకోండి
+	More for {name}	{name} కోసం మరిన్ని
+	No PDFs found.	PDFలు కనబడలేదు.
+	No files match.	సరిపోలే ఫైల్‌లు లేవు.
+	No recent files yet.	ఇంకా ఇటీవలి ఫైల్‌లు లేవు.
+	No starred files.	ఇష్టమైన ఫైల్‌లు లేవు.
+	On this device	ఈ పరికరంలో
+	Open another file…	మరో ఫైల్ తెరువు…
+	PDFs on this device	ఈ పరికరంలోని PDFలు
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft డౌన్‌లోడ్‌లు, పత్రాలు మరియు తన స్వంత ఫోల్డర్‌లో వెతుకుతుంది.
+	Photos and scans become the pages of a new PDF.	ఫోటోలు మరియు స్కాన్‌లు కొత్త PDF పేజీలుగా మారతాయి.
+	Pictures	చిత్రాలు
+	Places	స్థానాలు
+	Profile	ప్రొఫైల్
+	Remove from Starred	ఇష్టమైనవాటి నుండి తీసివేయి
+	Remove the photo	ఫోటోను తీసివేయి
+	Search files	ఫైల్‌లను వెతకండి
+	See your PDFs	మీ PDFలను చూడండి
+	Set up	సెటప్ చేయి
+	Several PDFs and pictures in one document.	అనేక PDFలు మరియు చిత్రాలు ఒకే పత్రంలో.
+	Star a file from its menu to find it here.	ఫైల్‌ను ఇక్కడ కనుగొనడానికి దాని మెనూ నుండి ఇష్టమైనవాటికి జోడించండి.
+	Starred	ఇష్టమైనవి
+	Summarize, ask and translate.	సారాంశం, ప్రశ్నలు, అనువాదం.
+	Summarize, question and correct your PDFs with Claude, with your own key.	మీ స్వంత కీతో Claude సహాయంతో మీ PDFలను సంగ్రహించండి, ప్రశ్నించండి మరియు సరిదిద్దండి.
+	Text, pictures and other files, converted to PDF.	PDFగా మార్చిన వచనం, చిత్రాలు మరియు ఇతర ఫైల్‌లు.
+	The files you open show here.	మీరు తెరిచే ఫైల్‌లు ఇక్కడ కనిపిస్తాయి.
+	What would you like to do?	మీరు ఏమి చేయాలనుకుంటున్నారు?
+	Which document?	ఏ పత్రం?
+	Your AI assistant	మీ AI సహాయకుడు
+file state	Open	తెరిచి ఉంది
+	Choose a PNG or JPEG picture.	PNG లేదా JPEG చిత్రాన్ని ఎంచుకోండి.
+	This picture is too large.	ఈ చిత్రం చాలా పెద్దది.
+	Couldn't use this picture: {e}	ఈ చిత్రాన్ని ఉపయోగించడం సాధ్యం కాలేదు: {e}
+	Couldn't use this picture.	ఈ చిత్రాన్ని ఉపయోగించడం సాధ్యం కాలేదు.

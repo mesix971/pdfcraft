@@ -1,9 +1,10 @@
 # pdfcraft-android
 
-PdfCraft on Android phones and tablets: the same egui shell as the desktop app
-(`crates/ui-egui`), run in a `NativeActivity`, so every tool, dialog and panel of the desktop app is
-there. There is no Java or Kotlin code and no Gradle: the app is one native library,
-`libpdfcraft_android.so`, packaged by `cargo xtask android`.
+PdfCraft on Android phones and tablets, run in a `NativeActivity`. On a phone it draws the phone
+layout (`crates/ui-egui/src/phone.rs`); on a tablet, the desktop shell. Both are the same egui
+app (`crates/ui-egui`) over the same engine, so every tool, dialog and panel is there. There is
+no Java or Kotlin code and no Gradle: the app is one native library, `libpdfcraft_android.so`,
+packaged by `cargo xtask android`.
 
 Status: **preview**. It builds, passes clippy for Android and its host-side tests, and packages as a
 signed APK; it has not yet been run through the test suite on a device, so expect rough edges (see
@@ -84,18 +85,48 @@ Android 8.0 (API 26) or later, 64-bit ARM by default.
   before the build) and are unpacked into the app's storage on first start.
 - **Settings and recovery.** Kept in the app's private storage; unsaved documents are autosaved
   when the app goes to the background, and offered again after Android stops it.
-- **Small screens.** On a phone, Auto draws the interface at 80% so more of the desktop layout fits,
-  and the first start keeps the tool panel closed so the page has a portrait screen to itself (the
-  Tools tab opens it); Preferences ▸ Interface size changes the size. When the mode tabs don't fit
-  they fold into one menu of the current mode, and the search box into its icon; when the side rail
-  is short its panel buttons scroll above the page controls.
+- **The phone layout.** A phone (smallest width under 600 dp) always gets the phone layout, drawn
+  at the phone's own points:
+  - Home (`crates/ui-egui/src/phone_home.rs`) greets the user by name (the name comments are
+    signed with) under a header with the ArtCraft mark, search and the profile photo; offers tips
+    to set up what isn't yet (the AI key, a name, file access), a row of quick actions (each asks
+    for a document, then opens it in that tool), and the files: Recent, Starred and On this
+    device (Download, Documents and PdfCraft's folder, scanned on a thread), each with a preview
+    of its first page, made for the rows on screen (the ArtCraft mark over "PDF" until it is
+    ready, and for a file that can't show one). A tab bar switches
+    between Home, Files, Create and Tools; "+" opens, creates and combines. The profile sets the
+    name and a photo (its centred square, 256 pixels, made on a thread and kept with the
+    settings).
+  - The reader shows the page across the screen. A tap hides or shows the bars, one finger
+    scrolls, two fingers zoom, a double tap zooms in on the point (and back), and a long press
+    selects a word.
+  - The top bar has Back, the AI assistant, search and a menu (save, print, pages, bookmarks,
+    comments, page display, properties, preferences).
+  - The bottom bar has Edit, Comments, Draw, Fill & Sign and Tools. Comments, Draw and Fill & Sign
+    are modes with their tools in the bottom bar, and Undo, Redo and Done in the top bar.
+  - Edit and every other tool group open their panel in a drawer under the page; two fingers
+    scroll while a tool takes one finger's drags.
+  - Dialogs are screens of their own, scrolling, no wider than the phone: their rows wrap, and
+    two-column settings put each label above its controls
+    (`tests/phone.rs::every_dialog_keeps_its_controls_on_a_phone_screen` checks every dialog).
+  - Back closes one thing at a time and never leaves Home.
+  - Colour: the accent is the icon's green, Home has a header in it, each tool keeps its
+    group's colour in the bottom bar, and a tool mode's bar takes a wash of it. The strip under
+    Android's status bar is PdfCraft's to paint (a `NativeActivity` window takes the whole
+    screen), in the same green.
+- **The AI assistant** (`crates/ai`): summarize the document, ask about it, translate a page,
+  with the user's own Anthropic API key. Asked to correct, reword or translate the document
+  itself, it proposes the changes (each passage and its replacement); **Apply** rewrites each
+  paragraph in its own font, size and colour, rewrapped in its box, as one step that Undo (in
+  the ⋮ menu) takes back. It is the only reason the app has the INTERNET permission: nothing is
+  sent until a key is entered and a question asked.
 - **Dark theme** follows the system's.
 
 ## Known limits
 
 - Not yet tested on a device: please report what breaks.
-- The phone layout is the desktop layout, scaled and folded where it would overlap; there is no
-  layout designed for small portrait screens yet (tablets and landscape suit it best).
+- In the phone layout, the tool drawer shows the desktop tool panels as they are: they work, but
+  most aren't designed for touch yet (rows are 34 points tall).
 - No screen reader: eframe's AccessKit bridge needs `GameActivity` (Java), not `NativeActivity`.
 - A text field takes typing through Android's text box, not in place: the box covers the page while
   it shows, and the field's text is replaced as a whole when OK is pressed.

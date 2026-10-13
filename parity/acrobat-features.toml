@@ -1658,8 +1658,8 @@ milestone = "M3"
 status = "shipped"
 commands = ["file.pin_folder"]
 tools = []
-evidence = ["crates/ui-egui/tests/ui.rs::home_shows_welcome_and_tools", "crates/ui-egui/tests/folders.rs::a_pinned_folder_lists_its_newest_pdfs_on_home", "crates/ui-egui/tests/folders.rs::clicking_a_pinned_pdf_opens_it_and_adds_it_to_recent", "crates/ui-egui/tests/folders.rs::pinned_folders_survive_a_restart"]
-notes = "Desktop: folders pinned to Home (File ▸ Pin folder to Home…, up to 8) list their newest PDFs, read on a worker thread and refreshed every few seconds while Home shows; a folder that can't be read (moved, offline synced drive) stays pinned and says so. Pinned folders are local paths, so a cloud drive works through its synced folder (iCloud Drive, OneDrive, Dropbox). Not yet: subfolders, search within a pinned folder, the web build."
+evidence = ["crates/ui-egui/tests/ui.rs::home_shows_welcome_and_tools", "crates/ui-egui/tests/folders.rs::a_pinned_folder_lists_its_newest_pdfs_on_home", "crates/ui-egui/tests/folders.rs::clicking_a_pinned_pdf_opens_it_and_adds_it_to_recent", "crates/ui-egui/tests/folders.rs::pinned_folders_survive_a_restart", "crates/ui-egui/tests/phone.rs::files_are_starred_listed_from_the_device_and_previewed", "crates/ui-egui/tests/phone.rs::only_the_rows_on_screen_are_previewed", "crates/ui-egui/tests/phone.rs::a_quick_action_opens_a_file_then_its_tool"]
+notes = "Desktop: folders pinned to Home (File ▸ Pin folder to Home…, up to 8) list their newest PDFs, read on a worker thread and refreshed every few seconds while Home shows; a folder that can't be read (moved, offline synced drive) stays pinned and says so. Pinned folders are local paths, so a cloud drive works through its synced folder (iCloud Drive, OneDrive, Dropbox). Phone (`phone_home.rs`): a greeting by name with a profile photo, tips, quick actions that open a file in their tool, Recent, Starred and On this device lists (Download, Documents and PdfCraft's folder scanned on a thread, the newest 500) with first-page previews of the rows on screen, search, and Home, Files, Create and Tools tabs. Not yet: subfolders, search within a pinned folder, the web build; on the phone, previews of files in the cloud, and folders other than the three scanned."
 
 [[feature]]
 id = "view.all-tools"
@@ -1826,7 +1826,7 @@ milestone = "M3"
 status = "partial"
 commands = []
 tools = []
-evidence = ["crates/ui-egui/src/file_browser.rs::open_shows_the_matching_files_and_hands_back_the_one_tapped", "crates/ui-egui/src/file_browser.rs::all_files_shows_every_file_and_several_can_be_chosen", "crates/ui-egui/src/file_browser.rs::save_adds_the_extension_and_asks_before_replacing_a_file", "crates/ui-egui/src/file_browser.rs::a_folder_is_chosen_where_the_browser_stands_and_new_folders_can_be_made", "crates/ui-egui/src/file_browser.rs::cancel_hands_back_nothing_and_frees_the_picker", "crates/ui-egui/src/file_browser.rs::missing_storage_access_offers_the_system_page_and_goes_once_granted", "apps/pdfcraft-android/src/storage.rs::storage_provider_documents_are_their_shared_storage_paths", "apps/pdfcraft-android/src/storage.rs::addresses_that_could_reach_private_files_are_read_through_the_system_instead", "apps/pdfcraft-android/src/screen.rs::the_keyboard_and_bars_become_insets_in_points", "crates/ocr/src/lib.rs::models_installed_by_the_app_are_searched_after_the_override_and_set_once", "xtask/src/android.rs::the_manifest_names_the_library_and_has_no_internet_permission", "apps/pdfcraft-android/src/typing.rs::the_dialog_gets_the_fields_text_and_its_answer_replaces_it_then_enter", "apps/pdfcraft-android/src/typing.rs::a_password_is_never_read_into_the_dialog", "apps/pdfcraft-android/tests/winit_android_recreation.rs::winit_lets_each_android_activity_create_its_event_loop", "crates/ui-egui/tests/small_screens.rs::a_narrow_window_keeps_every_mode_in_one_menu", "crates/ui-egui/tests/small_screens.rs::a_short_window_scrolls_the_rail_panels_above_the_page_controls", "crates/ui-egui/tests/print.rs::another_app_prints_where_the_host_has_no_spooler"]
+evidence = ["crates/ui-egui/src/file_browser.rs::open_shows_the_matching_files_and_hands_back_the_one_tapped", "crates/ui-egui/src/file_browser.rs::all_files_shows_every_file_and_several_can_be_chosen", "crates/ui-egui/src/file_browser.rs::save_adds_the_extension_and_asks_before_replacing_a_file", "crates/ui-egui/src/file_browser.rs::a_folder_is_chosen_where_the_browser_stands_and_new_folders_can_be_made", "crates/ui-egui/src/file_browser.rs::cancel_hands_back_nothing_and_frees_the_picker", "crates/ui-egui/src/file_browser.rs::missing_storage_access_offers_the_system_page_and_goes_once_granted", "apps/pdfcraft-android/src/storage.rs::storage_provider_documents_are_their_shared_storage_paths", "apps/pdfcraft-android/src/storage.rs::addresses_that_could_reach_private_files_are_read_through_the_system_instead", "apps/pdfcraft-android/src/screen.rs::the_keyboard_and_bars_become_insets_in_points", "crates/ocr/src/lib.rs::models_installed_by_the_app_are_searched_after_the_override_and_set_once", "xtask/src/android.rs::the_manifest_names_the_library_and_says_why_it_uses_the_network", "apps/pdfcraft-android/src/typing.rs::the_dialog_gets_the_fields_text_and_its_answer_replaces_it_then_enter", "apps/pdfcraft-android/src/typing.rs::a_password_is_never_read_into_the_dialog", "apps/pdfcraft-android/tests/winit_android_recreation.rs::winit_lets_each_android_activity_create_its_event_loop", "crates/ui-egui/tests/small_screens.rs::a_narrow_window_keeps_every_mode_in_one_menu", "crates/ui-egui/tests/small_screens.rs::a_short_window_scrolls_the_rail_panels_above_the_page_controls", "crates/ui-egui/tests/print.rs::another_app_prints_where_the_host_has_no_spooler"]
 notes = "Preview (apps/pdfcraft-android): the desktop egui shell in a NativeActivity, so every tool is present; `cargo xtask android` builds a signed APK (arm64 by default, Android 8.0+) and CI attaches a debug-signed one. Every picker is the in-app file browser on real paths (all-files access asked for when needed); Open with/Share for PDFs (in place on shared storage, else as an unsaved copy), also while PdfCraft runs (a second Activity hands the document over); typing through Android's own text box, so every input method works (accents, other alphabets, predictive text); system clipboard for text; printing through another app (MediaStore Download/PdfCraft + a chooser); back key as Escape; mode bar and rail fold on small screens; OCR models unpacked from the APK; language and units from the device; relaunch in a kept-alive process. Missing: testing on devices, a phone layout of its own, screen reader (needs GameActivity), a printer list and image/file clipboard (need Java), a Play-compatible target SDK 35"
 
 [[feature]]
@@ -9525,11 +9525,11 @@ title = "Summarize a document"
 area = "N"
 tier = "P2"
 milestone = "M13"
-status = "planned"
+status = "partial"
 commands = []
 tools = []
-evidence = []
-notes = ""
+evidence = ["crates/ai/src/lib.rs::the_first_question_sends_the_document_cached", "crates/ui-egui/tests/phone.rs::the_assistant_asks_for_a_key_and_says_why_it_cant_answer"]
+notes = "The phone layout's AI assistant (crates/ai): Summarize and Translate page with the user's own Anthropic API key (Claude reads the whole PDF, scans included; follow-ups read it back from the prompt cache). Not yet: an entry in the desktop layout, an automation tool, a local model."
 
 [[feature]]
 id = "misc.ai-ask"
@@ -9537,11 +9537,11 @@ title = "Ask questions with citations to pages"
 area = "N"
 tier = "P2"
 milestone = "M13"
-status = "planned"
+status = "partial"
 commands = []
 tools = []
-evidence = []
-notes = ""
+evidence = ["crates/ai/src/lib.rs::follow_up_questions_keep_the_conversation_and_its_cached_start", "crates/ai/src/lib.rs::answers_are_read_after_their_stop_reason"]
+notes = "Phone layout: questions and follow-ups about the open document, answers citing pages as (p. N) in text; the cost of each answer shown. Not yet: citations that jump to the page, the desktop layout, an automation tool."
 
 [[feature]]
 id = "misc.ai-conversational-edit"
@@ -9549,11 +9549,11 @@ title = "Natural-language editing through registry commands"
 area = "N"
 tier = "P3"
 milestone = "M13"
-status = "planned"
+status = "partial"
 commands = []
 tools = []
-evidence = []
-notes = ""
+evidence = ["crates/ai/src/lib.rs::proposed_changes_are_read_and_their_fate_goes_back_with_the_next_question", "crates/ui-egui/src/ai_ui.rs::apply_changes_the_document_once_and_the_next_question_says_what_happened"]
+notes = "Text only: asked to correct, reword or translate in place, the assistant proposes passage replacements; Apply rewrites each paragraph in its own font, size and colour, rewrapped in its box, as one undo step. Not yet: other edits (pages, comments, forms) through registry commands, the desktop layout."
 
 [[feature]]
 id = "misc.ai-presentation"

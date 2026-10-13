@@ -2320,3 +2320,81 @@ animation effects	Off	Изключени
 	Another app	Друго приложение
 	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Готовият за печат PDF се отваря в избраното от вас приложение, което го отпечатва със своите настройки за копия, двустранен печат и цвят.
 	Couldn't hand {name} to another app: {e}	{name} не може да бъде предаден на друго приложение: {e}
+phone bar	Edit	Редактиране
+	Send	Изпращане
+	Thinking…	Мисли…
+	Anthropic API key	API ключ за Anthropic
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	Въпросът ви и отвореният документ се изпращат до Anthropic (Claude) с вашия собствен API ключ, само когато поискате. Заявките се таксуват към акаунта ви в Anthropic.
+	Most pages sent per question	Най-много изпратени страници на въпрос
+	Translate page {n}	Превод на страница {n}
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} токена
+	The answer stopped at its length limit.	Отговорът спря при максималната си дължина.
+	Add your Anthropic API key to use the assistant.	Добавете своя API ключ за Anthropic, за да използвате асистента.
+	The API key was refused. Check it in the assistant's settings.	API ключът беше отхвърлен. Проверете го в настройките на асистента.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	Този документ има {pages} страници; асистентът чете най-много {max}. Увеличете ограничението в настройките на асистента.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	Този документ е твърде голям за асистента ({mb} MB, най-много {max} MB).
+	Too many requests right now. Try again in a moment.	Твърде много заявки в момента. Опитайте отново след малко.
+	The request was declined ({reason}).	Заявката беше отказана ({reason}).
+	Couldn't reach the AI service: {error}	Няма връзка с услугата за ИИ: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	API ключът не е валиден: поставете го отново в настройките на асистента.
+	The assistant gave no answer. Try asking differently.	Асистентът не даде отговор. Опитайте да попитате по друг начин.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Вашият акаунт в Anthropic не може да използва този модел или няма оставащ кредит: {error}
+	The AI service answered: {error}	Услугата за ИИ отговори: {error}
+	{tokens} tokens	{tokens} токена
+	New conversation	Нов разговор
+	Proposed changes	Предложени промени
+	Applied	Приложено
+	Discarded	Отхвърлено
+	The document has no page {page}.	Документът няма страница {page}.
+	The passage wasn't found on page {page}.	Пасажът не е намерен на страница {page}.
+	The document refused the change.	Документът отказа промяната.
+	Applied as one step: Undo takes them all back.	Прилагат се с една стъпка: „Отмени“ ги връща всички.
+	The passage appears more than once on page {page}.	Пасажът се среща повече от веднъж на страница {page}.
+	It overlaps another proposed change.	Тя се припокрива с друга предложена промяна.
+	A PDF on this device.	PDF на това устройство.
+	Add my name	Добави името ми
+	Add to Starred	Добави в любими
+	Add your name and a photo. Your name also signs your comments.	Добавете името си и снимка. Името ви подписва и коментарите ви.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Разрешете достъп до файловете си и PdfCraft ще покаже PDF файловете на това устройство.
+	An empty page to start from.	Празна страница за начало.
+	Change its text and pictures.	Променете текста и изображенията.
+	Choose a photo	Избери снимка
+	Files	Файлове
+	Fill in a form and sign it.	Попълнете формуляр и го подпишете.
+	From photos, scans or other files.	От снимки, сканирания или други файлове.
+	Hello, {name}	Здравейте, {name}
+	It shows on Home and signs your comments.	Показва се в началото и подписва коментарите ви.
+	Make PdfCraft yours	Направете PdfCraft свой
+	More for {name}	Още за {name}
+	No PDFs found.	Не са намерени PDF файлове.
+	No files match.	Няма съвпадащи файлове.
+	No recent files yet.	Все още няма скорошни файлове.
+	No starred files.	Няма любими файлове.
+	On this device	На това устройство
+	Open another file…	Отвори друг файл…
+	PDFs on this device	PDF файлове на това устройство
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft търси в „Изтегляния“, „Документи“ и в собствената си папка.
+	Photos and scans become the pages of a new PDF.	Снимките и сканиранията стават страници на нов PDF.
+	Pictures	Изображения
+	Places	Места
+	Profile	Профил
+	Remove from Starred	Премахни от любими
+	Remove the photo	Премахни снимката
+	Search files	Търсене на файлове
+	See your PDFs	Вижте своите PDF файлове
+	Set up	Настрой
+	Several PDFs and pictures in one document.	Няколко PDF файла и изображения в един документ.
+	Star a file from its menu to find it here.	Добавете файл в любими от менюто му, за да го намерите тук.
+	Starred	Любими
+	Summarize, ask and translate.	Обобщаване, въпроси, превод.
+	Summarize, question and correct your PDFs with Claude, with your own key.	Обобщавайте, питайте и коригирайте своите PDF файлове с Claude, със собствения си ключ.
+	Text, pictures and other files, converted to PDF.	Текст, изображения и други файлове, преобразувани в PDF.
+	The files you open show here.	Файловете, които отваряте, се показват тук.
+	What would you like to do?	Какво искате да направите?
+	Which document?	Кой документ?
+	Your AI assistant	Вашият ИИ асистент
+file state	Open	Отворен
+	Choose a PNG or JPEG picture.	Изберете изображение PNG или JPEG.
+	This picture is too large.	Това изображение е твърде голямо.
+	Couldn't use this picture: {e}	Това изображение не можа да бъде използвано: {e}
+	Couldn't use this picture.	Това изображение не можа да бъде използвано.

@@ -2353,3 +2353,81 @@ animation effects	Off	Kapalı
 	Another app	Başka bir uygulama
 	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Yazdırmaya hazır PDF seçtiğiniz uygulamada açılır ve o uygulama kendi kopya, çift taraflı ve renk ayarlarıyla yazdırır.
 	Couldn't hand {name} to another app: {e}	{name} başka bir uygulamaya aktarılamadı: {e}
+phone bar	Edit	Düzenle
+	Send	Gönder
+	Thinking…	Düşünüyor…
+	Anthropic API key	Anthropic API anahtarı
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	Sorunuz ve açık belge, yalnızca siz istediğinizde, kendi API anahtarınızla Anthropic'e (Claude) gönderilir. İstekler Anthropic hesabınızdan ücretlendirilir.
+	Most pages sent per question	Soru başına en fazla gönderilen sayfa
+	Translate page {n}	{n}. sayfayı çevir
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} token
+	The answer stopped at its length limit.	Yanıt en fazla uzunluğunda kesildi.
+	Add your Anthropic API key to use the assistant.	Asistanı kullanmak için Anthropic API anahtarınızı ekleyin.
+	The API key was refused. Check it in the assistant's settings.	API anahtarı reddedildi. Asistanın ayarlarından kontrol edin.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	Bu belge {pages} sayfa; asistan en fazla {max} sayfa okur. Sınırı asistanın ayarlarından artırın.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	Bu belge asistan için çok büyük ({mb} MB, en fazla {max} MB).
+	Too many requests right now. Try again in a moment.	Şu anda çok fazla istek var. Biraz sonra yeniden deneyin.
+	The request was declined ({reason}).	İstek reddedildi ({reason}).
+	Couldn't reach the AI service: {error}	Yapay zekâ hizmetine ulaşılamadı: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	API anahtarı geçerli değil: asistanın ayarlarına yeniden yapıştırın.
+	The assistant gave no answer. Try asking differently.	Asistan bir yanıt vermedi. Farklı bir şekilde sormayı deneyin.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Anthropic hesabınız bu modeli kullanamıyor veya kredisi kalmadı: {error}
+	The AI service answered: {error}	Yapay zekâ hizmetinin yanıtı: {error}
+	{tokens} tokens	{tokens} token
+	New conversation	Yeni sohbet
+	Proposed changes	Önerilen değişiklikler
+	Applied	Uygulandı
+	Discarded	Vazgeçildi
+	The document has no page {page}.	Belgede {page}. sayfa yok.
+	The passage wasn't found on page {page}.	Pasaj {page}. sayfada bulunamadı.
+	The document refused the change.	Belge değişikliği reddetti.
+	Applied as one step: Undo takes them all back.	Tek adımda uygulanır: Geri al hepsini geri alır.
+	The passage appears more than once on page {page}.	Pasaj {page}. sayfada birden fazla kez geçiyor.
+	It overlaps another proposed change.	Önerilen başka bir değişiklikle çakışıyor.
+	A PDF on this device.	Bu cihazdaki bir PDF.
+	Add my name	Adımı ekle
+	Add to Starred	Favorilere ekle
+	Add your name and a photo. Your name also signs your comments.	Adınızı ve bir fotoğraf ekleyin. Adınız yorumlarınızı da imzalar.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Dosyalarınıza erişim izni verin, PdfCraft bu cihazdaki PDF'leri listelesin.
+	An empty page to start from.	Başlamak için boş bir sayfa.
+	Change its text and pictures.	Metnini ve görsellerini değiştirin.
+	Choose a photo	Fotoğraf seç
+	Files	Dosyalar
+	Fill in a form and sign it.	Bir formu doldurup imzalayın.
+	From photos, scans or other files.	Fotoğraflardan, taramalardan veya diğer dosyalardan.
+	Hello, {name}	Merhaba, {name}
+	It shows on Home and signs your comments.	Ana sayfada görünür ve yorumlarınızı imzalar.
+	Make PdfCraft yours	PdfCraft'ı kendinize göre ayarlayın
+	More for {name}	{name} için diğer seçenekler
+	No PDFs found.	PDF bulunamadı.
+	No files match.	Eşleşen dosya yok.
+	No recent files yet.	Henüz son dosya yok.
+	No starred files.	Favori dosya yok.
+	On this device	Bu cihazda
+	Open another file…	Başka bir dosya aç…
+	PDFs on this device	Bu cihazdaki PDF'ler
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft, İndirilenler, Belgeler ve kendi klasöründe arar.
+	Photos and scans become the pages of a new PDF.	Fotoğraflar ve taramalar yeni bir PDF'nin sayfaları olur.
+	Pictures	Görseller
+	Places	Konumlar
+	Profile	Profil
+	Remove from Starred	Favorilerden kaldır
+	Remove the photo	Fotoğrafı kaldır
+	Search files	Dosya ara
+	See your PDFs	PDF'lerinizi görün
+	Set up	Ayarla
+	Several PDFs and pictures in one document.	Birden çok PDF ve görsel tek bir belgede.
+	Star a file from its menu to find it here.	Bir dosyayı burada bulmak için menüsünden favorilere ekleyin.
+	Starred	Favoriler
+	Summarize, ask and translate.	Özetleyin, sorun, çevirin.
+	Summarize, question and correct your PDFs with Claude, with your own key.	PDF'lerinizi kendi anahtarınızla Claude ile özetleyin, sorgulayın ve düzeltin.
+	Text, pictures and other files, converted to PDF.	PDF'ye dönüştürülmüş metin, görseller ve diğer dosyalar.
+	The files you open show here.	Açtığınız dosyalar burada görünür.
+	What would you like to do?	Ne yapmak istersiniz?
+	Which document?	Hangi belge?
+	Your AI assistant	Yapay zekâ asistanınız
+file state	Open	Açık
+	Choose a PNG or JPEG picture.	PNG veya JPEG görseli seçin.
+	This picture is too large.	Bu görsel çok büyük.
+	Couldn't use this picture: {e}	Bu görsel kullanılamadı: {e}
+	Couldn't use this picture.	Bu görsel kullanılamadı.

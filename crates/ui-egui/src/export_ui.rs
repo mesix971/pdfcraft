@@ -5,7 +5,6 @@
 
 use std::sync::{Arc, Mutex};
 
-use egui::{Align, Layout};
 use pdfcraft_engine::export::{ExportSource, Exporter, ImageFormat};
 
 use crate::marks_ui::PageRange;
@@ -51,8 +50,9 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: E
     );
     ui.add_space(8.0);
     if kind == ExportKind::Image {
-        ui.horizontal(|ui| {
+        widgets::row(ui, |ui| {
             ui.label(tl!("Resolution"));
+            widgets::line_break(ui);
             egui::ComboBox::from_id_salt("export-dpi")
                 .selected_text(crate::i18n::fmt(tl!("{dpi} pixels/inch"), &[("dpi", &d.dpi.to_string())]))
                 .show_ui(ui, |ui| {
@@ -61,8 +61,9 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: E
                     }
                 });
         });
-        ui.horizontal(|ui| {
+        widgets::row(ui, |ui| {
             ui.label(tl!("Format"));
+            widgets::line_break(ui);
             let mut quality = match d.format {
                 ImageFormat::Jpeg { quality } => quality,
                 _ => 85,
@@ -76,6 +77,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: E
                 }
             });
             if let ImageFormat::Jpeg { .. } = d.format {
+                widgets::line_break(ui);
                 ui.label(tl!("Quality"));
                 if ui.add(egui::Slider::new(&mut quality, 10..=100)).changed() {
                     d.format = ImageFormat::Jpeg { quality };
@@ -88,8 +90,9 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: E
                 .color(t.text_faint),
         );
     } else if kind == ExportKind::AllImages {
-        ui.horizontal(|ui| {
+        widgets::row(ui, |ui| {
             ui.label(tl!("Exclude images smaller than"));
+            widgets::line_break(ui);
             let label = move |n: u32| {
                 if n == 0 { tl!("No limit").to_string() } else { crate::i18n::trn(crate::i18n::current(), u64::from(n), "{n} pixel", "{n} pixels") }
             };
@@ -112,7 +115,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: E
     d.range.ui(ui, count);
     ui.add_space(12.0);
     let (mut apply, mut cancel) = (false, false);
-    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+    widgets::buttons_row(ui, |ui| {
         let ok = !d.range.pages(count).is_empty();
         if ui.add_enabled_ui(ok, |ui| widgets::pill_button(ui, tl!("Export"), true)).inner.clicked() {
             apply = true;

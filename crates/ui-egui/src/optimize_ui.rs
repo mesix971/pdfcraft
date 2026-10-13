@@ -7,7 +7,6 @@
 
 use std::sync::{Arc, Mutex};
 
-use egui::{Align, Layout};
 use pdfcraft_engine::optimize::{Compression, ImageSettings, QUALITIES, Settings};
 use pdfcraft_engine::optimizer::{OptimizeStage, Optimized};
 use pdfcraft_engine::{DocId, EditError, Hidden, OptimizeReport};
@@ -106,14 +105,14 @@ fn summary(r: &OptimizeReport) -> String {
 
 fn image_row(ui: &mut egui::Ui, id: &str, title: &str, s: &mut ImageSettings) {
     ui.label(egui::RichText::new(tl!(title)).font(theme::semibold(13.0)));
-    ui.horizontal(|ui| {
+    widgets::row(ui, |ui| {
         ui.add(widgets::checkbox(&mut s.downsample, tl!("Bicubic downsampling to")));
         ui.add_enabled(s.downsample, egui::DragValue::new(&mut s.target_ppi).range(9.0..=2400.0).suffix(" ppi"));
         ui.label(tl!("for images above"));
         ui.add_enabled(s.downsample, egui::DragValue::new(&mut s.above_ppi).range(9.0..=2400.0).suffix(" ppi"));
     });
     s.above_ppi = s.above_ppi.max(s.target_ppi);
-    ui.horizontal(|ui| {
+    widgets::row(ui, |ui| {
         ui.label(tl!("Compression"));
         let label = match s.compression {
             Compression::Jpeg(_) => "JPEG",
@@ -130,6 +129,7 @@ fn image_row(ui: &mut egui::Ui, id: &str, title: &str, s: &mut ImageSettings) {
             ui.selectable_value(&mut s.compression, Compression::Retain, tl!("Retain existing"));
         });
         if let Compression::Jpeg(q) = &mut s.compression {
+            widgets::line_break(ui);
             ui.label(tl!("Quality"));
             let name = QUALITIES.iter().min_by_key(|(_, v)| (*v as i32 - *q as i32).abs()).map_or(tl!("Medium"), |(n, _)| tl!(n));
             egui::ComboBox::from_id_salt((id, "quality")).selected_text(name).show_ui(ui, |ui| {
@@ -209,11 +209,11 @@ pub(crate) fn body(ui: &mut egui::Ui, d: &mut OptimizeDraft, t: &Tokens) -> (boo
     }
     ui.add_space(12.0);
     let (mut ok, mut cancel) = (false, false);
-    ui.horizontal(|ui| {
+    widgets::row(ui, |ui| {
         if widgets::pill_button(ui, tl!("Audit space usage…"), false).clicked() {
             d.audit = true;
         }
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        widgets::buttons_row(ui, |ui| {
             if widgets::pill_button(ui, tl!("OK"), true).clicked() {
                 ok = true;
             }
@@ -244,18 +244,18 @@ pub(crate) fn audit_body(ui: &mut egui::Ui, rows: &[pdfcraft_engine::optimize::S
                 tl!(r.category.label()).to_string()
             };
             ui.label(category);
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| ui.label(r.bytes.to_string()));
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| ui.label(format!("{:.2}%", r.percent)));
+            widgets::buttons_row(ui, |ui| ui.label(r.bytes.to_string()));
+            widgets::buttons_row(ui, |ui| ui.label(format!("{:.2}%", r.percent)));
             ui.end_row();
         }
         ui.label(egui::RichText::new(tl!("Total")).strong());
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| ui.label(egui::RichText::new(total.to_string()).strong()));
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| ui.label(egui::RichText::new("100.00%").strong()));
+        widgets::buttons_row(ui, |ui| ui.label(egui::RichText::new(total.to_string()).strong()));
+        widgets::buttons_row(ui, |ui| ui.label(egui::RichText::new("100.00%").strong()));
         ui.end_row();
     });
     ui.add_space(12.0);
     let mut ok = false;
-    ui.horizontal(|ui| ui.with_layout(Layout::right_to_left(Align::Center), |ui| ok = widgets::pill_button(ui, tl!("OK"), true).clicked()));
+    ui.horizontal(|ui| widgets::buttons_row(ui, |ui| ok = widgets::pill_button(ui, tl!("OK"), true).clicked()));
     ok
 }
 

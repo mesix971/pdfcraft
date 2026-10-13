@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use egui::{Align, Color32, CornerRadius, Layout, Pos2, Rect, Stroke, vec2};
+use egui::{Color32, CornerRadius, Pos2, Rect, Stroke, vec2};
 use pdfcraft_engine::sign::{self, Appearance, Certificate, DigitalId, Modification, Name, PrivateKey};
 use pdfcraft_engine::{SignOptions, SignatureImage, SignatureInfo, SignatureStatus};
 
@@ -635,7 +635,7 @@ fn choose(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> bool {
             d.step = SignStep::Configure;
             d.error = None;
         }
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        widgets::buttons_row(ui, |ui| {
             if ui.add_enabled_ui(d.selected.is_some(), |ui| widgets::pill_button(ui, tl!("Continue"), true)).inner.clicked() {
                 d.step = SignStep::SignAs;
                 d.error = None;
@@ -717,7 +717,7 @@ fn configure(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> bool {
             d.step = SignStep::Choose;
             d.error = None;
         }
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        widgets::buttons_row(ui, |ui| {
             if widgets::pill_button(ui, if d.new_id.create { tl!("Save") } else { tl!("Continue") }, true).clicked() {
                 go = true;
             }
@@ -917,7 +917,7 @@ fn sign_as(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> bool {
             d.step = SignStep::Choose;
             d.error = None;
         }
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        widgets::buttons_row(ui, |ui| {
             if widgets::pill_button(ui, tl!("Sign"), true).clicked() {
                 go = true;
             }
@@ -1283,7 +1283,7 @@ pub(crate) fn cert_viewer(ui: &mut egui::Ui, v: &mut CertViewer, trusted: &[Cert
     });
     ui.add_space(10.0);
     let mut close = false;
-    ui.horizontal(|ui| ui.with_layout(Layout::right_to_left(Align::Center), |ui| close = widgets::pill_button(ui, tl!("OK"), true).clicked()));
+    ui.horizontal(|ui| widgets::buttons_row(ui, |ui| close = widgets::pill_button(ui, tl!("OK"), true).clicked()));
     (close, action)
 }
 

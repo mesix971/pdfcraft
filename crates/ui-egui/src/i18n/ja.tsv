@@ -2357,3 +2357,81 @@ animation effects	Off	オフ
 	Another app	別のアプリ
 	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	印刷用の PDF は選択したアプリで開き、そのアプリの部数・両面・カラーの設定で印刷されます。
 	Couldn't hand {name} to another app: {e}	{name} を別のアプリに渡せませんでした: {e}
+phone bar	Edit	編集
+	Send	送信
+	Thinking…	考えています…
+	Anthropic API key	Anthropic API キー
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	質問と開いている文書は、あなたが依頼したときにだけ、あなた自身の API キーで Anthropic (Claude) に送信されます。リクエストの料金はあなたの Anthropic アカウントに請求されます。
+	Most pages sent per question	1 回の質問で送るページ数の上限
+	Translate page {n}	{n} ページを翻訳
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} トークン
+	The answer stopped at its length limit.	回答は最大長で途切れました。
+	Add your Anthropic API key to use the assistant.	アシスタントを使うには Anthropic API キーを追加してください。
+	The API key was refused. Check it in the assistant's settings.	API キーが拒否されました。アシスタントの設定で確認してください。
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	この文書は {pages} ページあります。アシスタントが読めるのは {max} ページまでです。アシスタントの設定で上限を上げてください。
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	この文書はアシスタントには大きすぎます ({mb} MB、上限 {max} MB)。
+	Too many requests right now. Try again in a moment.	現在リクエストが多すぎます。少し待ってからもう一度お試しください。
+	The request was declined ({reason}).	リクエストは拒否されました ({reason})。
+	Couldn't reach the AI service: {error}	AI サービスに接続できませんでした: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	API キーが無効です。アシスタントの設定でもう一度貼り付けてください。
+	The assistant gave no answer. Try asking differently.	アシスタントから回答がありませんでした。質問の仕方を変えてみてください。
+	Your Anthropic account can't use this model, or has no credit left: {error}	お使いの Anthropic アカウントではこのモデルを使用できないか、クレジットが残っていません: {error}
+	The AI service answered: {error}	AI サービスからの応答: {error}
+	{tokens} tokens	{tokens} トークン
+	New conversation	新しい会話
+	Proposed changes	提案された変更
+	Applied	適用済み
+	Discarded	破棄済み
+	The document has no page {page}.	この文書には {page} ページがありません。
+	The passage wasn't found on page {page}.	{page} ページにその箇所が見つかりませんでした。
+	The document refused the change.	文書が変更を受け付けませんでした。
+	Applied as one step: Undo takes them all back.	1 回の操作で適用されます。「取り消し」ですべて元に戻ります。
+	The passage appears more than once on page {page}.	{page} ページにその箇所が複数あります。
+	It overlaps another proposed change.	ほかの提案された変更と重なっています。
+	A PDF on this device.	このデバイス上の PDF。
+	Add my name	名前を追加
+	Add to Starred	お気に入りに追加
+	Add your name and a photo. Your name also signs your comments.	名前と写真を追加してください。名前はコメントの署名にも使われます。
+	Allow access to your files and PdfCraft lists the PDFs on this device.	ファイルへのアクセスを許可すると、PdfCraft がこのデバイス上の PDF を一覧表示します。
+	An empty page to start from.	白紙のページから始めます。
+	Change its text and pictures.	テキストや画像を変更します。
+	Choose a photo	写真を選択
+	Files	ファイル
+	Fill in a form and sign it.	フォームに入力して署名します。
+	From photos, scans or other files.	写真、スキャン、その他のファイルから。
+	Hello, {name}	こんにちは、{name} さん
+	It shows on Home and signs your comments.	ホームに表示され、コメントの署名にも使われます。
+	Make PdfCraft yours	PdfCraft を自分らしく
+	More for {name}	{name} のその他の操作
+	No PDFs found.	PDF が見つかりませんでした。
+	No files match.	一致するファイルはありません。
+	No recent files yet.	最近使ったファイルはまだありません。
+	No starred files.	お気に入りのファイルはありません。
+	On this device	このデバイス
+	Open another file…	別のファイルを開く…
+	PDFs on this device	このデバイス上の PDF
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft はダウンロード、ドキュメント、独自のフォルダーを探します。
+	Photos and scans become the pages of a new PDF.	写真やスキャンが新しい PDF のページになります。
+	Pictures	画像
+	Places	場所
+	Profile	プロフィール
+	Remove from Starred	お気に入りから削除
+	Remove the photo	写真を削除
+	Search files	ファイルを検索
+	See your PDFs	PDF を表示
+	Set up	設定する
+	Several PDFs and pictures in one document.	複数の PDF と画像を 1 つの文書に。
+	Star a file from its menu to find it here.	ファイルのメニューからお気に入りに追加すると、ここに表示されます。
+	Starred	お気に入り
+	Summarize, ask and translate.	要約、質問、翻訳。
+	Summarize, question and correct your PDFs with Claude, with your own key.	自分のキーを使い、Claude で PDF を要約・質問・修正できます。
+	Text, pictures and other files, converted to PDF.	テキスト、画像、その他のファイルを PDF に変換。
+	The files you open show here.	開いたファイルがここに表示されます。
+	What would you like to do?	何をしますか？
+	Which document?	どの文書ですか？
+	Your AI assistant	AI アシスタント
+file state	Open	開いています
+	Choose a PNG or JPEG picture.	PNG または JPEG の画像を選択してください。
+	This picture is too large.	この画像は大きすぎます。
+	Couldn't use this picture: {e}	この画像を使用できませんでした: {e}
+	Couldn't use this picture.	この画像を使用できませんでした。

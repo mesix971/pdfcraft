@@ -2358,3 +2358,81 @@ animation effects	Off	Aus
 	Another app	Eine andere App
 	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Das druckfertige PDF wird in der App Ihrer Wahl geöffnet, die es mit ihren eigenen Einstellungen für Kopien, Duplexdruck und Farbe druckt.
 	Couldn't hand {name} to another app: {e}	{name} konnte nicht an eine andere App übergeben werden: {e}
+phone bar	Edit	Bearbeiten
+	Send	Senden
+	Thinking…	Denkt nach…
+	Anthropic API key	Anthropic-API-Schlüssel
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	Deine Frage und das geöffnete Dokument werden mit deinem eigenen API-Schlüssel an Anthropic (Claude) gesendet, nur wenn du es verlangst. Die Anfragen werden deinem Anthropic-Konto berechnet.
+	Most pages sent per question	Höchstens gesendete Seiten pro Frage
+	Translate page {n}	Seite {n} übersetzen
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} Token
+	The answer stopped at its length limit.	Die Antwort wurde bei ihrer Höchstlänge abgebrochen.
+	Add your Anthropic API key to use the assistant.	Füge deinen Anthropic-API-Schlüssel hinzu, um den Assistenten zu nutzen.
+	The API key was refused. Check it in the assistant's settings.	Der API-Schlüssel wurde abgelehnt. Prüfe ihn in den Einstellungen des Assistenten.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	Dieses Dokument hat {pages} Seiten; der Assistent liest höchstens {max}. Erhöhe das Limit in den Einstellungen des Assistenten.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	Dieses Dokument ist zu groß für den Assistenten ({mb} MB, höchstens {max} MB).
+	Too many requests right now. Try again in a moment.	Gerade zu viele Anfragen. Versuche es gleich noch einmal.
+	The request was declined ({reason}).	Die Anfrage wurde abgelehnt ({reason}).
+	Couldn't reach the AI service: {error}	Der KI-Dienst ist nicht erreichbar: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	Der API-Schlüssel ist ungültig: Füge ihn in den Einstellungen des Assistenten erneut ein.
+	The assistant gave no answer. Try asking differently.	Der Assistent hat keine Antwort gegeben. Versuche, die Frage anders zu stellen.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Dein Anthropic-Konto kann dieses Modell nicht nutzen oder hat kein Guthaben mehr: {error}
+	The AI service answered: {error}	Der KI-Dienst hat geantwortet: {error}
+	{tokens} tokens	{tokens} Token
+	New conversation	Neue Unterhaltung
+	Proposed changes	Vorgeschlagene Änderungen
+	Applied	Übernommen
+	Discarded	Verworfen
+	The document has no page {page}.	Das Dokument hat keine Seite {page}.
+	The passage wasn't found on page {page}.	Die Stelle wurde auf Seite {page} nicht gefunden.
+	The document refused the change.	Das Dokument hat die Änderung abgelehnt.
+	Applied as one step: Undo takes them all back.	In einem Schritt übernommen: Rückgängig nimmt alle zurück.
+	The passage appears more than once on page {page}.	Die Stelle kommt auf Seite {page} mehrmals vor.
+	It overlaps another proposed change.	Sie überschneidet sich mit einer anderen vorgeschlagenen Änderung.
+	A PDF on this device.	Ein PDF auf diesem Gerät.
+	Add my name	Meinen Namen hinzufügen
+	Add to Starred	Zu Favoriten hinzufügen
+	Add your name and a photo. Your name also signs your comments.	Füge deinen Namen und ein Foto hinzu. Dein Name zeichnet auch deine Kommentare.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Erlaube den Zugriff auf deine Dateien, dann listet PdfCraft die PDFs auf diesem Gerät auf.
+	An empty page to start from.	Eine leere Seite zum Anfangen.
+	Change its text and pictures.	Text und Bilder ändern.
+	Choose a photo	Foto auswählen
+	Files	Dateien
+	Fill in a form and sign it.	Ein Formular ausfüllen und unterschreiben.
+	From photos, scans or other files.	Aus Fotos, Scans oder anderen Dateien.
+	Hello, {name}	Hallo, {name}
+	It shows on Home and signs your comments.	Er erscheint auf der Startseite und zeichnet deine Kommentare.
+	Make PdfCraft yours	Mach PdfCraft zu deinem
+	More for {name}	Mehr für {name}
+	No PDFs found.	Keine PDFs gefunden.
+	No files match.	Keine passenden Dateien.
+	No recent files yet.	Noch keine zuletzt verwendeten Dateien.
+	No starred files.	Keine Favoriten.
+	On this device	Auf diesem Gerät
+	Open another file…	Andere Datei öffnen…
+	PDFs on this device	PDFs auf diesem Gerät
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft sucht in Download, Dokumente und seinem eigenen Ordner.
+	Photos and scans become the pages of a new PDF.	Fotos und Scans werden zu den Seiten eines neuen PDF.
+	Pictures	Bilder
+	Places	Orte
+	Profile	Profil
+	Remove from Starred	Aus Favoriten entfernen
+	Remove the photo	Foto entfernen
+	Search files	Dateien suchen
+	See your PDFs	Deine PDFs sehen
+	Set up	Einrichten
+	Several PDFs and pictures in one document.	Mehrere PDFs und Bilder in einem Dokument.
+	Star a file from its menu to find it here.	Markiere eine Datei über ihr Menü als Favorit, um sie hier zu finden.
+	Starred	Favoriten
+	Summarize, ask and translate.	Zusammenfassen, fragen, übersetzen.
+	Summarize, question and correct your PDFs with Claude, with your own key.	Fasse deine PDFs mit Claude zusammen, stelle Fragen und korrigiere sie – mit deinem eigenen Schlüssel.
+	Text, pictures and other files, converted to PDF.	Text, Bilder und andere Dateien, in PDF umgewandelt.
+	The files you open show here.	Die Dateien, die du öffnest, erscheinen hier.
+	What would you like to do?	Was möchtest du tun?
+	Which document?	Welches Dokument?
+	Your AI assistant	Dein KI-Assistent
+file state	Open	Geöffnet
+	Choose a PNG or JPEG picture.	Wähle ein PNG- oder JPEG-Bild.
+	This picture is too large.	Dieses Bild ist zu groß.
+	Couldn't use this picture: {e}	Dieses Bild konnte nicht verwendet werden: {e}
+	Couldn't use this picture.	Dieses Bild konnte nicht verwendet werden.

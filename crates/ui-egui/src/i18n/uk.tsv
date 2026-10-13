@@ -2379,3 +2379,82 @@ animation effects	Off	Вимкнено
 	Another app	Інший застосунок
 	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Готовий до друку PDF відкриється у вибраному вами застосунку, який надрукує його зі своїми налаштуваннями копій, двобічного друку й кольору.
 	Couldn't hand {name} to another app: {e}	Не вдалося передати {name} іншому застосунку: {e}
+	Tools	Інструменти
+phone bar	Edit	Редагувати
+	Send	Надіслати
+	Thinking…	Думаю…
+	Anthropic API key	API-ключ Anthropic
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	Ваше запитання та відкритий документ надсилаються до Anthropic (Claude) з вашим власним API-ключем, лише коли ви про це просите. Запити оплачуються з вашого облікового запису Anthropic.
+	Most pages sent per question	Найбільше сторінок на запитання
+	Translate page {n}	Перекласти сторінку {n}
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} токенів
+	The answer stopped at its length limit.	Відповідь обірвалася на максимальній довжині.
+	Add your Anthropic API key to use the assistant.	Додайте свій API-ключ Anthropic, щоб користуватися асистентом.
+	The API key was refused. Check it in the assistant's settings.	API-ключ відхилено. Перевірте його в налаштуваннях асистента.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	У цьому документі {pages} стор.; асистент читає щонайбільше {max}. Збільште ліміт у налаштуваннях асистента.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	Цей документ завеликий для асистента ({mb} МБ, щонайбільше {max} МБ).
+	Too many requests right now. Try again in a moment.	Зараз забагато запитів. Спробуйте ще раз за мить.
+	The request was declined ({reason}).	Запит відхилено ({reason}).
+	Couldn't reach the AI service: {error}	Не вдалося зв'язатися з ШІ-сервісом: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	API-ключ недійсний: вставте його знову в налаштуваннях асистента.
+	The assistant gave no answer. Try asking differently.	Асистент не дав відповіді. Спробуйте сформулювати запитання інакше.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Ваш обліковий запис Anthropic не може використовувати цю модель або на ньому закінчилися кошти: {error}
+	The AI service answered: {error}	ШІ-сервіс відповів: {error}
+	{tokens} tokens	{tokens} токенів
+	New conversation	Нова розмова
+	Proposed changes	Запропоновані зміни
+	Applied	Застосовано
+	Discarded	Відхилено
+	The document has no page {page}.	У документі немає сторінки {page}.
+	The passage wasn't found on page {page}.	Фрагмент не знайдено на сторінці {page}.
+	The document refused the change.	Документ не прийняв зміну.
+	Applied as one step: Undo takes them all back.	Застосовуються одним кроком: «Скасувати» скасовує їх усі.
+	The passage appears more than once on page {page}.	Фрагмент трапляється на сторінці {page} кілька разів.
+	It overlaps another proposed change.	Вона перетинається з іншою запропонованою зміною.
+	A PDF on this device.	PDF на цьому пристрої.
+	Add my name	Додати ім'я
+	Add to Starred	Додати до вибраного
+	Add your name and a photo. Your name also signs your comments.	Додайте ім'я та фото. Ім'я також підписує ваші коментарі.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Дозвольте доступ до файлів, і PdfCraft покаже PDF на цьому пристрої.
+	An empty page to start from.	Порожня сторінка для початку.
+	Change its text and pictures.	Змінити текст і зображення.
+	Choose a photo	Вибрати фото
+	Files	Файли
+	Fill in a form and sign it.	Заповнити форму й підписати.
+	From photos, scans or other files.	З фото, сканів або інших файлів.
+	Hello, {name}	Вітаємо, {name}
+	It shows on Home and signs your comments.	Воно відображається на головній і підписує ваші коментарі.
+	Make PdfCraft yours	Налаштуйте PdfCraft під себе
+	More for {name}	Більше для «{name}»
+	No PDFs found.	PDF не знайдено.
+	No files match.	Немає відповідних файлів.
+	No recent files yet.	Нещодавніх файлів поки немає.
+	No starred files.	Немає вибраних файлів.
+	On this device	На пристрої
+	Open another file…	Відкрити інший файл…
+	PDFs on this device	PDF на цьому пристрої
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft шукає в теках «Завантаження», «Документи» та у своїй теці.
+	Photos and scans become the pages of a new PDF.	Фото й скани стають сторінками нового PDF.
+	Pictures	Зображення
+	Places	Розташування
+	Profile	Профіль
+	Remove from Starred	Прибрати з вибраного
+	Remove the photo	Видалити фото
+	Search files	Пошук файлів
+	See your PDFs	Ваші PDF
+	Set up	Налаштувати
+	Several PDFs and pictures in one document.	Кілька PDF і зображень в одному документі.
+	Star a file from its menu to find it here.	Додайте файл до вибраного через його меню, щоб знайти його тут.
+	Starred	Вибране
+	Summarize, ask and translate.	Підсумок, запитання, переклад.
+	Summarize, question and correct your PDFs with Claude, with your own key.	Підсумовуйте, розпитуйте й виправляйте свої PDF із Claude, використовуючи власний ключ.
+	Text, pictures and other files, converted to PDF.	Текст, зображення та інші файли, перетворені на PDF.
+	The files you open show here.	Тут з'являються файли, які ви відкриваєте.
+	What would you like to do?	Що ви хочете зробити?
+	Which document?	Який документ?
+	Your AI assistant	Ваш ШІ-асистент
+file state	Open	Відкрито
+	Choose a PNG or JPEG picture.	Виберіть зображення PNG або JPEG.
+	This picture is too large.	Це зображення завелике.
+	Couldn't use this picture: {e}	Не вдалося використати це зображення: {e}
+	Couldn't use this picture.	Не вдалося використати це зображення.

@@ -2378,3 +2378,82 @@ animation effects	Off	معطّلة
 	Another app	تطبيق آخر
 	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	يُفتح ملف PDF الجاهز للطباعة في التطبيق الذي تختاره، فيطبعه بإعداداته الخاصة للنسخ والطباعة على الوجهين والألوان.
 	Couldn't hand {name} to another app: {e}	تعذّر تسليم {name} إلى تطبيق آخر: {e}
+	Tools	الأدوات
+phone bar	Edit	تحرير
+	Send	إرسال
+	Thinking…	جارٍ التفكير…
+	Anthropic API key	مفتاح API من Anthropic
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	يُرسَل سؤالك والمستند المفتوح إلى Anthropic (Claude) باستخدام مفتاح API الخاص بك، فقط عندما تطلب ذلك. تُحتسب تكلفة الطلبات على حسابك في Anthropic.
+	Most pages sent per question	أقصى عدد من الصفحات المُرسَلة لكل سؤال
+	Translate page {n}	ترجمة الصفحة {n}
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} رمزًا
+	The answer stopped at its length limit.	توقفت الإجابة عند حدّها الأقصى للطول.
+	Add your Anthropic API key to use the assistant.	أضف مفتاح API من Anthropic لاستخدام المساعد.
+	The API key was refused. Check it in the assistant's settings.	رُفض مفتاح API. تحقّق منه في إعدادات المساعد.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	يحتوي هذا المستند على {pages} صفحة؛ ويقرأ المساعد {max} صفحة على الأكثر. ارفع الحد في إعدادات المساعد.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	هذا المستند كبير جدًا على المساعد ({mb} ميغابايت، والحد الأقصى {max} ميغابايت).
+	Too many requests right now. Try again in a moment.	هناك طلبات كثيرة جدًا الآن. حاول مجددًا بعد قليل.
+	The request was declined ({reason}).	رُفض الطلب ({reason}).
+	Couldn't reach the AI service: {error}	تعذّر الوصول إلى خدمة الذكاء الاصطناعي: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	مفتاح API غير صالح: الصقه مرة أخرى في إعدادات المساعد.
+	The assistant gave no answer. Try asking differently.	لم يقدّم المساعد أي إجابة. جرّب صياغة السؤال بطريقة أخرى.
+	Your Anthropic account can't use this model, or has no credit left: {error}	لا يمكن لحسابك في Anthropic استخدام هذا النموذج، أو لم يعد فيه رصيد: {error}
+	The AI service answered: {error}	ردّت خدمة الذكاء الاصطناعي: {error}
+	{tokens} tokens	{tokens} رمزًا
+	New conversation	محادثة جديدة
+	Proposed changes	التغييرات المقترحة
+	Applied	طُبِّق
+	Discarded	تم تجاهله
+	The document has no page {page}.	لا يحتوي المستند على الصفحة {page}.
+	The passage wasn't found on page {page}.	لم يُعثر على المقطع في الصفحة {page}.
+	The document refused the change.	رفض المستند التغيير.
+	Applied as one step: Undo takes them all back.	تُطبَّق في خطوة واحدة: «تراجع» يلغيها كلها.
+	The passage appears more than once on page {page}.	يظهر المقطع أكثر من مرة في الصفحة {page}.
+	It overlaps another proposed change.	يتداخل مع تغيير مقترح آخر.
+	A PDF on this device.	ملف PDF على هذا الجهاز.
+	Add my name	إضافة اسمي
+	Add to Starred	إضافة إلى المفضلة
+	Add your name and a photo. Your name also signs your comments.	أضف اسمك وصورة. اسمك يوقّع تعليقاتك أيضًا.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	اسمح بالوصول إلى ملفاتك ليعرض PdfCraft ملفات PDF الموجودة على هذا الجهاز.
+	An empty page to start from.	صفحة فارغة للبدء.
+	Change its text and pictures.	غيّر نصه وصوره.
+	Choose a photo	اختيار صورة
+	Files	الملفات
+	Fill in a form and sign it.	املأ نموذجًا ووقّعه.
+	From photos, scans or other files.	من الصور أو المستندات الممسوحة أو ملفات أخرى.
+	Hello, {name}	مرحبًا، {name}
+	It shows on Home and signs your comments.	يظهر في الصفحة الرئيسية ويوقّع تعليقاتك.
+	Make PdfCraft yours	اجعل PdfCraft خاصًا بك
+	More for {name}	المزيد لـ {name}
+	No PDFs found.	لم يُعثر على ملفات PDF.
+	No files match.	لا توجد ملفات مطابقة.
+	No recent files yet.	لا توجد ملفات حديثة بعد.
+	No starred files.	لا توجد ملفات مفضلة.
+	On this device	على هذا الجهاز
+	Open another file…	فتح ملف آخر…
+	PDFs on this device	ملفات PDF على هذا الجهاز
+	PdfCraft looks in Download, Documents and its own folder.	يبحث PdfCraft في التنزيلات والمستندات ومجلده الخاص.
+	Photos and scans become the pages of a new PDF.	تصبح الصور والمستندات الممسوحة صفحات ملف PDF جديد.
+	Pictures	الصور
+	Places	المواقع
+	Profile	الملف الشخصي
+	Remove from Starred	إزالة من المفضلة
+	Remove the photo	إزالة الصورة
+	Search files	البحث في الملفات
+	See your PDFs	اعرض ملفات PDF لديك
+	Set up	إعداد
+	Several PDFs and pictures in one document.	عدة ملفات PDF وصور في مستند واحد.
+	Star a file from its menu to find it here.	أضف ملفًا إلى المفضلة من قائمته لتجده هنا.
+	Starred	المفضلة
+	Summarize, ask and translate.	تلخيص وأسئلة وترجمة.
+	Summarize, question and correct your PDFs with Claude, with your own key.	لخّص ملفات PDF واسألها وصحّحها مع Claude، بمفتاحك الخاص.
+	Text, pictures and other files, converted to PDF.	نص وصور وملفات أخرى، محوّلة إلى PDF.
+	The files you open show here.	تظهر هنا الملفات التي تفتحها.
+	What would you like to do?	ماذا تريد أن تفعل؟
+	Which document?	أي مستند؟
+	Your AI assistant	مساعد الذكاء الاصطناعي الخاص بك
+file state	Open	مفتوح
+	Choose a PNG or JPEG picture.	اختر صورة PNG أو JPEG.
+	This picture is too large.	هذه الصورة كبيرة جدًا.
+	Couldn't use this picture: {e}	تعذّر استخدام هذه الصورة: {e}
+	Couldn't use this picture.	تعذّر استخدام هذه الصورة.

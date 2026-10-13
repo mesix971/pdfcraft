@@ -2362,3 +2362,81 @@ animation effects	Off	Izklopljeni
 	Another app	Druga aplikacija
 	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	PDF, pripravljen za tisk, se odpre v aplikaciji, ki jo izberete, in ta ga natisne s svojimi nastavitvami kopij, obojestranskega tiska in barve.
 	Couldn't hand {name} to another app: {e}	{name} ni bilo mogoče predati drugi aplikaciji: {e}
+phone bar	Edit	Uredi
+	Send	Pošlji
+	Thinking…	Razmišljam…
+	Anthropic API key	Ključ API za Anthropic
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	Vaše vprašanje in odprti dokument se pošljeta podjetju Anthropic (Claude) z vašim lastnim ključem API, samo ko to zahtevate. Zahteve se zaračunajo vašemu računu Anthropic.
+	Most pages sent per question	Največ poslanih strani na vprašanje
+	Translate page {n}	Prevedi stran {n}
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} žetonov
+	The answer stopped at its length limit.	Odgovor se je ustavil pri največji dolžini.
+	Add your Anthropic API key to use the assistant.	Za uporabo pomočnika dodajte svoj ključ API za Anthropic.
+	The API key was refused. Check it in the assistant's settings.	Ključ API je bil zavrnjen. Preverite ga v nastavitvah pomočnika.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	Ta dokument ima {pages} strani; pomočnik prebere največ {max}. Povišajte omejitev v nastavitvah pomočnika.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	Ta dokument je prevelik za pomočnika ({mb} MB, največ {max} MB).
+	Too many requests right now. Try again in a moment.	Trenutno je preveč zahtev. Poskusite znova čez trenutek.
+	The request was declined ({reason}).	Zahteva je bila zavrnjena ({reason}).
+	Couldn't reach the AI service: {error}	Storitve UI ni mogoče doseči: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	Ključ API ni veljaven: znova ga prilepite v nastavitvah pomočnika.
+	The assistant gave no answer. Try asking differently.	Pomočnik ni dal odgovora. Poskusite vprašati drugače.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Vaš račun Anthropic ne more uporabljati tega modela ali nima več dobroimetja: {error}
+	The AI service answered: {error}	Storitev UI je odgovorila: {error}
+	{tokens} tokens	{tokens} žetonov
+	New conversation	Nov pogovor
+	Proposed changes	Predlagane spremembe
+	Applied	Uporabljeno
+	Discarded	Zavrženo
+	The document has no page {page}.	Dokument nima strani {page}.
+	The passage wasn't found on page {page}.	Odlomka na strani {page} ni bilo mogoče najti.
+	The document refused the change.	Dokument je spremembo zavrnil.
+	Applied as one step: Undo takes them all back.	Uporabijo se v enem koraku: Razveljavi jih vse povrne.
+	The passage appears more than once on page {page}.	Odlomek se na strani {page} pojavi večkrat.
+	It overlaps another proposed change.	Prekriva se z drugo predlagano spremembo.
+	A PDF on this device.	PDF v tej napravi.
+	Add my name	Dodaj moje ime
+	Add to Starred	Dodaj med priljubljene
+	Add your name and a photo. Your name also signs your comments.	Dodajte svoje ime in fotografijo. Vaše ime podpisuje tudi vaše komentarje.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Dovolite dostop do datotek in PdfCraft bo prikazal PDF-je v tej napravi.
+	An empty page to start from.	Prazna stran za začetek.
+	Change its text and pictures.	Spremenite besedilo in slike.
+	Choose a photo	Izberi fotografijo
+	Files	Datoteke
+	Fill in a form and sign it.	Izpolnite obrazec in ga podpišite.
+	From photos, scans or other files.	Iz fotografij, skenov ali drugih datotek.
+	Hello, {name}	Pozdravljeni, {name}
+	It shows on Home and signs your comments.	Prikaže se na začetni strani in podpisuje vaše komentarje.
+	Make PdfCraft yours	Prilagodite si PdfCraft
+	More for {name}	Več za {name}
+	No PDFs found.	Ni najdenih PDF-jev.
+	No files match.	Nobena datoteka se ne ujema.
+	No recent files yet.	Nedavnih datotek še ni.
+	No starred files.	Ni priljubljenih datotek.
+	On this device	V tej napravi
+	Open another file…	Odpri drugo datoteko…
+	PDFs on this device	PDF-ji v tej napravi
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft išče v mapah Prenosi, Dokumenti in v svoji mapi.
+	Photos and scans become the pages of a new PDF.	Fotografije in skeni postanejo strani novega PDF-ja.
+	Pictures	Slike
+	Places	Mesta
+	Profile	Profil
+	Remove from Starred	Odstrani iz priljubljenih
+	Remove the photo	Odstrani fotografijo
+	Search files	Iskanje datotek
+	See your PDFs	Oglejte si svoje PDF-je
+	Set up	Nastavi
+	Several PDFs and pictures in one document.	Več PDF-jev in slik v enem dokumentu.
+	Star a file from its menu to find it here.	Datoteko dodajte med priljubljene v njenem meniju, da jo najdete tukaj.
+	Starred	Priljubljene
+	Summarize, ask and translate.	Povzemite, vprašajte, prevedite.
+	Summarize, question and correct your PDFs with Claude, with your own key.	Povzemajte, sprašujte in popravljajte svoje PDF-je s Claudom, z lastnim ključem.
+	Text, pictures and other files, converted to PDF.	Besedilo, slike in druge datoteke, pretvorjene v PDF.
+	The files you open show here.	Datoteke, ki jih odprete, so prikazane tukaj.
+	What would you like to do?	Kaj želite narediti?
+	Which document?	Kateri dokument?
+	Your AI assistant	Vaš pomočnik UI
+file state	Open	Odprto
+	Choose a PNG or JPEG picture.	Izberite sliko PNG ali JPEG.
+	This picture is too large.	Ta slika je prevelika.
+	Couldn't use this picture: {e}	Te slike ni bilo mogoče uporabiti: {e}
+	Couldn't use this picture.	Te slike ni bilo mogoče uporabiti.

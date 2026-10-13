@@ -2367,3 +2367,81 @@ animation effects	Off	Ανενεργά
 	Another app	Άλλη εφαρμογή
 	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Το έτοιμο για εκτύπωση PDF ανοίγει στην εφαρμογή που θα επιλέξετε, η οποία το εκτυπώνει με τις δικές της ρυθμίσεις αντιγράφων, διπλής όψης και χρώματος.
 	Couldn't hand {name} to another app: {e}	Δεν ήταν δυνατή η μεταβίβαση του {name} σε άλλη εφαρμογή: {e}
+phone bar	Edit	Επεξεργασία
+	Send	Αποστολή
+	Thinking…	Σκέφτεται…
+	Anthropic API key	Κλειδί API της Anthropic
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	Η ερώτησή σας και το ανοιχτό έγγραφο στέλνονται στην Anthropic (Claude) με το δικό σας κλειδί API, μόνο όταν το ζητάτε. Τα αιτήματα χρεώνονται στον λογαριασμό σας στην Anthropic.
+	Most pages sent per question	Μέγιστος αριθμός σελίδων ανά ερώτηση
+	Translate page {n}	Μετάφραση σελίδας {n}
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} tokens
+	The answer stopped at its length limit.	Η απάντηση σταμάτησε στο μέγιστο μήκος της.
+	Add your Anthropic API key to use the assistant.	Προσθέστε το κλειδί API της Anthropic για να χρησιμοποιήσετε τον βοηθό.
+	The API key was refused. Check it in the assistant's settings.	Το κλειδί API απορρίφθηκε. Ελέγξτε το στις ρυθμίσεις του βοηθού.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	Αυτό το έγγραφο έχει {pages} σελίδες· ο βοηθός διαβάζει έως {max}. Αυξήστε το όριο στις ρυθμίσεις του βοηθού.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	Αυτό το έγγραφο είναι πολύ μεγάλο για τον βοηθό ({mb} MB, έως {max} MB).
+	Too many requests right now. Try again in a moment.	Πάρα πολλά αιτήματα αυτή τη στιγμή. Δοκιμάστε ξανά σε λίγο.
+	The request was declined ({reason}).	Το αίτημα απορρίφθηκε ({reason}).
+	Couldn't reach the AI service: {error}	Δεν ήταν δυνατή η σύνδεση με την υπηρεσία ΤΝ: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	Το κλειδί API δεν είναι έγκυρο: επικολλήστε το ξανά στις ρυθμίσεις του βοηθού.
+	The assistant gave no answer. Try asking differently.	Ο βοηθός δεν έδωσε απάντηση. Δοκιμάστε να ρωτήσετε διαφορετικά.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Ο λογαριασμός σας στην Anthropic δεν μπορεί να χρησιμοποιήσει αυτό το μοντέλο ή δεν έχει άλλη πίστωση: {error}
+	The AI service answered: {error}	Η υπηρεσία ΤΝ απάντησε: {error}
+	{tokens} tokens	{tokens} tokens
+	New conversation	Νέα συζήτηση
+	Proposed changes	Προτεινόμενες αλλαγές
+	Applied	Εφαρμόστηκε
+	Discarded	Απορρίφθηκε
+	The document has no page {page}.	Το έγγραφο δεν έχει σελίδα {page}.
+	The passage wasn't found on page {page}.	Το απόσπασμα δεν βρέθηκε στη σελίδα {page}.
+	The document refused the change.	Το έγγραφο απέρριψε την αλλαγή.
+	Applied as one step: Undo takes them all back.	Εφαρμόζονται σε ένα βήμα: η Αναίρεση τις αναιρεί όλες.
+	The passage appears more than once on page {page}.	Το απόσπασμα εμφανίζεται περισσότερες από μία φορές στη σελίδα {page}.
+	It overlaps another proposed change.	Επικαλύπτεται με άλλη προτεινόμενη αλλαγή.
+	A PDF on this device.	Ένα PDF σε αυτή τη συσκευή.
+	Add my name	Προσθήκη του ονόματός μου
+	Add to Starred	Προσθήκη στα αγαπημένα
+	Add your name and a photo. Your name also signs your comments.	Προσθέστε το όνομά σας και μια φωτογραφία. Το όνομά σας υπογράφει και τα σχόλιά σας.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Επιτρέψτε την πρόσβαση στα αρχεία σας και το PdfCraft θα εμφανίζει τα PDF αυτής της συσκευής.
+	An empty page to start from.	Μια κενή σελίδα για να ξεκινήσετε.
+	Change its text and pictures.	Αλλάξτε το κείμενο και τις εικόνες του.
+	Choose a photo	Επιλογή φωτογραφίας
+	Files	Αρχεία
+	Fill in a form and sign it.	Συμπληρώστε μια φόρμα και υπογράψτε την.
+	From photos, scans or other files.	Από φωτογραφίες, σαρώσεις ή άλλα αρχεία.
+	Hello, {name}	Γεια σας, {name}
+	It shows on Home and signs your comments.	Εμφανίζεται στην Αρχική και υπογράφει τα σχόλιά σας.
+	Make PdfCraft yours	Κάντε το PdfCraft δικό σας
+	More for {name}	Περισσότερα για {name}
+	No PDFs found.	Δεν βρέθηκαν PDF.
+	No files match.	Κανένα αρχείο δεν ταιριάζει.
+	No recent files yet.	Δεν υπάρχουν ακόμη πρόσφατα αρχεία.
+	No starred files.	Δεν υπάρχουν αγαπημένα αρχεία.
+	On this device	Σε αυτή τη συσκευή
+	Open another file…	Άνοιγμα άλλου αρχείου…
+	PDFs on this device	PDF σε αυτή τη συσκευή
+	PdfCraft looks in Download, Documents and its own folder.	Το PdfCraft ψάχνει στις Λήψεις, στα Έγγραφα και στον δικό του φάκελο.
+	Photos and scans become the pages of a new PDF.	Οι φωτογραφίες και οι σαρώσεις γίνονται σελίδες ενός νέου PDF.
+	Pictures	Εικόνες
+	Places	Τοποθεσίες
+	Profile	Προφίλ
+	Remove from Starred	Αφαίρεση από τα αγαπημένα
+	Remove the photo	Αφαίρεση φωτογραφίας
+	Search files	Αναζήτηση αρχείων
+	See your PDFs	Δείτε τα PDF σας
+	Set up	Ρύθμιση
+	Several PDFs and pictures in one document.	Πολλά PDF και εικόνες σε ένα έγγραφο.
+	Star a file from its menu to find it here.	Προσθέστε ένα αρχείο στα αγαπημένα από το μενού του για να το βρίσκετε εδώ.
+	Starred	Αγαπημένα
+	Summarize, ask and translate.	Σύνοψη, ερωτήσεις, μετάφραση.
+	Summarize, question and correct your PDFs with Claude, with your own key.	Συνοψίστε, ρωτήστε και διορθώστε τα PDF σας με το Claude, με το δικό σας κλειδί.
+	Text, pictures and other files, converted to PDF.	Κείμενο, εικόνες και άλλα αρχεία, σε PDF.
+	The files you open show here.	Τα αρχεία που ανοίγετε εμφανίζονται εδώ.
+	What would you like to do?	Τι θέλετε να κάνετε;
+	Which document?	Ποιο έγγραφο;
+	Your AI assistant	Ο βοηθός ΤΝ σας
+file state	Open	Ανοιχτό
+	Choose a PNG or JPEG picture.	Επιλέξτε μια εικόνα PNG ή JPEG.
+	This picture is too large.	Αυτή η εικόνα είναι πολύ μεγάλη.
+	Couldn't use this picture: {e}	Δεν ήταν δυνατή η χρήση αυτής της εικόνας: {e}
+	Couldn't use this picture.	Δεν ήταν δυνατή η χρήση αυτής της εικόνας.

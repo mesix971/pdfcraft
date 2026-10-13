@@ -131,7 +131,7 @@ pub enum PlaceKind {
 }
 
 impl PlaceKind {
-    fn label(&self) -> String {
+    pub(crate) fn label(&self) -> String {
         match self {
             Self::Storage => tl!("Internal storage").to_owned(),
             Self::Downloads => tl!("Download").to_owned(),
@@ -141,7 +141,7 @@ impl PlaceKind {
         }
     }
 
-    fn icon(&self) -> &'static str {
+    pub(crate) fn icon(&self) -> &'static str {
         match self {
             Self::Downloads => "file-down",
             Self::AppFiles => "files",

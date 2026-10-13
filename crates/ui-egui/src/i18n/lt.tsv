@@ -2601,3 +2601,81 @@ key	Space	Tarpas
 	Another app	Kita programa
 	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Spausdinti paruoštas PDF atsidarys jūsų pasirinktoje programoje, kuri jį išspausdins su savo kopijų, dvipusio spausdinimo ir spalvų nustatymais.
 	Couldn't hand {name} to another app: {e}	Nepavyko perduoti {name} kitai programai: {e}
+phone bar	Edit	Redaguoti
+	Send	Siųsti
+	Thinking…	Galvoja…
+	Anthropic API key	Anthropic API raktas
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	Jūsų klausimas ir atidarytas dokumentas siunčiami Anthropic (Claude) su jūsų pačių API raktu, tik kai to paprašote. Už užklausas mokama iš jūsų Anthropic paskyros.
+	Most pages sent per question	Daugiausia siunčiamų puslapių vienam klausimui
+	Translate page {n}	Versti {n} puslapį
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} žetonų
+	The answer stopped at its length limit.	Atsakymas nutrūko pasiekęs didžiausią ilgį.
+	Add your Anthropic API key to use the assistant.	Kad galėtumėte naudotis asistentu, pridėkite savo Anthropic API raktą.
+	The API key was refused. Check it in the assistant's settings.	API raktas atmestas. Patikrinkite jį asistento nustatymuose.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	Šiame dokumente yra {pages} psl.; asistentas skaito daugiausia {max}. Padidinkite ribą asistento nustatymuose.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	Šis dokumentas per didelis asistentui ({mb} MB, daugiausia {max} MB).
+	Too many requests right now. Try again in a moment.	Šiuo metu per daug užklausų. Bandykite dar kartą po akimirkos.
+	The request was declined ({reason}).	Užklausa atmesta ({reason}).
+	Couldn't reach the AI service: {error}	Nepavyko pasiekti DI paslaugos: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	API raktas negalioja: įklijuokite jį iš naujo asistento nustatymuose.
+	The assistant gave no answer. Try asking differently.	Asistentas neatsakė. Pabandykite paklausti kitaip.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Jūsų Anthropic paskyra negali naudoti šio modelio arba joje nebeliko kredito: {error}
+	The AI service answered: {error}	DI paslauga atsakė: {error}
+	{tokens} tokens	{tokens} žetonų
+	New conversation	Naujas pokalbis
+	Proposed changes	Siūlomi pakeitimai
+	Applied	Pritaikyta
+	Discarded	Atmesta
+	The document has no page {page}.	Dokumente nėra {page} puslapio.
+	The passage wasn't found on page {page}.	Ištrauka nerasta {page} puslapyje.
+	The document refused the change.	Dokumentas atmetė pakeitimą.
+	Applied as one step: Undo takes them all back.	Pritaikoma vienu žingsniu: „Anuliuoti“ atšaukia juos visus.
+	The passage appears more than once on page {page}.	Ištrauka {page} puslapyje pasitaiko daugiau nei kartą.
+	It overlaps another proposed change.	Jis persidengia su kitu siūlomu pakeitimu.
+	A PDF on this device.	PDF šiame įrenginyje.
+	Add my name	Pridėti savo vardą
+	Add to Starred	Pridėti prie mėgstamų
+	Add your name and a photo. Your name also signs your comments.	Pridėkite savo vardą ir nuotrauką. Jūsų vardu taip pat pasirašomi komentarai.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Leiskite pasiekti failus ir „PdfCraft“ parodys šiame įrenginyje esančius PDF.
+	An empty page to start from.	Tuščias puslapis pradžiai.
+	Change its text and pictures.	Pakeiskite jo tekstą ir paveikslėlius.
+	Choose a photo	Pasirinkti nuotrauką
+	Files	Failai
+	Fill in a form and sign it.	Užpildykite formą ir ją pasirašykite.
+	From photos, scans or other files.	Iš nuotraukų, skenuotų vaizdų ar kitų failų.
+	Hello, {name}	Sveiki, {name}
+	It shows on Home and signs your comments.	Jis rodomas pradžioje ir juo pasirašomi jūsų komentarai.
+	Make PdfCraft yours	Pritaikykite „PdfCraft“ sau
+	More for {name}	Daugiau: {name}
+	No PDFs found.	PDF nerasta.
+	No files match.	Atitinkančių failų nėra.
+	No recent files yet.	Naujausių failų dar nėra.
+	No starred files.	Mėgstamų failų nėra.
+	On this device	Šiame įrenginyje
+	Open another file…	Atverti kitą failą…
+	PDFs on this device	PDF šiame įrenginyje
+	PdfCraft looks in Download, Documents and its own folder.	„PdfCraft“ ieško aplankuose „Atsisiuntimai“, „Dokumentai“ ir savo aplanke.
+	Photos and scans become the pages of a new PDF.	Nuotraukos ir skenuoti vaizdai tampa naujo PDF puslapiais.
+	Pictures	Paveikslėliai
+	Places	Vietos
+	Profile	Profilis
+	Remove from Starred	Pašalinti iš mėgstamų
+	Remove the photo	Pašalinti nuotrauką
+	Search files	Ieškoti failų
+	See your PDFs	Peržiūrėkite savo PDF
+	Set up	Nustatyti
+	Several PDFs and pictures in one document.	Keli PDF ir paveikslėliai viename dokumente.
+	Star a file from its menu to find it here.	Pažymėkite failą kaip mėgstamą jo meniu, kad rastumėte jį čia.
+	Starred	Mėgstami
+	Summarize, ask and translate.	Apibendrinti, klausti, versti.
+	Summarize, question and correct your PDFs with Claude, with your own key.	Apibendrinkite, klauskite ir taisykite savo PDF su „Claude“, naudodami savo raktą.
+	Text, pictures and other files, converted to PDF.	Tekstas, paveikslėliai ir kiti failai, konvertuoti į PDF.
+	The files you open show here.	Čia rodomi jūsų atverti failai.
+	What would you like to do?	Ką norėtumėte daryti?
+	Which document?	Kuris dokumentas?
+	Your AI assistant	Jūsų DI asistentas
+file state	Open	Atvertas
+	Choose a PNG or JPEG picture.	Pasirinkite PNG arba JPEG paveikslėlį.
+	This picture is too large.	Šis paveikslėlis per didelis.
+	Couldn't use this picture: {e}	Nepavyko panaudoti šio paveikslėlio: {e}
+	Couldn't use this picture.	Nepavyko panaudoti šio paveikslėlio.
