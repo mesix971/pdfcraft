@@ -118,11 +118,56 @@ pub struct SignatureImage {
     size: [usize; 2],
 }
 
+/// The largest picture file taken for a profile photo: a phone's camera writes several megabytes.
+pub const MAX_PROFILE_SOURCE_BYTES: usize = 24 << 20;
+/// A profile photo's side, in pixels.
+pub const PROFILE_SIDE: u32 = 256;
+
+/// A profile photo: the centred square of a PNG or JPEG picture (upright per its EXIF
+/// orientation), [`PROFILE_SIDE`] pixels, as a PNG without metadata. The picture is decoded within
+/// the same pixel and allocation limits as an image signature.
+pub fn profile_picture(bytes: &[u8]) -> Result<Vec<u8>, SignatureImageError> {
+    let image = decode_limited(bytes, MAX_PROFILE_SOURCE_BYTES)?;
+    let (w, h) = (image.width(), image.height());
+    let side = w.min(h);
+    if side == 0 {
+        return Err(SignatureImageError::Format);
+    }
+    // `side` is at most each dimension, so the crop stays inside the picture.
+    let square = image.crop_imm((w - side) / 2, (h - side) / 2, side, side);
+    let small = square.thumbnail(PROFILE_SIDE, PROFILE_SIDE).into_rgba8();
+    let mut png = Cursor::new(Vec::new());
+    DynamicImage::ImageRgba8(small).write_to(&mut png, ImageFormat::Png)?;
+    Ok(png.into_inner())
+}
+
+/// The pixels of a profile photo [`profile_picture`] made (its width, height and RGBA, at most
+/// [`PROFILE_SIDE`] square); `None` for anything else, as settings are untrusted.
+pub fn profile_picture_pixels(png: &[u8]) -> Option<(usize, usize, Vec<u8>)> {
+    if png.len() > MAX_SIGNATURE_IMAGE_BYTES {
+        return None;
+    }
+    let mut reader = ImageReader::with_format(Cursor::new(png), ImageFormat::Png);
+    let mut limits = Limits::default();
+    limits.max_image_width = Some(PROFILE_SIDE);
+    limits.max_image_height = Some(PROFILE_SIDE);
+    limits.max_alloc = Some(u64::from(PROFILE_SIDE) * u64::from(PROFILE_SIDE) * 8);
+    reader.limits(limits);
+    let image = reader.decode().ok()?.into_rgba8();
+    let (w, h) = (image.width() as usize, image.height() as usize);
+    (w > 0 && h > 0).then(|| (w, h, image.into_raw()))
+}
+
 /// Decode an imported PNG or JPEG within the source limits (file size, 32 megapixels, 8192 pixels
 /// per side, bounded allocation), upright per its EXIF orientation and scaled down to at most
 /// 4 megapixels and 4096 pixels per side. Shared by image signatures and scanned photos.
 pub(crate) fn decode_source(bytes: &[u8]) -> Result<DynamicImage, SignatureImageError> {
-    if bytes.len() > MAX_SIGNATURE_IMAGE_BYTES {
+    decode_limited(bytes, MAX_SIGNATURE_IMAGE_BYTES)
+}
+
+/// [`decode_source`] for a file of at most `max_bytes`.
+fn decode_limited(bytes: &[u8], max_bytes: usize) -> Result<DynamicImage, SignatureImageError> {
+    if bytes.len() > max_bytes {
         return Err(SignatureImageError::Size);
     }
     let format = image::guess_format(bytes).map_err(|_| SignatureImageError::Format)?;
@@ -243,6 +288,29 @@ impl SignatureImage {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_profile_photo_is_the_pictures_centred_square() {
+        // A wide picture: red on the left third, green in the middle, blue on the right.
+        let picture = image::RgbaImage::from_fn(900, 300, |x, _| match x {
+            0..300 => image::Rgba([255, 0, 0, 255]),
+            300..600 => image::Rgba([0, 255, 0, 255]),
+            _ => image::Rgba([0, 0, 255, 255]),
+        });
+        let mut source = Cursor::new(Vec::new());
+        picture.write_to(&mut source, ImageFormat::Png).unwrap();
+        let png = profile_picture(source.get_ref()).unwrap();
+        let photo = image::load_from_memory(&png).unwrap().into_rgba8();
+        assert_eq!(photo.dimensions(), (PROFILE_SIDE, PROFILE_SIDE));
+        assert!(photo.pixels().all(|p| p.0 == [0, 255, 0, 255]), "only the middle of the picture");
+        // Read back from the settings: its pixels, and nothing for what isn't one.
+        let (w, h, rgba) = profile_picture_pixels(&png).unwrap();
+        assert_eq!((w, h, rgba.len()), (256, 256, 256 * 256 * 4));
+        assert_eq!(profile_picture_pixels(b"junk"), None);
+        assert_eq!(profile_picture_pixels(source.get_ref()), None, "a 900 x 300 picture isn't a profile photo");
+        assert!(matches!(profile_picture(b"not a picture"), Err(SignatureImageError::Format)));
+        assert!(matches!(profile_picture(&vec![0u8; MAX_PROFILE_SOURCE_BYTES + 1]), Err(SignatureImageError::Size)));
+    }
 
     /// A 300 x 400 page shown turned `rotation` degrees clockwise.
     fn page(rotation: u16) -> PageInfo {
