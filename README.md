@@ -262,6 +262,7 @@ Press <kbd>⌘K</kbd> to search every tool and command, or browse the **All tool
 ## Runs everywhere, stays yours
 
 - **Native on macOS, Windows, Linux and FreeBSD**, and **in the browser** through WebAssembly, from the same Rust codebase. Windows builds come for x64, x86 and ARM64 (Windows on ARM, no emulation); every ARM64 change is tested on ARM64 hardware in CI.
+- **On Android (preview)**, the same interface and every tool, with PdfCraft's own file browser for opening and saving; build the APK with `cargo xtask android` ([apps/pdfcraft-android](apps/pdfcraft-android/README.md)).
 - **Private by design.** Documents never leave your machine. There's no account, no telemetry and no cloud processing.
 - **Engine first.** Parsing, rendering and editing live in reusable library crates. The interface is one swappable layer on top.
 - **Scriptable.** The `pdfcraft-cli` tool (see [Built for agents, too](#built-for-agents-too)) covers inspecting, rendering, extracting text, editing, combining, extracting pages and splitting. Robustness sweeps run on the same engine as the app.
@@ -378,6 +379,7 @@ git clone https://github.com/storytold/pdfcraft
 cd pdfcraft
 cargo xtask models                                # fetch the OCR models Scan & OCR needs (release builds include them)
 cargo run --release -p pdfcraft -- some.pdf     # desktop app
+cargo xtask android                               # Android APK in dist/android/ (needs the NDK and SDK; see apps/pdfcraft-android)
 cargo xtask demo-pdf                              # build the showcase PDF used in these screenshots
 cargo xtask screenshots                           # regenerate every screenshot in this README
 ```
@@ -496,6 +498,13 @@ Every other Linux build needs glibc 2.35 or newer (Ubuntu 22.04+, Debian 12+, Fe
 | Build | File | Notes |
 |---|---|---|
 | Static site | `pdfcraft-web-<ver>.zip` | Runs in a modern browser; host it on any static server |
+
+### Android (preview)
+
+Not in releases yet. Every CI run attaches a debug-signed APK (artifact `pdfcraft-android`, 64-bit
+ARM, Android 8.0 or later), or build one with `cargo xtask android`; see
+[apps/pdfcraft-android](apps/pdfcraft-android/README.md) for installing it and what differs from
+the desktop app.
 
 ---
 

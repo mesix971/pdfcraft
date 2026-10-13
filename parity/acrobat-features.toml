@@ -1818,6 +1818,18 @@ evidence = ["crates/ui-egui/tests/pickers.rs::a_startup_url_opens_in_front_when_
 notes = "web build works; a late startup ?file= download opens in a background tab after the user starts working, preserving the active document and Save target (#171). IndexedDB/OPFS recent list and download flow are M3.10"
 
 [[feature]]
+id = "view.android-app"
+title = "Run on Android phones and tablets"
+area = "B"
+tier = "P2"
+milestone = "M3"
+status = "partial"
+commands = []
+tools = []
+evidence = ["crates/ui-egui/src/file_browser.rs::open_shows_the_matching_files_and_hands_back_the_one_tapped", "crates/ui-egui/src/file_browser.rs::all_files_shows_every_file_and_several_can_be_chosen", "crates/ui-egui/src/file_browser.rs::save_adds_the_extension_and_asks_before_replacing_a_file", "crates/ui-egui/src/file_browser.rs::a_folder_is_chosen_where_the_browser_stands_and_new_folders_can_be_made", "crates/ui-egui/src/file_browser.rs::cancel_hands_back_nothing_and_frees_the_picker", "crates/ui-egui/src/file_browser.rs::missing_storage_access_offers_the_system_page_and_goes_once_granted", "apps/pdfcraft-android/src/storage.rs::storage_provider_documents_are_their_shared_storage_paths", "apps/pdfcraft-android/src/storage.rs::addresses_that_could_reach_private_files_are_read_through_the_system_instead", "apps/pdfcraft-android/src/screen.rs::the_keyboard_and_bars_become_insets_in_points", "crates/ocr/src/lib.rs::models_installed_by_the_app_are_searched_after_the_override_and_set_once", "xtask/src/android.rs::the_manifest_names_the_library_and_has_no_internet_permission"]
+notes = "Preview (apps/pdfcraft-android): the desktop egui shell in a NativeActivity, so every tool is present; `cargo xtask android` builds a signed APK (arm64 by default, Android 8.0+) and CI attaches a debug-signed one. Every picker is the in-app file browser on real paths (all-files access asked for when needed); Open with/Share for PDFs (in place on shared storage, else as an unsaved copy); system clipboard for text; back key as Escape; soft keyboard; OCR models unpacked from the APK; language and units from the device. Missing: testing on devices, a phone layout, screen reader (needs GameActivity), Android printing and image/file clipboard (need Java), soft-keyboard composing (accents, predictive text), documents opened from another app while PdfCraft runs, a Play-compatible target SDK 35"
+
+[[feature]]
 id = "view.large-document-performance"
 title = "Smooth scrolling on 500-page documents"
 area = "B"

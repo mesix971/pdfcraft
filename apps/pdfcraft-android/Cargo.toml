@@ -1,0 +1,39 @@
+[package]
+name = "pdfcraft-android"
+description = "PdfCraft on Android: the egui shell in a NativeActivity (build the APK with `cargo xtask android`)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+# Android loads the app as `libpdfcraft_android.so`; the rlib lets the host run the unit tests.
+crate-type = ["cdylib", "rlib"]
+
+# The workspace's lints, except that unsafe code is denied instead of forbidden: Android starts
+# a native app by calling a function it finds by name, which takes `#[unsafe(no_mangle)]`, and
+# the activity reaches JNI as a raw global reference (`src/jvm.rs`). Those two items allow it,
+# one by one, with their reasons; everything else here is safe Rust (README.md, "Unsafe code").
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+
+[target.'cfg(target_os = "android")'.dependencies]
+pdfcraft-ui-egui = { workspace = true }
+# Where the text recognition models are unpacked to (they ship in the APK's assets).
+pdfcraft-ocr = { workspace = true }
+# NativeActivity: the app needs no Java code. Its accessibility bridge needs GameActivity, so it is
+# off here (crates/ui-egui/Cargo.toml).
+eframe = { workspace = true, features = ["default_fonts", "wgpu", "persistence", "android-native-activity"] }
+egui = { workspace = true }
+# The activity handle eframe runs in (`AndroidApp`); the same, patched winit eframe uses.
+winit = { version = "0.30", default-features = false, features = ["android-native-activity"] }
+log = { workspace = true }
+# Records go to logcat (`adb logcat -s PdfCraft`).
+android_logger = { version = "0.15", default-features = false }
+# The same jni as android-activity, which hands it the Java VM before `android_main` runs, so
+# `JavaVM::singleton` is safe to call.
+jni = "0.22"
