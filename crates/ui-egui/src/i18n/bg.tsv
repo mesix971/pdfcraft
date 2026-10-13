@@ -2301,3 +2301,17 @@ animation effects	Off	Изключени
 	The linked PDF opened, but its named destination was not applied.	Свързаният PDF се отвори, но именуваната му цел не беше приложена.
 	The linked PDF opened, but its page destination was out of range.	Свързаният PDF се отвори, но целевата му страница е извън обхвата.
 	Local cross-PDF links require the desktop app	Локалните връзки между PDF файлове изискват настолното приложение
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Вътрешна памет
+	Documents	Документи
+	PdfCraft files	Файлове на PdfCraft
+	SD card {name}	SD карта {name}
+	Couldn't create the folder {name}: {e}	Папката {name} не може да бъде създадена: {e}
+	Choose this folder	Избиране на тази папка
+	{name} already exists. Replace it?	{name} вече съществува. Да бъде ли заменен?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	За да отваряте и записвате файлове навсякъде на това устройство, разрешете на PdfCraft да управлява всички файлове.
+	Allow access	Разрешаване на достъпа
+	All files	Всички файлове
+	This folder is empty	Тази папка е празна
+	New folder	Нова папка

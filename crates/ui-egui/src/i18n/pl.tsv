@@ -2318,3 +2318,17 @@ animation effects	Off	Wyłączone
 	Local cross-PDF links require the desktop app	Lokalne łącza między plikami PDF wymagają aplikacji komputerowej
 	The existing action will be preserved.	Istniejąca akcja zostanie zachowana.
 	This form's scripts are turned off because one ran too long. Reopen the document to run them again.	Skrypty tego formularza są wyłączone, ponieważ jeden z nich działał zbyt długo. Otwórz dokument ponownie, aby znów je uruchomić.
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Pamięć wewnętrzna
+	Documents	Dokumenty
+	PdfCraft files	Pliki PdfCraft
+	SD card {name}	Karta SD {name}
+	Couldn't create the folder {name}: {e}	Nie udało się utworzyć folderu {name}: {e}
+	Choose this folder	Wybierz ten folder
+	{name} already exists. Replace it?	{name} już istnieje. Zastąpić?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Aby otwierać i zapisywać pliki w dowolnym miejscu na tym urządzeniu, zezwól aplikacji PdfCraft na zarządzanie wszystkimi plikami.
+	Allow access	Zezwól na dostęp
+	All files	Wszystkie pliki
+	This folder is empty	Ten folder jest pusty
+	New folder	Nowy folder

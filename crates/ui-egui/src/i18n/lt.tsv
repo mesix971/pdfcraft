@@ -2582,3 +2582,17 @@ key	Esc	Esc
 key	Home	Home
 key	End	End
 key	Space	Tarpas
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Vidinė saugykla
+	Documents	Dokumentai
+	PdfCraft files	PdfCraft failai
+	SD card {name}	SD kortelė {name}
+	Couldn't create the folder {name}: {e}	Nepavyko sukurti aplanko {name}: {e}
+	Choose this folder	Pasirinkti šį aplanką
+	{name} already exists. Replace it?	{name} jau yra. Pakeisti?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Kad galėtumėte atidaryti ir įrašyti failus bet kurioje šio įrenginio vietoje, leiskite PdfCraft tvarkyti visus failus.
+	Allow access	Leisti prieigą
+	All files	Visi failai
+	This folder is empty	Šis aplankas tuščias
+	New folder	Naujas aplankas

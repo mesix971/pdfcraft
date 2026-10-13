@@ -40,6 +40,9 @@ pub enum OcrError {
     EmptyImage,
 }
 
+/// Where the app installed the models (see [`Models::set_installed_dir`]).
+static INSTALLED_DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
 /// Where the two model files are.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Models {
@@ -54,10 +57,18 @@ impl Models {
         (m.detection.is_file() && m.recognition.is_file()).then_some(m)
     }
 
-    /// Look for the models: `$PDFCRAFT_MODELS`, then where the release packages install them
-    /// beside the executable ([`Models::dirs_beside_exe`]), then the source tree's `assets/models/`.
+    /// Look for the models: `$PDFCRAFT_MODELS`, then where the app installed them
+    /// ([`Models::set_installed_dir`]), then where the release packages install them beside the
+    /// executable ([`Models::dirs_beside_exe`]), then the source tree's `assets/models/`.
     pub fn find() -> Option<Models> {
         Self::search_dirs().iter().find_map(|d| Self::in_dir(d))
+    }
+
+    /// Tell [`Models::find`] where the app installed the models, for an app whose models aren't
+    /// beside its executable (Android unpacks them from the APK into its own storage). Only the
+    /// first call counts; returns whether it was taken.
+    pub fn set_installed_dir(dir: PathBuf) -> bool {
+        INSTALLED_DIR.set(dir).is_ok()
     }
 
     /// The directories [`Models::find`] looks in, in order.
@@ -65,6 +76,9 @@ impl Models {
         let mut dirs = Vec::new();
         if let Some(d) = std::env::var_os("PDFCRAFT_MODELS") {
             dirs.push(PathBuf::from(d));
+        }
+        if let Some(d) = INSTALLED_DIR.get() {
+            dirs.push(d.clone());
         }
         if let Some(exe) = std::env::current_exe().ok().and_then(|e| e.parent().map(Path::to_path_buf)) {
             dirs.extend(Self::dirs_beside_exe(&exe));
@@ -336,6 +350,23 @@ mod tests {
         // The euro sign follows the ASCII punctuation (class 44; 0 is the CTC blank), not a second E.
         assert_eq!(chars.iter().position(|&c| c == '€'), Some(43));
         assert_eq!(chars.iter().filter(|&&c| c == 'E').count(), 1);
+    }
+
+    /// Android unpacks the models into the app's own storage, far from its executable.
+    #[test]
+    fn models_installed_by_the_app_are_searched_after_the_override_and_set_once() {
+        let dir = std::env::temp_dir().join(format!("pdfcraft-ocr-installed-{}", std::process::id()));
+        assert!(Models::set_installed_dir(dir.clone()));
+        assert!(!Models::set_installed_dir(PathBuf::from("/elsewhere")), "only the first call counts");
+        let dirs = Models::search_dirs();
+        let at = dirs.iter().position(|d| d == &dir).expect("searched");
+        let beside_exe = std::env::current_exe().ok().and_then(|e| e.parent().map(|p| p.join("models")));
+        if let Some(exe) = beside_exe {
+            assert!(dirs.iter().position(|d| d == &exe).is_some_and(|i| i > at), "before the folders beside the executable");
+        }
+        if let Some(over) = std::env::var_os("PDFCRAFT_MODELS") {
+            assert_eq!(dirs.first(), Some(&PathBuf::from(over)), "the variable still wins");
+        }
     }
 
     #[test]

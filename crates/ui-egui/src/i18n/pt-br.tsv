@@ -2352,3 +2352,17 @@ animation effects	Off	Desativados
 	The linked PDF opened, but its named destination was not applied.	O PDF vinculado foi aberto, mas seu destino nomeado não foi aplicado.
 	The linked PDF opened, but its page destination was out of range.	O PDF vinculado foi aberto, mas sua página de destino está fora do intervalo.
 	Local cross-PDF links require the desktop app	Links locais entre PDFs exigem o aplicativo para desktop
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Armazenamento interno
+	Documents	Documentos
+	PdfCraft files	Arquivos do PdfCraft
+	SD card {name}	Cartão SD {name}
+	Couldn't create the folder {name}: {e}	Não foi possível criar a pasta {name}: {e}
+	Choose this folder	Escolher esta pasta
+	{name} already exists. Replace it?	{name} já existe. Substituir?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Para abrir e salvar arquivos em qualquer lugar deste dispositivo, permita que o PdfCraft gerencie todos os arquivos.
+	Allow access	Permitir acesso
+	All files	Todos os arquivos
+	This folder is empty	Esta pasta está vazia
+	New folder	Nova pasta

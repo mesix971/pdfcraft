@@ -2338,3 +2338,17 @@ animation effects	Off	オフ
 	The linked PDF opened, but its named destination was not applied.	リンク先の PDF を開きましたが、名前付き移動先は適用されませんでした。
 	The linked PDF opened, but its page destination was out of range.	リンク先の PDF を開きましたが、移動先のページが範囲外です。
 	Local cross-PDF links require the desktop app	PDF 間のローカルリンクにはデスクトップアプリが必要です
+
+# In-app file browser (Android's file pickers)
+	Internal storage	内部ストレージ
+	Documents	ドキュメント
+	PdfCraft files	PdfCraft のファイル
+	SD card {name}	SD カード {name}
+	Couldn't create the folder {name}: {e}	フォルダー {name} を作成できませんでした: {e}
+	Choose this folder	このフォルダーを選択
+	{name} already exists. Replace it?	{name} は既に存在します。置き換えますか?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	このデバイスのどこにでもファイルを開いて保存するには、PdfCraft にすべてのファイルの管理を許可してください。
+	Allow access	アクセスを許可
+	All files	すべてのファイル
+	This folder is empty	このフォルダーは空です
+	New folder	新しいフォルダー

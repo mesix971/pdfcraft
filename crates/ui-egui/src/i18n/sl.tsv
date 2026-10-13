@@ -2343,3 +2343,17 @@ animation effects	Off	Izklopljeni
 	The linked PDF opened, but its named destination was not applied.	Povezani PDF se je odprl, vendar njegov poimenovani cilj ni bil uporabljen.
 	The linked PDF opened, but its page destination was out of range.	Povezani PDF se je odprl, vendar je ciljna stran zunaj obsega.
 	Local cross-PDF links require the desktop app	Lokalne povezave med PDF-ji zahtevajo namizno aplikacijo
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Notranji pomnilnik
+	Documents	Dokumenti
+	PdfCraft files	Datoteke PdfCraft
+	SD card {name}	Kartica SD {name}
+	Couldn't create the folder {name}: {e}	Mape {name} ni bilo mogoče ustvariti: {e}
+	Choose this folder	Izberi to mapo
+	{name} already exists. Replace it?	{name} že obstaja. Ga želite zamenjati?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Če želite odpirati in shranjevati datoteke kjer koli v tej napravi, dovolite PdfCraftu upravljanje vseh datotek.
+	Allow access	Dovoli dostop
+	All files	Vse datoteke
+	This folder is empty	Ta mapa je prazna
+	New folder	Nova mapa

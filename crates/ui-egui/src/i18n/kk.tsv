@@ -2336,3 +2336,17 @@ animation effects	Off	Өшірулі
 	The linked PDF opened, but its named destination was not applied.	Байланысты PDF ашылды, бірақ оның аталған мақсаты қолданылмады.
 	The linked PDF opened, but its page destination was out of range.	Байланысты PDF ашылды, бірақ оның мақсатты беті ауқымнан тыс.
 	Local cross-PDF links require the desktop app	PDF файлдары арасындағы жергілікті сілтемелер үшін жұмыс үстелі қолданбасы қажет
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Ішкі жад
+	Documents	Құжаттар
+	PdfCraft files	PdfCraft файлдары
+	SD card {name}	SD картасы {name}
+	Couldn't create the folder {name}: {e}	{name} қалтасын жасау мүмкін болмады: {e}
+	Choose this folder	Осы қалтаны таңдау
+	{name} already exists. Replace it?	{name} бар. Ауыстыру керек пе?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Осы құрылғының кез келген жерінде файлдарды ашу және сақтау үшін PdfCraft-қа барлық файлдарды басқаруға рұқсат беріңіз.
+	Allow access	Қатынауға рұқсат беру
+	All files	Барлық файлдар
+	This folder is empty	Бұл қалта бос
+	New folder	Жаңа қалта

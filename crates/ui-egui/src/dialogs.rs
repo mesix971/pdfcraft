@@ -13,6 +13,9 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
     dialogs(app, ctx);
     // Last, so it sits above Document Properties when Security's Unlock… asked for it.
     unlock(app, ctx);
+    // Above every dialog: a dialog's Browse… or Save opens it.
+    #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+    crate::file_browser::show(app, ctx);
 }
 
 fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {

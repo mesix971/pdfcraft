@@ -2212,3 +2212,18 @@ animation effects	Off	關
 	The linked PDF opened, but its page destination was out of range.	已開啟連結的 PDF，但其頁面目的地超出範圍。
 	Local cross-PDF links require the desktop app	PDF 之間的本機連結需要桌面應用程式
 	The existing action will be preserved.	將保留現有動作。
+
+# In-app file browser (Android's file pickers)
+	Internal storage	內部儲存空間
+	Documents	文件
+	PdfCraft files	PdfCraft 檔案
+	SD card {name}	SD 卡 {name}
+	Couldn't create the folder {name}: {e}	無法建立資料夾 {name}：{e}
+	Choose this folder	選擇此資料夾
+	{name} already exists. Replace it?	{name} 已存在。要取代嗎？
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	若要在此裝置上的任何位置開啟及儲存檔案，請允許 PdfCraft 管理所有檔案。
+	Allow access	允許存取
+	All files	所有檔案
+	This folder is empty	此資料夾是空的
+	New folder	新增資料夾
+	Create	建立
