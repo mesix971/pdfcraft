@@ -582,3 +582,134 @@ fn check_dialog(env: &mut Env, dialog: &OpenDialog) -> Jni<Option<Option<String>
     let showing = env.call_method(&*dialog.dialog, jni_str!("isShowing"), jni_sig!("()Z"), &[])?.z()?;
     Ok((cancelled || !showing).then_some(None))
 }
+
+/// Android 10 (API 29): `MediaStore.Downloads`, where an app adds files without a permission.
+const API_Q: i32 = 29;
+/// `Intent.FLAG_GRANT_READ_URI_PERMISSION`, `Intent.FLAG_ACTIVITY_NEW_TASK`.
+const FLAG_GRANT_READ_URI_PERMISSION: i32 = 0x1;
+const FLAG_ACTIVITY_NEW_TASK: i32 = 0x1000_0000;
+/// Where printed PDFs go, under shared storage.
+const PRINT_FOLDER: &str = "Download/PdfCraft";
+
+/// Print through another app: put `bytes` in Download/PdfCraft as `name` and open it in the app
+/// the user picks (a PDF viewer prints it). Android has no print spooler a native app can reach
+/// without Java (a `PrintDocumentAdapter` is a Java class), and a file can only be handed to
+/// another app through a content provider: from Android 10 the system's own (`MediaStore`), before
+/// that a plain file in Download (the storage permission covers it there).
+pub fn print_with_app(app: &AndroidApp, name: &str, bytes: &[u8], title: &str) -> Result<(), String> {
+    // A name from the document: one file name, never a path.
+    let name = crate::storage::display_name(Some(name), "");
+    let name = name.as_str();
+    with_activity(app, |env, activity| {
+        let uri = if AndroidApp::sdk_version() >= API_Q { media_store_file(env, activity, name, bytes)? } else { download_file(env, name, bytes)? };
+        let action = env.new_string("android.intent.action.VIEW")?;
+        let view = env.new_object(jni_str!("android/content/Intent"), jni_sig!("(Ljava/lang/String;)V"), &[JValue::Object(&action)])?;
+        let mime = env.new_string("application/pdf")?;
+        env.call_method(
+            &view,
+            jni_str!("setDataAndType"),
+            jni_sig!("(Landroid/net/Uri;Ljava/lang/String;)Landroid/content/Intent;"),
+            &[JValue::Object(&uri), JValue::Object(&mime)],
+        )?;
+        env.call_method(
+            &view,
+            jni_str!("addFlags"),
+            jni_sig!("(I)Landroid/content/Intent;"),
+            &[JValue::Int(FLAG_GRANT_READ_URI_PERMISSION | FLAG_ACTIVITY_NEW_TASK)],
+        )?;
+        let title = env.new_string(title)?;
+        let chooser = env
+            .call_static_method(
+                jni_str!("android/content/Intent"),
+                jni_str!("createChooser"),
+                jni_sig!("(Landroid/content/Intent;Ljava/lang/CharSequence;)Landroid/content/Intent;"),
+                &[JValue::Object(&view), JValue::Object(&title)],
+            )?
+            .l()?;
+        env.call_method(activity, jni_str!("startActivity"), jni_sig!("(Landroid/content/Intent;)V"), &[JValue::Object(&chooser)])?;
+        Ok(())
+    })
+}
+
+/// A new file `name` in Download/PdfCraft holding `bytes`, through `MediaStore.Downloads`; its URI.
+fn media_store_file<'local>(env: &mut Env<'local>, activity: &JObject, name: &str, bytes: &[u8]) -> Jni<JObject<'local>> {
+    let values = env.new_object(jni_str!("android/content/ContentValues"), jni_sig!("()V"), &[])?;
+    for (key, value) in [("_display_name", name), ("mime_type", "application/pdf"), ("relative_path", PRINT_FOLDER)] {
+        let key = env.new_string(key)?;
+        let value = env.new_string(value)?;
+        env.call_method(
+            &values,
+            jni_str!("put"),
+            jni_sig!("(Ljava/lang/String;Ljava/lang/String;)V"),
+            &[JValue::Object(&key), JValue::Object(&value)],
+        )?;
+    }
+    let collection = env
+        .get_static_field(jni_str!("android/provider/MediaStore$Downloads"), jni_str!("EXTERNAL_CONTENT_URI"), jni_sig!("Landroid/net/Uri;"))?
+        .l()?;
+    let resolver = env.call_method(activity, jni_str!("getContentResolver"), jni_sig!("()Landroid/content/ContentResolver;"), &[])?.l()?;
+    let uri = env
+        .call_method(
+            &resolver,
+            jni_str!("insert"),
+            jni_sig!("(Landroid/net/Uri;Landroid/content/ContentValues;)Landroid/net/Uri;"),
+            &[JValue::Object(&collection), JValue::Object(&values)],
+        )?
+        .l()?;
+    if uri.is_null() {
+        return Err(Failure::Io(std::io::Error::other("Download refused a new file")));
+    }
+    let stream = env
+        .call_method(&resolver, jni_str!("openOutputStream"), jni_sig!("(Landroid/net/Uri;)Ljava/io/OutputStream;"), &[JValue::Object(&uri)])?
+        .l()?;
+    if stream.is_null() {
+        return Err(Failure::Io(std::io::Error::other("the new file in Download can't be written")));
+    }
+    let written = write_stream(env, &stream, bytes);
+    let _ = env.call_method(&stream, jni_str!("close"), jni_sig!("()V"), &[]);
+    written?;
+    Ok(uri)
+}
+
+/// `bytes` to a `java.io.OutputStream`, a chunk at a time through one Java array.
+fn write_stream(env: &mut Env, stream: &JObject, bytes: &[u8]) -> Jni<()> {
+    let buffer = env.new_byte_array(CHUNK)?;
+    let mut chunk = vec![0i8; CHUNK];
+    for part in bytes.chunks(CHUNK) {
+        let staged = chunk.get_mut(..part.len()).ok_or_else(|| Failure::Io(std::io::Error::other("chunk")))?;
+        for (s, b) in staged.iter_mut().zip(part) {
+            *s = i8::from_ne_bytes([*b]);
+        }
+        buffer.set_region(env, 0, staged)?;
+        let n = i32::try_from(part.len()).unwrap_or(0);
+        env.call_method(stream, jni_str!("write"), jni_sig!("([BII)V"), &[JValue::Object(&buffer), JValue::Int(0), JValue::Int(n)])?;
+    }
+    Ok(())
+}
+
+/// Before Android 10: `bytes` as a file in Download/PdfCraft (the storage permission lets PdfCraft
+/// write there, and other apps read it), handed over as a `file://` address. StrictMode refuses to
+/// let such an address leave the app, so its VM policy is relaxed first.
+fn download_file<'local>(env: &mut Env<'local>, name: &str, bytes: &[u8]) -> Jni<JObject<'local>> {
+    let folder = std::path::Path::new(crate::storage::SHARED).join(PRINT_FOLDER);
+    let path = folder.join(name);
+    std::fs::create_dir_all(&folder).and_then(|()| std::fs::write(&path, bytes)).map_err(Failure::Io)?;
+    let builder = env.new_object(jni_str!("android/os/StrictMode$VmPolicy$Builder"), jni_sig!("()V"), &[])?;
+    let policy = env.call_method(&builder, jni_str!("build"), jni_sig!("()Landroid/os/StrictMode$VmPolicy;"), &[])?.l()?;
+    env.call_static_method(
+        jni_str!("android/os/StrictMode"),
+        jni_str!("setVmPolicy"),
+        jni_sig!("(Landroid/os/StrictMode$VmPolicy;)V"),
+        &[JValue::Object(&policy)],
+    )?;
+    let path = env.new_string(path.to_string_lossy())?;
+    let file = env.new_object(jni_str!("java/io/File"), jni_sig!("(Ljava/lang/String;)V"), &[JValue::Object(&path)])?;
+    Ok(env
+        .call_static_method(
+            jni_str!("android/net/Uri"),
+            jni_str!("fromFile"),
+            jni_sig!("(Ljava/io/File;)Landroid/net/Uri;"),
+            &[JValue::Object(&file)],
+        )?
+        .l()?)
+}

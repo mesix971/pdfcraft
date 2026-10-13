@@ -2362,3 +2362,8 @@ animation effects	Off	Ανενεργά
 	All files	Όλα τα αρχεία
 	This folder is empty	Αυτός ο φάκελος είναι κενός
 	New folder	Νέος φάκελος
+
+# Printing through another app (Android)
+	Another app	Άλλη εφαρμογή
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Το έτοιμο για εκτύπωση PDF ανοίγει στην εφαρμογή που θα επιλέξετε, η οποία το εκτυπώνει με τις δικές της ρυθμίσεις αντιγράφων, διπλής όψης και χρώματος.
+	Couldn't hand {name} to another app: {e}	Δεν ήταν δυνατή η μεταβίβαση του {name} σε άλλη εφαρμογή: {e}

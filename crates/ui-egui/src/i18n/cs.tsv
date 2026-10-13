@@ -2426,3 +2426,8 @@ animation effects	Off	Vypnuto
 	All files	Všechny soubory
 	This folder is empty	Tato složka je prázdná
 	New folder	Nová složka
+
+# Printing through another app (Android)
+	Another app	Jiná aplikace
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	PDF připravené k tisku se otevře ve vybrané aplikaci, která ho vytiskne s vlastním nastavením kopií, oboustranného tisku a barev.
+	Couldn't hand {name} to another app: {e}	{name} se nepodařilo předat jiné aplikaci: {e}

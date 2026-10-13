@@ -2227,3 +2227,8 @@ animation effects	Off	關
 	This folder is empty	此資料夾是空的
 	New folder	新增資料夾
 	Create	建立
+
+# Printing through another app (Android)
+	Another app	其他應用程式
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	可列印的 PDF 會在您選擇的應用程式中開啟，並依該應用程式自己的份數、雙面與色彩設定列印。
+	Couldn't hand {name} to another app: {e}	無法將 {name} 交給其他應用程式：{e}

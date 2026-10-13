@@ -2373,3 +2373,8 @@ animation effects	Off	معطّلة
 	All files	جميع الملفات
 	This folder is empty	هذا المجلد فارغ
 	New folder	مجلد جديد
+
+# Printing through another app (Android)
+	Another app	تطبيق آخر
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	يُفتح ملف PDF الجاهز للطباعة في التطبيق الذي تختاره، فيطبعه بإعداداته الخاصة للنسخ والطباعة على الوجهين والألوان.
+	Couldn't hand {name} to another app: {e}	تعذّر تسليم {name} إلى تطبيق آخر: {e}

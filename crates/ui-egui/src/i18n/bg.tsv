@@ -2315,3 +2315,8 @@ animation effects	Off	Изключени
 	All files	Всички файлове
 	This folder is empty	Тази папка е празна
 	New folder	Нова папка
+
+# Printing through another app (Android)
+	Another app	Друго приложение
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Готовият за печат PDF се отваря в избраното от вас приложение, което го отпечатва със своите настройки за копия, двустранен печат и цвят.
+	Couldn't hand {name} to another app: {e}	{name} не може да бъде предаден на друго приложение: {e}

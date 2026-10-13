@@ -395,6 +395,10 @@ pub type OsEventsFn = Box<dyn FnMut() -> Vec<OsEvent>>;
 /// Reads the text on the system clipboard, where egui can't (Android).
 pub type ClipboardTextFn = Box<dyn Fn() -> Option<String>>;
 
+/// Hands a print-ready PDF `(file name, bytes)` to an app that prints it, where there is no print
+/// spooler (Android: the user picks the app). `Err` says why it couldn't.
+pub type HostPrintFn = Box<dyn Fn(&str, Vec<u8>) -> Result<(), String>>;
+
 /// Hands a saved PDF to the page embedding PdfCraft (web): `(name, bytes, save_as)`. `save_as`
 /// is `true` for Save As. Set by the web app when a host page (such as a Nextcloud app) asked
 /// for saves; without it the browser downloads the file.
@@ -675,6 +679,9 @@ pub struct PdfCraftApp {
     pub system_clipboard: bool,
     /// Reads the system clipboard's text where egui can't (Android sets it; Create ▸ Clipboard).
     pub clipboard_text: Option<ClipboardTextFn>,
+    /// Prints through other apps where there is no spooler (Android sets it): the Print dialog
+    /// lists "Another app" first and hands it the print-ready PDF.
+    pub host_print: Option<HostPrintFn>,
     /// Attach file: the file to attach instead of asking (tests, automation).
     pub attach_override: Option<(String, Vec<u8>)>,
     /// Duplicate Field: which field and onto which pages.
@@ -948,6 +955,7 @@ impl PdfCraftApp {
             last_copied_file: None,
             system_clipboard: true,
             clipboard_text: None,
+            host_print: None,
             attach_override: None,
             duplicate_draft: None,
             form_preview: false,

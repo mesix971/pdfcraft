@@ -2596,3 +2596,8 @@ key	Space	Tarpas
 	All files	Visi failai
 	This folder is empty	Šis aplankas tuščias
 	New folder	Naujas aplankas
+
+# Printing through another app (Android)
+	Another app	Kita programa
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Spausdinti paruoštas PDF atsidarys jūsų pasirinktoje programoje, kuri jį išspausdins su savo kopijų, dvipusio spausdinimo ir spalvų nustatymais.
+	Couldn't hand {name} to another app: {e}	Nepavyko perduoti {name} kitai programai: {e}

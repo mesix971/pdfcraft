@@ -75,31 +75,34 @@ Android 8.0 (API 26) or later, 64-bit ARM by default.
 - **Clipboard.** Copied text goes to the system clipboard and pasted text comes from it. Images and
   files copied in PdfCraft stay in PdfCraft (Android takes those only from a content provider, which
   needs Java); use Save Image As.
-- **Print.** Android has no print spooler a native app can reach without Java, so the Print dialog
-  offers **Save as PDF**: the print-ready PDF (with n-up, booklet, poster and the other layouts) is
-  written to a file you then print from any Android app.
+- **Print.** Android has no print spooler a native app can reach without Java, so the Print dialog's
+  first printer is **Another app**: the print-ready PDF (with n-up, booklet, poster and the other
+  layouts) is saved in Download/PdfCraft and opens in the app you pick, which prints it (a PDF
+  viewer's Print reaches every printer Android knows). Copies, two-sided printing and colour are set
+  in that app. **Save as PDF** is still there.
 - **Text recognition.** The OCR models ship inside the APK (when `cargo xtask models` fetched them
   before the build) and are unpacked into the app's storage on first start.
 - **Settings and recovery.** Kept in the app's private storage; unsaved documents are autosaved
   when the app goes to the background, and offered again after Android stops it.
-- **Interface size.** On a phone, Auto draws the interface at 80% so more of the desktop layout fits,
+- **Small screens.** On a phone, Auto draws the interface at 80% so more of the desktop layout fits,
   and the first start keeps the tool panel closed so the page has a portrait screen to itself (the
-  Tools tab opens it); Preferences ▸ Interface size changes the size. Tablets and landscape suit the
-  layout best.
+  Tools tab opens it); Preferences ▸ Interface size changes the size. When the mode tabs don't fit
+  they fold into one menu of the current mode, and the search box into its icon; when the side rail
+  is short its panel buttons scroll above the page controls.
 - **Dark theme** follows the system's.
 
 ## Known limits
 
 - Not yet tested on a device: please report what breaks.
-- The phone layout is the desktop layout, scaled; there is no layout designed for small portrait
-  screens yet.
+- The phone layout is the desktop layout, scaled and folded where it would overlap; there is no
+  layout designed for small portrait screens yet (tablets and landscape suit it best).
 - No screen reader: eframe's AccessKit bridge needs `GameActivity` (Java), not `NativeActivity`.
 - A text field takes typing through Android's text box, not in place: the box covers the page while
   it shows, and the field's text is replaced as a whole when OK is pressed.
 - If the text box can't be shown, typing falls back to key events for the session, where keyboards
   that compose words (accents, other alphabets, predictive text) may lose characters.
-- Images and files can't go to the system clipboard; there is no Android print service; "Reveal in
-  file manager" and opening attachments in other apps are unavailable.
+- Images and files can't go to the system clipboard; printing goes through another app rather than
+  a printer list; "Reveal in file manager" is unavailable.
 - `targetSdkVersion` is 34: Android 15 makes apps targeting 35 draw under the system bars, and a
   `NativeActivity` reports no insets for them. Google Play requires 35 for new apps; this APK is for
   installing directly.

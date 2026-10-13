@@ -35,12 +35,13 @@ printing are counted in their feature areas). **Platforms ≈ 70% ready, 15–30
 | Linux | no | yes | AppImage, deb, rpm, Flatpak, tarball | Chinese faces in Flatpak (#689) |
 | FreeBSD | no | yes | package | — |
 | Web | Acrobat online (cloud) | yes (WASM, offline in the browser) | static site | OCR, crash recovery, PKCS #12 signing, hosted deployment |
-| Android | Acrobat Reader mobile (separate app) | preview: the full desktop shell in a NativeActivity, in-app file browser | debug-signed APK from CI or `cargo xtask android`; not in releases | device testing, phone layout, screen reader, system printing, image clipboard, soft-keyboard composing |
+| Android | Acrobat Reader mobile (separate app) | preview: the full desktop shell in a NativeActivity, in-app file browser, typing through Android's text box, printing through another app | debug-signed APK from CI or `cargo xtask android`; not in releases | device testing, phone layout, screen reader, a printer list, image clipboard |
 
 ## Revision history
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-13 | minor | Android row: typing in any language and printing through another app; readiness not re-judged |
 | 2026-10-12 | minor | Android platform row (preview); readiness not re-judged |
 | 2026-10-11 | minor | Web printers row: printing through the browser's print dialog (gap 4 closed); Web platform row no longer lists printing |
 | 2026-10-10 | major | Created from the code, `vendor/README.md`, `.github/workflows/release.yml`, the print crate's README and user issues |

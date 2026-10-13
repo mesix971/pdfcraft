@@ -63,6 +63,8 @@ pub fn run(android: AndroidApp) {
         app.file_browser_host = browser_host(&android);
         let clipboard = android.clone();
         app.clipboard_text = Some(Box::new(move || jvm::clipboard_text(&clipboard)));
+        let printing = android.clone();
+        app.host_print = Some(Box::new(move |name, bytes| jvm::print_with_app(&printing, name, &bytes, pdfcraft_ui_egui::i18n::t("Print"))));
         if let Some(dir) = &data {
             app.enable_recovery(RecoveryStore::new(dir.join("recovery")));
             install_models(&android, dir.join("models"));

@@ -2357,3 +2357,8 @@ animation effects	Off	Izklopljeni
 	All files	Vse datoteke
 	This folder is empty	Ta mapa je prazna
 	New folder	Nova mapa
+
+# Printing through another app (Android)
+	Another app	Druga aplikacija
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	PDF, pripravljen za tisk, se odpre v aplikaciji, ki jo izberete, in ta ga natisne s svojimi nastavitvami kopij, obojestranskega tiska in barve.
+	Couldn't hand {name} to another app: {e}	{name} ni bilo mogoče predati drugi aplikaciji: {e}

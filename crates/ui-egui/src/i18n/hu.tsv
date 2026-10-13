@@ -2351,3 +2351,8 @@ animation effects	Off	Ki
 	All files	Minden fájl
 	This folder is empty	Ez a mappa üres
 	New folder	Új mappa
+
+# Printing through another app (Android)
+	Another app	Másik alkalmazás
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	A nyomtatásra kész PDF a választott alkalmazásban nyílik meg, amely a saját példányszám-, kétoldalas és színbeállításaival nyomtatja ki.
+	Couldn't hand {name} to another app: {e}	A(z) {name} nem adható át másik alkalmazásnak: {e}

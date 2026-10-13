@@ -2353,3 +2353,8 @@ animation effects	Off	Aus
 	All files	Alle Dateien
 	This folder is empty	Dieser Ordner ist leer
 	New folder	Neuer Ordner
+
+# Printing through another app (Android)
+	Another app	Eine andere App
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Das druckfertige PDF wird in der App Ihrer Wahl geöffnet, die es mit ihren eigenen Einstellungen für Kopien, Duplexdruck und Farbe druckt.
+	Couldn't hand {name} to another app: {e}	{name} konnte nicht an eine andere App übergeben werden: {e}

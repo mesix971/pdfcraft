@@ -2316,3 +2316,8 @@ animation effects	Off	关
 	All files	所有文件
 	This folder is empty	此文件夹为空
 	New folder	新建文件夹
+
+# Printing through another app (Android)
+	Another app	其他应用
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	可打印的 PDF 会在您选择的应用中打开，并按该应用自己的份数、双面和颜色设置打印。
+	Couldn't hand {name} to another app: {e}	无法将 {name} 交给其他应用：{e}

@@ -2265,3 +2265,8 @@ animation effects	Off	ఆఫ్
 	All files	అన్ని ఫైళ్లు
 	This folder is empty	ఈ ఫోల్డర్ ఖాళీగా ఉంది
 	New folder	కొత్త ఫోల్డర్
+
+# Printing through another app (Android)
+	Another app	మరొక యాప్
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	ముద్రణకు సిద్ధమైన PDF మీరు ఎంచుకున్న యాప్‌లో తెరుచుకుంటుంది, అది తన సొంత కాపీలు, రెండు వైపులా మరియు రంగు సెట్టింగ్‌లతో దాన్ని ముద్రిస్తుంది.
+	Couldn't hand {name} to another app: {e}	{name}ను మరొక యాప్‌కు అందించలేకపోయాం: {e}

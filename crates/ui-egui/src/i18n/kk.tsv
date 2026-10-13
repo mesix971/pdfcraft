@@ -2350,3 +2350,8 @@ animation effects	Off	Өшірулі
 	All files	Барлық файлдар
 	This folder is empty	Бұл қалта бос
 	New folder	Жаңа қалта
+
+# Printing through another app (Android)
+	Another app	Басқа қолданба
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Басып шығаруға дайын PDF сіз таңдаған қолданбада ашылады, ол оны өз көшірме, екі жақты және түс параметрлерімен басып шығарады.
+	Couldn't hand {name} to another app: {e}	{name} басқа қолданбаға берілмеді: {e}

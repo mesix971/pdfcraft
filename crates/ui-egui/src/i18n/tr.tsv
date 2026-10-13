@@ -2348,3 +2348,8 @@ animation effects	Off	Kapalı
 	All files	Tüm dosyalar
 	This folder is empty	Bu klasör boş
 	New folder	Yeni klasör
+
+# Printing through another app (Android)
+	Another app	Başka bir uygulama
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Yazdırmaya hazır PDF seçtiğiniz uygulamada açılır ve o uygulama kendi kopya, çift taraflı ve renk ayarlarıyla yazdırır.
+	Couldn't hand {name} to another app: {e}	{name} başka bir uygulamaya aktarılamadı: {e}

@@ -2482,3 +2482,8 @@ animation effects	Off	Desactivados
 	All files	Todos los archivos
 	This folder is empty	Esta carpeta está vacía
 	New folder	Nueva carpeta
+
+# Printing through another app (Android)
+	Another app	Otra aplicación
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	El PDF listo para imprimir se abre en la aplicación que elija, que lo imprime con sus propios ajustes de copias, doble cara y color.
+	Couldn't hand {name} to another app: {e}	No se pudo pasar {name} a otra aplicación: {e}
