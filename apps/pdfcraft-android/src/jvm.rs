@@ -159,9 +159,17 @@ pub enum Incoming {
     TooLarge(String),
 }
 
-/// The document the app was started with, if any: the address of a VIEW or EDIT intent, or the
-/// stream of a SEND. Reads it whole, so call it off the UI thread.
-pub fn launch_document(app: &AndroidApp) -> Result<Option<Incoming>, String> {
+/// Where the document an Activity was started with is: a file on shared storage, or an address
+/// only the system can read (with what reads it, held past the Activity).
+pub enum Address {
+    Path(String),
+    Content { address: String, uri: Global<JObject<'static>>, resolver: Global<JObject<'static>> },
+}
+
+/// The document `app`'s Activity was started with, if any: the address of a VIEW or EDIT intent,
+/// or the stream of a SEND. Quick (nothing is read yet), so a second Activity can take it before
+/// it finishes; [`read`] reads it afterwards, on any thread.
+pub fn launch_address(app: &AndroidApp) -> Result<Option<Address>, String> {
     with_activity(app, |env, activity| {
         let intent = env.call_method(activity, jni_str!("getIntent"), jni_sig!("()Landroid/content/Intent;"), &[])?.l()?;
         if intent.is_null() {
@@ -187,19 +195,59 @@ pub fn launch_document(app: &AndroidApp) -> Result<Option<Incoming>, String> {
         };
         let Some(address) = string_of(env, &uri)? else { return Ok(None) };
         if let Some(path) = crate::storage::path_for_uri(&address).filter(|p| std::fs::File::open(p).is_ok()) {
-            return Ok(Some(Incoming::Path(path.to_string_lossy().into_owned())));
+            return Ok(Some(Address::Path(path.to_string_lossy().into_owned())));
         }
-        let resolver = env.call_method(activity, jni_str!("getContentResolver"), jni_sig!("()Landroid/content/ContentResolver;"), &[])?.l()?;
+        // The application's resolver outlives the Activity; the URI grant is the app's.
+        let context = env.call_method(activity, jni_str!("getApplicationContext"), jni_sig!("()Landroid/content/Context;"), &[])?.l()?;
+        let resolver = env.call_method(&context, jni_str!("getContentResolver"), jni_sig!("()Landroid/content/ContentResolver;"), &[])?.l()?;
+        Ok(Some(Address::Content { address, uri: env.new_global_ref(&uri)?, resolver: env.new_global_ref(&resolver)? }))
+    })
+}
+
+/// Read the document at `address` (whole, so off the UI thread).
+pub fn read(address: Address) -> Result<Incoming, String> {
+    let (address, uri, resolver) = match address {
+        Address::Path(path) => return Ok(Incoming::Path(path)),
+        Address::Content { address, uri, resolver } => (address, uri, resolver),
+    };
+    let vm = jni::JavaVM::singleton().map_err(|e| e.to_string())?;
+    vm.attach_current_thread(|env| -> Jni<Incoming> {
         let shown = display_name(env, &resolver, &uri).unwrap_or_else(|e| {
             log::warn!("the opened document's name: {e}");
             None
         });
         let name = crate::storage::display_name(shown.as_deref(), &address);
-        Ok(Some(match read_uri(env, &resolver, &uri)? {
+        Ok(match read_uri(env, &resolver, &uri)? {
             Some(bytes) => Incoming::Bytes(name, bytes),
             None => Incoming::TooLarge(name),
-        }))
+        })
     })
+    .map_err(|e| e.to_string())
+}
+
+/// The task `app`'s Activity runs in (`Activity.getTaskId`).
+pub fn task_id(app: &AndroidApp) -> Option<i32> {
+    with_activity(app, |env, activity| Ok(env.call_method(activity, jni_str!("getTaskId"), jni_sig!("()I"), &[])?.i()?))
+        .map_err(|e| log::warn!("the app's task: {e}"))
+        .ok()
+}
+
+/// Bring task `task` (the running PdfCraft's) to the front, from another of the app's Activities
+/// (`ActivityManager.moveTaskToFront`, which the REORDER_TASKS permission allows).
+pub fn move_task_to_front(app: &AndroidApp, task: i32) {
+    let result = with_activity(app, |env, activity| {
+        let name = env.new_string("activity")?;
+        let manager = env
+            .call_method(activity, jni_str!("getSystemService"), jni_sig!("(Ljava/lang/String;)Ljava/lang/Object;"), &[JValue::Object(&name)])?
+            .l()?;
+        if !manager.is_null() {
+            env.call_method(&manager, jni_str!("moveTaskToFront"), jni_sig!("(II)V"), &[JValue::Int(task), JValue::Int(0)])?;
+        }
+        Ok(())
+    });
+    if let Err(e) = result {
+        log::warn!("bringing PdfCraft to the front: {e}");
+    }
 }
 
 /// The name the content provider gives the document (`OpenableColumns.DISPLAY_NAME`).
@@ -347,4 +395,190 @@ pub fn clipboard_text(app: &AndroidApp) -> Option<String> {
         log::warn!("reading the clipboard: {e}");
         None
     })
+}
+
+/// The system's text dialog: an `EditText` in an `AlertDialog`, so every keyboard and input
+/// method works (accents, other alphabets, predictive text, voice typing). A NativeActivity's own
+/// window gets typing only as key events, and characters the keyboard map can't produce are lost.
+///
+/// It is built from framework classes only, with no Java of PdfCraft's. Which button closed it is
+/// learnt without a listener (a listener would be a Java class): each button sends a `Message`
+/// whose callback is a `FutureTask` around an idle `Thread`, so pressing it makes that task done,
+/// which [`TextDialog::poll`] reads.
+pub struct TextDialog {
+    state: std::sync::Arc<std::sync::Mutex<DialogState>>,
+    /// A check is queued on the Java thread (one at a time).
+    checking: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+enum DialogState {
+    Opening,
+    Open(Box<OpenDialog>),
+    Closed(Option<String>),
+    Failed,
+}
+
+struct OpenDialog {
+    dialog: Global<JObject<'static>>,
+    edit: Global<JObject<'static>>,
+    ok: Global<JObject<'static>>,
+    cancel: Global<JObject<'static>>,
+}
+
+/// `EditorInfo` input types.
+const TYPE_CLASS_TEXT: i32 = 0x1;
+const TYPE_TEXT_VARIATION_PASSWORD: i32 = 0x80;
+const TYPE_TEXT_FLAG_MULTI_LINE: i32 = 0x2_0000;
+/// `DialogInterface.BUTTON_POSITIVE`, `BUTTON_NEGATIVE`.
+const BUTTON_POSITIVE: i32 = -1;
+const BUTTON_NEGATIVE: i32 = -2;
+/// `WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE`.
+const SOFT_INPUT_STATE_ALWAYS_VISIBLE: i32 = 5;
+
+impl TextDialog {
+    /// Show the dialog (on the Java UI thread; it appears a moment later), with `ok` and
+    /// `cancel` as its buttons.
+    pub fn open(app: &AndroidApp, request: crate::typing::Request, ok: String, cancel: String) -> TextDialog {
+        let state = std::sync::Arc::new(std::sync::Mutex::new(DialogState::Opening));
+        let shown = state.clone();
+        let main = app.clone();
+        app.run_on_java_main_thread(Box::new(move || {
+            let built = with_activity(&main, |env, activity| build_dialog(env, activity, &request, [&ok, &cancel]));
+            let next = match built {
+                Ok(open) => DialogState::Open(Box::new(open)),
+                Err(e) => {
+                    log::warn!("showing the text dialog: {e}");
+                    DialogState::Failed
+                }
+            };
+            *shown.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = next;
+        }));
+        TextDialog { state, checking: std::sync::Arc::default() }
+    }
+
+    /// How the dialog ended, or `None` while it shows. Each call asks the Java UI thread to look
+    /// again; its answer shows on a later call.
+    pub fn poll(&self, app: &AndroidApp) -> Option<crate::typing::Outcome> {
+        let open = {
+            let state = self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            match &*state {
+                DialogState::Opening => return None,
+                DialogState::Failed => return Some(crate::typing::Outcome::Failed),
+                DialogState::Closed(Some(text)) => return Some(crate::typing::Outcome::Done(text.clone())),
+                DialogState::Closed(None) => return Some(crate::typing::Outcome::Cancelled),
+                DialogState::Open(_) => true,
+            }
+        };
+        if open && !self.checking.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            let state = self.state.clone();
+            let checking = self.checking.clone();
+            let main = app.clone();
+            app.run_on_java_main_thread(Box::new(move || {
+                let mut state = state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                if let DialogState::Open(dialog) = &*state {
+                    let checked = with_activity(&main, |env, _| check_dialog(env, dialog));
+                    match checked {
+                        Ok(Some(result)) => *state = DialogState::Closed(result),
+                        Ok(None) => {}
+                        Err(e) => {
+                            log::warn!("checking the text dialog: {e}");
+                            *state = DialogState::Failed;
+                        }
+                    }
+                }
+                checking.store(false, std::sync::atomic::Ordering::SeqCst);
+            }));
+        }
+        None
+    }
+}
+
+/// A `FutureTask` that does nothing when run, and a `Message` to `handler` that runs it.
+fn button_task<'local>(env: &mut Env<'local>, handler: &JObject) -> Jni<(JObject<'local>, JObject<'local>)> {
+    let idle = env.new_object(jni_str!("java/lang/Thread"), jni_sig!("()V"), &[])?;
+    let null = JObject::null();
+    let task = env.new_object(
+        jni_str!("java/util/concurrent/FutureTask"),
+        jni_sig!("(Ljava/lang/Runnable;Ljava/lang/Object;)V"),
+        &[JValue::Object(&idle), JValue::Object(&null)],
+    )?;
+    let message = env
+        .call_static_method(
+            jni_str!("android/os/Message"),
+            jni_str!("obtain"),
+            jni_sig!("(Landroid/os/Handler;Ljava/lang/Runnable;)Landroid/os/Message;"),
+            &[JValue::Object(handler), JValue::Object(&task)],
+        )?
+        .l()?;
+    Ok((task, message))
+}
+
+fn build_dialog(env: &mut Env, activity: &JObject, request: &crate::typing::Request, [ok_label, cancel_label]: [&String; 2]) -> Jni<OpenDialog> {
+    let edit = env.new_object(jni_str!("android/widget/EditText"), jni_sig!("(Landroid/content/Context;)V"), &[JValue::Object(activity)])?;
+    let kind = TYPE_CLASS_TEXT
+        | if request.password { TYPE_TEXT_VARIATION_PASSWORD } else { 0 }
+        | if request.multiline && !request.password { TYPE_TEXT_FLAG_MULTI_LINE } else { 0 };
+    env.call_method(&edit, jni_str!("setInputType"), jni_sig!("(I)V"), &[JValue::Int(kind)])?;
+    let text = env.new_string(&request.text)?;
+    env.call_method(&edit, jni_str!("setText"), jni_sig!("(Ljava/lang/CharSequence;)V"), &[JValue::Object(&text)])?;
+    // The caret after the text, where typing usually continues (positions count UTF-16 units).
+    let end = i32::try_from(request.text.encode_utf16().count()).unwrap_or(0);
+    env.call_method(&edit, jni_str!("setSelection"), jni_sig!("(I)V"), &[JValue::Int(end)])?;
+
+    let looper = env.call_static_method(jni_str!("android/os/Looper"), jni_str!("getMainLooper"), jni_sig!("()Landroid/os/Looper;"), &[])?.l()?;
+    let handler = env.new_object(jni_str!("android/os/Handler"), jni_sig!("(Landroid/os/Looper;)V"), &[JValue::Object(&looper)])?;
+    let (ok, ok_message) = button_task(env, &handler)?;
+    let (cancel, cancel_message) = button_task(env, &handler)?;
+    // A message is sent once, so the back key gets its own, running the same task.
+    let back_message = env
+        .call_static_method(
+            jni_str!("android/os/Message"),
+            jni_str!("obtain"),
+            jni_sig!("(Landroid/os/Message;)Landroid/os/Message;"),
+            &[JValue::Object(&cancel_message)],
+        )?
+        .l()?;
+
+    let builder =
+        env.new_object(jni_str!("android/app/AlertDialog$Builder"), jni_sig!("(Landroid/content/Context;)V"), &[JValue::Object(activity)])?;
+    let builder = env
+        .call_method(&builder, jni_str!("setView"), jni_sig!("(Landroid/view/View;)Landroid/app/AlertDialog$Builder;"), &[JValue::Object(&edit)])?
+        .l()?;
+    let dialog = env.call_method(&builder, jni_str!("create"), jni_sig!("()Landroid/app/AlertDialog;"), &[])?.l()?;
+    for (which, label, message) in [(BUTTON_POSITIVE, ok_label, &ok_message), (BUTTON_NEGATIVE, cancel_label, &cancel_message)] {
+        let label = env.new_string(label)?;
+        env.call_method(
+            &dialog,
+            jni_str!("setButton"),
+            jni_sig!("(ILjava/lang/CharSequence;Landroid/os/Message;)V"),
+            &[JValue::Int(which), JValue::Object(&label), JValue::Object(message)],
+        )?;
+    }
+    env.call_method(&dialog, jni_str!("setCancelMessage"), jni_sig!("(Landroid/os/Message;)V"), &[JValue::Object(&back_message)])?;
+    env.call_method(&dialog, jni_str!("setCanceledOnTouchOutside"), jni_sig!("(Z)V"), &[JValue::Bool(false)])?;
+    let window = env.call_method(&dialog, jni_str!("getWindow"), jni_sig!("()Landroid/view/Window;"), &[])?.l()?;
+    if !window.is_null() {
+        env.call_method(&window, jni_str!("setSoftInputMode"), jni_sig!("(I)V"), &[JValue::Int(SOFT_INPUT_STATE_ALWAYS_VISIBLE)])?;
+    }
+    env.call_method(&dialog, jni_str!("show"), jni_sig!("()V"), &[])?;
+    env.call_method(&edit, jni_str!("requestFocus"), jni_sig!("()Z"), &[])?;
+    Ok(OpenDialog {
+        dialog: env.new_global_ref(&dialog)?,
+        edit: env.new_global_ref(&edit)?,
+        ok: env.new_global_ref(&ok)?,
+        cancel: env.new_global_ref(&cancel)?,
+    })
+}
+
+/// How the dialog ended: `Some(Some(text))` for OK, `Some(None)` when cancelled or closed, `None`
+/// while it shows. OK's task runs before the dialog is dismissed, so a dismissed dialog whose OK
+/// task isn't done was cancelled.
+fn check_dialog(env: &mut Env, dialog: &OpenDialog) -> Jni<Option<Option<String>>> {
+    if env.call_method(&*dialog.ok, jni_str!("isDone"), jni_sig!("()Z"), &[])?.z()? {
+        let text = env.call_method(&*dialog.edit, jni_str!("getText"), jni_sig!("()Landroid/text/Editable;"), &[])?.l()?;
+        return Ok(Some(Some(string_of(env, &text)?.unwrap_or_default())));
+    }
+    let cancelled = env.call_method(&*dialog.cancel, jni_str!("isDone"), jni_sig!("()Z"), &[])?.z()?;
+    let showing = env.call_method(&*dialog.dialog, jni_str!("isShowing"), jni_sig!("()Z"), &[])?.z()?;
+    Ok((cancelled || !showing).then_some(None))
 }

@@ -21,6 +21,11 @@ unsafe_code = "deny"
 dbg_macro = "warn"
 todo = "warn"
 
+[dependencies]
+# Typing through the system text dialog drives egui text fields (`src/typing.rs`, tested on the host).
+egui = { workspace = true }
+log = { workspace = true }
+
 [target.'cfg(target_os = "android")'.dependencies]
 pdfcraft-ui-egui = { workspace = true }
 # Where the text recognition models are unpacked to (they ship in the APK's assets).
@@ -28,10 +33,8 @@ pdfcraft-ocr = { workspace = true }
 # NativeActivity: the app needs no Java code. Its accessibility bridge needs GameActivity, so it is
 # off here (crates/ui-egui/Cargo.toml).
 eframe = { workspace = true, features = ["default_fonts", "wgpu", "persistence", "android-native-activity"] }
-egui = { workspace = true }
 # The activity handle eframe runs in (`AndroidApp`); the same, patched winit eframe uses.
 winit = { version = "0.30", default-features = false, features = ["android-native-activity"] }
-log = { workspace = true }
 # Records go to logcat (`adb logcat -s PdfCraft`).
 android_logger = { version = "0.15", default-features = false }
 # The same jni as android-activity, which hands it the Java VM before `android_main` runs, so

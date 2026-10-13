@@ -10,6 +10,7 @@
 
 pub mod screen;
 pub mod storage;
+pub mod typing;
 
 #[cfg(target_os = "android")]
 mod jvm;

@@ -377,6 +377,9 @@ mod tests {
         assert!(manifest.contains("android:hasCode=\"false\""));
         assert!(manifest.contains("android.app.NativeActivity"));
         assert!(!manifest.contains("android.permission.INTERNET"), "PdfCraft sends nothing");
+        // A document opened while PdfCraft runs reaches it through a second Activity (shell.rs).
+        assert!(manifest.contains("android:launchMode=\"standard\""), "singleTask would drop documents opened while PdfCraft runs");
+        assert!(manifest.contains("android.permission.REORDER_TASKS"));
         // Rotating or folding must not restart the activity: android_main can't run twice.
         for change in ["orientation", "screenSize", "smallestScreenSize", "screenLayout", "keyboardHidden", "uiMode", "density"] {
             assert!(manifest.contains(change), "configChanges lacks {change}");

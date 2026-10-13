@@ -4,7 +4,8 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::mpsc::{Receiver, channel};
+use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::{Mutex, PoisonError};
 
 use pdfcraft_ui_egui::file_browser::{Place, PlaceKind};
 use pdfcraft_ui_egui::{OsEvent, PdfCraftApp, RecoveryStore};
@@ -27,6 +28,9 @@ pub fn run(android: AndroidApp) {
     // this records every panic, caught or not.
     std::panic::set_hook(Box::new(|info| log::error!("internal error: {info}")));
     log::info!("PdfCraft {} on Android (API {})", env!("CARGO_PKG_VERSION"), AndroidApp::sdk_version());
+    if hand_off(&android) {
+        return;
+    }
 
     let config = android.config();
     if let Some(language) = config.language() {
@@ -65,11 +69,13 @@ pub fn run(android: AndroidApp) {
         }
         app.os_events = Some(launch_document(&android, &app, &cc.egui_ctx));
         app.reopen_last_files(&[]);
-        Ok(Box::new(Shell { app, android: android.clone(), keyboard: false }))
+        Ok(Box::new(Shell { app, android: android.clone(), typing: Default::default() }))
     });
     if let Err(e) = eframe::run_native("PdfCraft", options, creator) {
         log::error!("PdfCraft stopped: {e}");
     }
+    // This Activity is finishing: the next one starts PdfCraft afresh.
+    *running() = None;
 }
 
 /// Unpack the text recognition models from the APK's assets into `dir` (once; a model already
@@ -132,36 +138,94 @@ fn browser_host(android: &AndroidApp) -> pdfcraft_ui_egui::file_browser::Host {
     }
 }
 
-/// Read the document the app was opened with (if any) off the UI thread, and deliver it: a file
-/// on shared storage opens in place through the returned poll; bytes go to the startup inbox.
-fn launch_document(android: &AndroidApp, app: &PdfCraftApp, ctx: &egui::Context) -> pdfcraft_ui_egui::OsEventsFn {
-    let (send, receive) = channel::<String>();
-    let android = android.clone();
-    let inbox = app.startup_inbox.clone();
-    let failed = app.failed_inbox.clone();
-    let ctx = ctx.clone();
-    let spawned = std::thread::Builder::new().name("open-intent".into()).spawn(move || {
-        match jvm::launch_document(&android) {
-            Ok(Some(jvm::Incoming::Path(path))) => {
-                let _ = send.send(path);
+/// Where documents go in the PdfCraft running in this process: files to open in place, and the
+/// bytes of documents only the system can read.
+#[derive(Clone)]
+struct Deliver {
+    paths: Sender<String>,
+    inbox: pdfcraft_ui_egui::Inbox,
+    failed: pdfcraft_ui_egui::FailedInbox,
+    ctx: egui::Context,
+}
+
+impl Deliver {
+    /// Read `address` on a thread of its own and hand the document over.
+    fn read_in_background(self, address: jvm::Address) {
+        let spawned = std::thread::Builder::new().name("open-intent".into()).spawn(move || {
+            match jvm::read(address) {
+                Ok(jvm::Incoming::Path(path)) => {
+                    let _ = self.paths.send(path);
+                }
+                Ok(jvm::Incoming::Bytes(name, bytes)) => {
+                    self.inbox.lock().map(|mut q| q.push((name, bytes))).ok();
+                }
+                Ok(jvm::Incoming::TooLarge(name)) => {
+                    self.failed.lock().map(|mut q| q.push((name, "the document is larger than 512 MB".into()))).ok();
+                }
+                Err(e) => {
+                    log::warn!("reading a document another app handed over: {e}");
+                    self.failed.lock().map(|mut q| q.push(("document".into(), e))).ok();
+                }
             }
-            Ok(Some(jvm::Incoming::Bytes(name, bytes))) => {
-                inbox.lock().map(|mut q| q.push((name, bytes))).ok();
-            }
-            Ok(Some(jvm::Incoming::TooLarge(name))) => {
-                failed.lock().map(|mut q| q.push((name, "the document is larger than 512 MB".into()))).ok();
-            }
-            Ok(None) => {}
-            Err(e) => {
-                log::warn!("reading the document the app was opened with: {e}");
-                failed.lock().map(|mut q| q.push(("document".into(), e))).ok();
-            }
+            self.ctx.request_repaint();
+        });
+        if let Err(e) = spawned {
+            log::warn!("couldn't start reading the document: {e}");
         }
-        ctx.request_repaint();
-    });
-    if let Err(e) = spawned {
-        log::warn!("couldn't start reading the opened document: {e}");
     }
+}
+
+/// The PdfCraft running in this process, for a later Activity to hand its document to, and the
+/// task to bring forward.
+#[derive(Clone)]
+struct Running {
+    deliver: Deliver,
+    task: Option<i32>,
+}
+
+/// Set while an Activity runs PdfCraft (see [`hand_off`]).
+static RUNNING: Mutex<Option<Running>> = Mutex::new(None);
+
+fn running() -> std::sync::MutexGuard<'static, Option<Running>> {
+    RUNNING.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// A NativeActivity never hears of an intent sent to it once it runs, so an "Open with" or
+/// "Share" while PdfCraft runs starts a second Activity (the manifest's standard launch mode).
+/// That one takes its document, hands it to the PdfCraft already running, brings it forward and
+/// finishes (by returning from `android_main`). Returns false when no PdfCraft runs yet.
+fn hand_off(android: &AndroidApp) -> bool {
+    let Some(running) = running().clone() else { return false };
+    log::info!("PdfCraft already runs: handing this document to it");
+    let address = jvm::launch_address(android);
+    if let Some(task) = running.task {
+        jvm::move_task_to_front(android, task);
+    }
+    match address {
+        Ok(Some(address)) => running.deliver.read_in_background(address),
+        Ok(None) => {}
+        Err(e) => log::warn!("the document handed to a second window: {e}"),
+    }
+    true
+}
+
+/// Read the document this Activity was started with (if any) off the UI thread and deliver it:
+/// a file on shared storage opens in place through the returned poll, bytes go to the startup
+/// inbox. Also makes this the PdfCraft later Activities hand their documents to.
+fn launch_document(android: &AndroidApp, app: &PdfCraftApp, ctx: &egui::Context) -> pdfcraft_ui_egui::OsEventsFn {
+    let (paths, receive) = channel::<String>();
+    let startup = Deliver { paths: paths.clone(), inbox: app.startup_inbox.clone(), failed: app.failed_inbox.clone(), ctx: ctx.clone() };
+    match jvm::launch_address(android) {
+        Ok(Some(address)) => startup.read_in_background(address),
+        Ok(None) => {}
+        Err(e) => {
+            log::warn!("the document the app was opened with: {e}");
+            app.failed_inbox.lock().map(|mut q| q.push(("document".into(), e))).ok();
+        }
+    }
+    // Documents handed over later open in front, like a deliberate Open.
+    let later = Deliver { paths, inbox: app.inbox.clone(), failed: app.failed_inbox.clone(), ctx: ctx.clone() };
+    *running() = Some(Running { deliver: later, task: jvm::task_id(android) });
     Box::new(move || poll(&receive))
 }
 
@@ -183,8 +247,39 @@ fn poll(receive: &Receiver<String>) -> Vec<OsEvent> {
 struct Shell {
     app: PdfCraftApp,
     android: AndroidApp,
-    /// Whether the soft keyboard was asked for last frame.
-    keyboard: bool,
+    /// Text entry through the system's text dialog (`typing`).
+    typing: crate::typing::Typing<jvm::TextDialog>,
+}
+
+/// The system text dialog and the window's keyboard, for [`crate::typing`].
+struct TypingHost<'a>(&'a AndroidApp);
+
+impl crate::typing::Host for TypingHost<'_> {
+    type Dialog = jvm::TextDialog;
+
+    fn open(&mut self, request: crate::typing::Request) -> jvm::TextDialog {
+        let t = |s: &str| pdfcraft_ui_egui::i18n::t(s).to_owned();
+        jvm::TextDialog::open(self.0, request, t("OK"), t("Cancel"))
+    }
+
+    fn poll(&mut self, dialog: &jvm::TextDialog) -> Option<crate::typing::Outcome> {
+        dialog.poll(self.0)
+    }
+
+    fn soft_keyboard(&mut self, show: bool) {
+        if show {
+            self.0.show_soft_input(false);
+        } else {
+            self.0.hide_soft_input(false);
+        }
+    }
+}
+
+/// Whether a hardware keyboard is attached and open: typing then goes straight to the window.
+fn hardware_keyboard(android: &AndroidApp) -> bool {
+    use winit::platform::android::activity::ndk::configuration::{Keyboard, KeysHidden};
+    let config = android.config();
+    config.keyboard() == Keyboard::Qwerty && config.keys_hidden() == KeysHidden::No
 }
 
 impl eframe::App for Shell {
@@ -206,6 +301,7 @@ impl eframe::App for Shell {
             raw.events.retain(|e| !matches!(e, egui::Event::Paste(_)));
             raw.events.push(egui::Event::Paste(system));
         }
+        self.typing.queue(raw);
         raw.safe_area_insets = Some(self.uncovered(raw));
         raw.system_theme = Some(match self.android.config().ui_mode_night() {
             winit::platform::android::activity::ndk::configuration::UiModeNight::Yes => egui::Theme::Dark,
@@ -228,34 +324,23 @@ impl eframe::App for Shell {
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         self.app.ui(ui, frame);
         let ctx = ui.ctx().clone();
-        // Copies go to the system clipboard as well as egui's own.
-        let copied: Vec<String> = ctx.output(|o| {
+        let copied: Option<String> = ctx.output(|o| {
             o.commands
                 .iter()
                 .filter_map(|c| match c {
                     egui::OutputCommand::CopyText(text) => Some(text.clone()),
                     _ => None,
                 })
-                .collect()
+                .next_back()
         });
-        if let Some(text) = copied.into_iter().last() {
-            jvm::set_clipboard_text(&self.android, text);
+        let reading = self.typing.reading();
+        // Copies go to the system clipboard as well as egui's own, except the one that reads a
+        // field for the text dialog.
+        if !reading && let Some(text) = &copied {
+            jvm::set_clipboard_text(&self.android, text.clone());
         }
-        // winit asks for the keyboard implicitly, which some devices ignore: ask outright while
-        // a text field has focus, and again when the field is tapped after the keyboard was put
-        // away (focus didn't change, so nothing else would bring it back).
-        let want = ctx.egui_wants_keyboard_input();
-        let released = ctx.input(|i| if i.pointer.any_released() { i.pointer.interact_pos() } else { None });
-        let field = ctx.memory(|m| m.focused()).and_then(|id| ctx.read_response(id));
-        let tapped = want && released.zip(field).is_some_and(|(at, field)| field.rect.contains(at));
-        if want != self.keyboard || tapped {
-            if want {
-                self.android.show_soft_input(false);
-            } else {
-                self.android.hide_soft_input(false);
-            }
-            self.keyboard = want;
-        }
+        let dialog = !hardware_keyboard(&self.android);
+        self.typing.frame(&ctx, copied.filter(|_| reading), dialog, &mut TypingHost(&self.android));
     }
 }
 

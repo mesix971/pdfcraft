@@ -14,6 +14,8 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <!-- Bring PdfCraft forward when another app opens a document in it while it runs. -->
+    <uses-permission android:name="android.permission.REORDER_TASKS" />
     <!-- No INTERNET permission: PdfCraft works offline and sends nothing. -->
 
     <!-- wgpu draws with Vulkan, or OpenGL ES 3 where Vulkan is missing. -->
@@ -29,13 +31,15 @@
         android:resizeableActivity="true"
         android:appCategory="productivity">
 
-        <!-- singleTask: one window, so a document opened from another app joins it instead of
-             starting a second copy. configChanges: turning the device or folding it resizes the
-             window; it never restarts the app and its open documents. -->
+        <!-- standard: a NativeActivity never hears of an intent sent to it while it runs, so a
+             document opened from another app then starts a second Activity, which hands the
+             document to the running PdfCraft, brings it forward and finishes
+             (apps/pdfcraft-android/src/shell.rs, hand_off). configChanges: turning the device or
+             folding it resizes the window; it never restarts the app and its open documents. -->
         <activity
             android:name="android.app.NativeActivity"
             android:exported="true"
-            android:launchMode="singleTask"
+            android:launchMode="standard"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
             android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboard|keyboardHidden|navigation|uiMode|locale|layoutDirection|fontScale|touchscreen|colorMode|mcc|mnc">

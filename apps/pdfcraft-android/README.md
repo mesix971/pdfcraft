@@ -59,11 +59,19 @@ Android 8.0 (API 26) or later, 64-bit ARM by default.
   and Reopen last session work, and changed files reload, as on the desktop.
 - **Open with / Share.** PdfCraft appears in "Open with" and "Share" for PDFs. A file on shared
   storage opens in place (Save writes it back); a document only another app can read (a mail
-  attachment) opens as an unsaved copy, and Save asks where to keep it.
+  attachment) opens as an unsaved copy, and Save asks where to keep it. This works while PdfCraft
+  already runs too: a `NativeActivity` never hears of a new intent, so Android starts a second
+  window, which hands the document to the running PdfCraft, brings it forward and closes.
 - **Back key** closes the open menu or dialog, like Escape. It never closes the app, so unsaved work
   isn't dropped without the usual question.
-- **Keyboard.** The soft keyboard opens for text fields; the window keeps the part the keyboard
-  leaves free.
+- **Typing.** Tapping a text field opens Android's own text box with the field's text, so every
+  keyboard works: accents, other alphabets, predictive text, voice typing (a `NativeActivity`'s
+  window only gets key events, and loses the characters a keyboard map can't produce). **OK** puts
+  the text back and acts as the keyboard's Done: in a one-line field it also presses Enter, so a page
+  number, a zoom, a search or a file name takes effect (in the command palette, it runs the top
+  match). **Cancel** leaves the field as it was. A password is never shown in the box's prefill.
+  With a hardware keyboard, typing goes straight to the field; the window keeps the part the soft
+  keyboard leaves free.
 - **Clipboard.** Copied text goes to the system clipboard and pasted text comes from it. Images and
   files copied in PdfCraft stay in PdfCraft (Android takes those only from a content provider, which
   needs Java); use Save Image As.
@@ -82,14 +90,14 @@ Android 8.0 (API 26) or later, 64-bit ARM by default.
 
 ## Known limits
 
-- Not yet tested on devices beyond start-up: please report what breaks.
+- Not yet tested on a device: please report what breaks.
 - The phone layout is the desktop layout, scaled; there is no layout designed for small portrait
   screens yet.
-- A document opened from another app while PdfCraft is already running brings PdfCraft forward but
-  doesn't open (a `NativeActivity` never sees the new intent); open it from the file browser.
 - No screen reader: eframe's AccessKit bridge needs `GameActivity` (Java), not `NativeActivity`.
-- Text typed with the soft keyboard arrives as key events; keyboards that compose words (predictive
-  text, some accent and CJK input methods) may not commit text as expected.
+- A text field takes typing through Android's text box, not in place: the box covers the page while
+  it shows, and the field's text is replaced as a whole when OK is pressed.
+- If the text box can't be shown, typing falls back to key events for the session, where keyboards
+  that compose words (accents, other alphabets, predictive text) may lose characters.
 - Images and files can't go to the system clipboard; there is no Android print service; "Reveal in
   file manager" and opening attachments in other apps are unavailable.
 - `targetSdkVersion` is 34: Android 15 makes apps targeting 35 draw under the system bars, and a
@@ -116,7 +124,10 @@ allow unsafe code.
 - `src/lib.rs`: the entry point.
 - `src/shell.rs`: the `eframe::App` around `PdfCraftApp` (input, keyboard, clipboard, insets, saving
   on suspend), the file browser's places, OCR model unpacking, and the start-up document.
-- `src/jvm.rs`: JNI (storage access, the start-up intent and `ContentResolver`, the clipboard).
+- `src/jvm.rs`: JNI (storage access, the start-up intent and `ContentResolver`, handing a document to
+  the running window, the clipboard, the system text box).
+- `src/typing.rs`: typing through the system text box (the egui side, host-tested on real egui text
+  fields with a stand-in box).
 - `src/storage.rs`, `src/screen.rs`: plain functions with host tests (which `content://` and
   `file://` addresses are shared-storage paths, confined to `/storage` without `..`; display names;
   removable cards; the keyboard's inset).
