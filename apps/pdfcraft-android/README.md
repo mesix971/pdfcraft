@@ -128,6 +128,12 @@ Android 8.0 (API 26) or later, 64-bit ARM by default.
   found on the device, newest first, each with its first page, and one tap opens it. Recent
   files and the places (Downloads, Documents, the storage, PdfCraft's folder) are chips across
   the top; search narrows the list; several files can be picked from different folders.
+- **Editing.** Edit goes straight to changing the page: a finger scrolls, a tap on a paragraph
+  opens it large on a screen of its own (size, bold, italic, underline, alignment, colours; Done
+  or ✕), Add text puts new text where the page is tapped, and a tapped picture gets a bar to
+  turn, flip, replace, save or delete it. A long press picks a paragraph, added text or a
+  picture up to move it: it follows the finger and lands where it lifts. More has headers and
+  footers, a watermark, the background, Bates numbers and the pages.
 - **Combine files** is a list of cards in the order they will be combined, each with its first
   page: arrows move a file, a cross takes it out, a tap shows it large, Combine is at the bottom.
 - **Dark mode.** Profile ▸ Appearance chooses Automatic (the phone's theme), Light or Dark; until

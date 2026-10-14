@@ -96,6 +96,7 @@ mod pageboxes;
 mod palette;
 mod panels;
 pub mod phone;
+mod phone_edit;
 pub mod phone_home;
 #[cfg(not(target_arch = "wasm32"))]
 mod pickers;

@@ -66,6 +66,8 @@ pub enum Sheet {
     Item,
     /// Which document a Home action is for.
     Pick,
+    /// The rest of the Edit mode's tools.
+    EditMore,
 }
 
 impl Sheet {
@@ -82,6 +84,8 @@ pub enum ToolMode {
     Comment,
     Draw,
     FillSign,
+    /// Change the page's text and pictures, add text and pictures (`phone_edit.rs`).
+    Edit,
 }
 
 impl ToolMode {
@@ -92,6 +96,7 @@ impl ToolMode {
             Self::Comment => "Comments",
             Self::Draw => "Draw",
             Self::FillSign => "Fill & Sign",
+            Self::Edit => "Edit a PDF",
         }
     }
 
@@ -100,6 +105,7 @@ impl ToolMode {
             Self::Comment => "message-square-plus",
             Self::Draw => "pencil",
             Self::FillSign => "signature",
+            Self::Edit => "file-pen-line",
         }
     }
 
@@ -109,6 +115,7 @@ impl ToolMode {
             Self::Comment => "comment",
             Self::Draw => "draw",
             Self::FillSign => "fill_sign",
+            Self::Edit => "edit",
         }
     }
 
@@ -125,7 +132,7 @@ impl ToolMode {
                 CommentTool::Callout,
             ],
             Self::Draw => &[CommentTool::Ink, CommentTool::Line, CommentTool::Arrow, CommentTool::Rectangle, CommentTool::Oval, CommentTool::Eraser],
-            Self::FillSign => &[],
+            Self::FillSign | Self::Edit => &[],
         }
     }
 
@@ -133,6 +140,8 @@ impl ToolMode {
     fn owns(self, tool: QuickTool) -> bool {
         match (self, tool) {
             (Self::FillSign, QuickTool::Fill(_)) => true,
+            (Self::Edit, QuickTool::EditText | QuickTool::AddText) => true,
+            (Self::Edit, _) => false,
             (_, QuickTool::Comment(t)) => self.comment_tools().contains(&t),
             _ => false,
         }
@@ -143,6 +152,7 @@ impl ToolMode {
     fn first_command(self, app: &PdfCraftApp) -> &'static str {
         match self {
             Self::FillSign => FillTool::Text.command(),
+            Self::Edit => "edit.edit_text",
             _ => {
                 let tools = self.comment_tools();
                 let last = tools.first().and_then(|t| app.comment_prefs.group_tool.get(t.group()).copied()).filter(|t| tools.contains(t));
@@ -179,6 +189,11 @@ pub struct PhoneState {
     text_focused: bool,
     /// Home: its tab, lists, profile and previews.
     pub(crate) home: crate::phone_home::HomeState,
+    /// The typing screen showed last frame (its field takes the keyboard when it first shows).
+    pub(crate) typing_shown: bool,
+    /// A format was tapped on the typing screen: the text takes the keyboard back next frame
+    /// (the tap took it this one).
+    pub(crate) typing_refocus: bool,
     /// The colours of the screen's top and bottom this frame, for the system's bars around it.
     pub(crate) system_bars: Option<(Color32, Color32)>,
 }
@@ -236,11 +251,12 @@ impl PdfCraftApp {
         !self.phone.bars_hidden
     }
 
-    /// Open tool group id on the active document: its tool mode (Comments, Fill & Sign), the page
-    /// grid (Organize), or its panel in the drawer, its tools on the page above.
+    /// Open tool group id on the active document: its tool mode (Comments, Fill & Sign, Edit),
+    /// the page grid (Organize), or its panel in the drawer, its tools on the page above.
     pub(crate) fn open_phone_tool_group(&mut self, id: &'static str) {
         match id {
             "comment" => self.enter_phone_tool(ToolMode::Comment),
+            "edit" => self.enter_phone_tool(ToolMode::Edit),
             "fill_sign" => self.enter_phone_tool(ToolMode::FillSign),
             "organize" => {
                 self.leave_phone_tool();
@@ -271,6 +287,18 @@ impl PdfCraftApp {
 
     /// Leave the tool mode (Done or Back): back to reading.
     pub fn leave_phone_tool(&mut self) {
+        // Leaving Edit lets go of what it picked: a picture or added item kept selected would
+        // come back with its bar, and maybe another one's place, the next time.
+        if self.phone.tool == Some(ToolMode::Edit)
+            && let Some(v) = self.active.and_then(|i| self.views.get_mut(i))
+        {
+            v.image_selection = None;
+            v.content.selected = None;
+            v.content.select_added = None;
+            // Something carried by a long press stays where it was.
+            v.block_drag = None;
+            v.content.cancel_grab();
+        }
         if self.phone.tool.take().is_some() {
             self.comment_prefs.pinned = self.phone.pinned_before;
         }
@@ -284,6 +312,14 @@ impl PdfCraftApp {
         let organizing = self.active.and_then(|i| self.views.get(i)).is_some_and(|v| v.organize);
         if self.phone.sheet.is_some() {
             self.phone.sheet = None;
+        } else if self.phone_text_editing() {
+            // Back keeps what was typed (✕ is there to throw it away); text the page's fonts
+            // can't draw stays, and says why.
+            if !self.finish_phone_text(true)
+                && let Some(c) = self.active.and_then(|i| self.views.get(i)).and_then(|v| v.content.blocked())
+            {
+                self.notify(crate::content_ui::undrawable_message(c));
+            }
         } else if self.combine_showing() {
             // Combine covers Home: Back is its own. A window over the list (a file shown large,
             // the password box) takes the key itself.
@@ -304,11 +340,15 @@ impl PdfCraftApp {
             self.right = None;
         } else if self.phone.searching {
             self.stop_phone_search();
-        } else if let Some(v) =
-            self.active.and_then(|i| self.views.get_mut(i)).filter(|v| v.selected_text().is_some() || v.comments.selected.is_some())
+        } else if let Some(v) = self
+            .active
+            .and_then(|i| self.views.get_mut(i))
+            .filter(|v| v.selected_text().is_some() || v.comments.selected.is_some() || v.image_selection.is_some() || v.content.selected.is_some())
         {
             v.clear_selection();
             v.comments.selected = None;
+            v.image_selection = None;
+            v.content.selected = None;
         } else if self.phone.tool.is_some() {
             self.leave_phone_tool();
         } else if self.phone.drawer {
@@ -376,8 +416,14 @@ impl PdfCraftApp {
         }
         // The reader starts a document plain (its first frame closes sheets and the assistant):
         // this one is already the shown one.
-        self.phone.doc = self.active.and_then(|i| self.views.get(i)).map(|v| v.id);
+        self.phone_adopt_active();
         Ok(())
+    }
+
+    /// The active document is the one the reader shows already: its first frame doesn't start it
+    /// plain (an action run on it as it opens, a tool from Home, stays).
+    pub(crate) fn phone_adopt_active(&mut self) {
+        self.phone.doc = self.active.and_then(|i| self.views.get(i)).map(|v| v.id);
     }
 
     /// Back to Home. The document stays open there, with its place kept.
@@ -445,6 +491,10 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
         None if app.combine_showing() => crate::combine_ui::phone::system_bars(app, &t),
         None => crate::phone_home::system_bars(app, &t),
         Some(_) if app.phone.ai_open => (t.chrome, t.pasteboard),
+        Some(_) if app.phone_text_editing() => {
+            let ground = crate::phone_home::look(&t).ground;
+            (ground, ground)
+        }
         Some(_) if app.phone.bars_hidden => (t.pasteboard, t.pasteboard),
         Some(_) => (t.chrome, t.chrome),
     };
@@ -516,7 +566,7 @@ pub(crate) fn title_text(ui: &mut egui::Ui, title: &str, width: f32, t: &Tokens)
 
 /// The bottom-bar labels' size: Material's 11.5 points, or smaller until every word of every
 /// label fits its item (French "Commentaires"), never below 9. Labels then wrap between words.
-fn bar_label_size(ui: &egui::Ui, labels: &[&str], room: f32) -> f32 {
+pub(crate) fn bar_label_size(ui: &egui::Ui, labels: &[&str], room: f32) -> f32 {
     const SIZE: f32 = 11.5;
     let widest = labels
         .iter()
@@ -710,11 +760,17 @@ fn shaded_rect(painter: &egui::Painter, rect: Rect, radius: f32, shade: impl Fn(
 }
 
 /// A bottom-bar item: an icon above its label (`size` points, up to two lines), a finger wide.
-/// The icon is drawn in `hue`.
-fn bar_item(ui: &mut egui::Ui, icon: &str, label: &str, width: f32, size: f32, hue: Color32, t: &Tokens) -> egui::Response {
+/// The icon is drawn in `hue`; `on` (the tool in use) fills its chip with it.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn bar_item(ui: &mut egui::Ui, icon: &str, label: &str, width: f32, size: f32, hue: Color32, on: bool, t: &Tokens) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(vec2(width, BOTTOM_BAR), Sense::click());
     let text = label.to_owned();
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &text));
+    let enabled = ui.is_enabled();
+    if on {
+        resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Button, enabled, true, &text));
+    } else {
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, &text));
+    }
     let press = theme::Press::track(ui, &resp);
     press.wash(ui, rect.shrink2(vec2(3.0, 4.0)), 12, false);
     let body = rect.translate(press.offset());
@@ -727,9 +783,14 @@ fn bar_item(ui: &mut egui::Ui, icon: &str, label: &str, width: f32, size: f32, h
     let block = 28.0 + 3.0 + galley.size().y;
     let top = body.center().y - block / 2.0;
     let chip = Rect::from_center_size(pos2(body.center().x, top + 14.0), vec2(44.0, 28.0));
-    let wash = if t.dark() { hue.gamma_multiply(0.30) } else { hue.gamma_multiply(0.14) };
-    ui.painter().rect_filled(chip, CornerRadius::same(14), wash);
-    icons::paint_bold(ui, chip, icon, 19.0, if t.dark() { hue.lerp_to_gamma(Color32::WHITE, 0.15) } else { hue });
+    if on {
+        glowing_tile(ui.painter(), chip, 14.0, hue, t);
+        icons::paint_bold(ui, chip, icon, 19.0, Color32::WHITE);
+    } else {
+        let wash = if t.dark() { hue.gamma_multiply(0.30) } else { hue.gamma_multiply(0.14) };
+        ui.painter().rect_filled(chip, CornerRadius::same(14), wash);
+        icons::paint_bold(ui, chip, icon, 19.0, if t.dark() { hue.lerp_to_gamma(Color32::WHITE, 0.15) } else { hue });
+    }
     ui.painter().galley(pos2(body.center().x, top + 31.0), galley, text_color);
     theme::hand(resp)
 }
@@ -841,6 +902,12 @@ fn reader(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, screen: Rect, 
         }
         return;
     }
+    // Text being typed (Edit): a screen of its own, the keyboard under it.
+    if app.phone_text_editing() {
+        crate::phone_edit::screen(app, index, ui, screen);
+        return;
+    }
+    app.phone.typing_shown = false;
     // A panel (bookmarks, page thumbnails, comments…) takes the whole screen, as a page of its own.
     if app.right.is_some() {
         let before = app.views.get(index).map(|v| (v.goto, v.current));
@@ -920,6 +987,7 @@ fn reader(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, screen: Rect, 
         reader_top_bar(app, index, ui, top, t);
     }
     match app.phone.tool {
+        Some(ToolMode::Edit) => crate::phone_edit::bottom_bar(app, index, ui, bottom, t),
         Some(mode) => tool_bottom_bar(app, mode, ui, bottom, t),
         None if !app.phone.searching && !app.phone.drawer => reader_bottom_bar(app, ui, bottom, t),
         None => {}
@@ -988,16 +1056,16 @@ fn reader_bottom_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui, rect: Rect, t: &T
         let width = (ui.available_width() / 5.0).floor();
         let labels: Vec<&str> = [edit_label].into_iter().chain(ToolMode::ALL.iter().map(|m| tl!(m.label()))).chain([tl!("Tools")]).collect();
         let size = bar_label_size(ui, &labels, width - 6.0);
-        edit = bar_item(ui, "file-pen-line", edit_label, width, size, tool_hue(t, "edit"), t).clicked();
+        edit = bar_item(ui, "file-pen-line", edit_label, width, size, tool_hue(t, "edit"), false, t).clicked();
         for mode in ToolMode::ALL {
-            if bar_item(ui, mode.icon(), tl!(mode.label()), width, size, tool_hue(t, mode.hue_id()), t).clicked() {
+            if bar_item(ui, mode.icon(), tl!(mode.label()), width, size, tool_hue(t, mode.hue_id()), false, t).clicked() {
                 picked = Some(mode);
             }
         }
-        tools = bar_item(ui, "layout-grid", tl!("Tools"), width, size, t.accent_text, t).clicked();
+        tools = bar_item(ui, "layout-grid", tl!("Tools"), width, size, t.accent_text, false, t).clicked();
     });
     if edit {
-        app.open_phone_drawer("edit");
+        app.enter_phone_tool(ToolMode::Edit);
     }
     if let Some(mode) = picked {
         app.enter_phone_tool(mode);
@@ -1219,6 +1287,7 @@ fn sheets(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, screen: Rect, 
         Some(Sheet::Tools) => tools_sheet(app, index, &ctx, screen, t),
         Some(Sheet::GoTo) => go_to_sheet(app, index, &ctx, screen, t),
         Some(Sheet::Style) => style_sheet(app, &ctx, screen, t),
+        Some(Sheet::EditMore) => crate::phone_edit::more_sheet(app, &ctx, screen, t),
         Some(Sheet::New | Sheet::Item | Sheet::Pick) | None => {}
     }
 }

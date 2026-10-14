@@ -301,6 +301,8 @@ impl PdfCraftApp {
         if self.active.is_none() {
             return;
         }
+        // A document just opened would start plain on its first frame, the tool with it.
+        self.phone_adopt_active();
         self.phone.bars_hidden = false;
         match then {
             Then::Read => {}

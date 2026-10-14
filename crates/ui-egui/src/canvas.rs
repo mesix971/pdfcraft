@@ -395,6 +395,9 @@ pub struct DocView {
     /// line being edited.
     pub(crate) edit_lines: HashMap<usize, (u64, Vec<pdfcraft_engine::TextBlock>)>,
     pub line_editor: Option<crate::edit_text_ui::LineEditor>,
+    /// The phone's Edit: the press (when it began, as egui counts it) that already picked
+    /// something up, or found nothing to, so it doesn't again.
+    pub(crate) carried_press: Option<f64>,
     pub(crate) text_background: crate::edit_text_ui::TextBackground,
     /// Edit text & images: the images per page (by document generation), and the selected one.
     pub(crate) edit_images: HashMap<usize, (u64, Vec<pdfcraft_engine::PageImage>)>,
@@ -648,6 +651,7 @@ impl DocView {
             pending_edit: None,
             edit_lines: HashMap::new(),
             line_editor: None,
+            carried_press: None,
             text_background: Default::default(),
             edit_images: HashMap::new(),
             objects: Default::default(),
@@ -1261,6 +1265,13 @@ impl DocView {
         self.fit = Fit::None;
         self.zoom_anchor = Some((page, content[0].clamp(0.0, 1.0), content[1].clamp(0.0, 1.0), vec2(PAD, MARGIN)));
         true
+    }
+
+    /// Something is being moved on the page: a paragraph, an added item or a picture.
+    pub(crate) fn carrying(&self) -> bool {
+        self.block_drag.is_some()
+            || self.content.grabbing()
+            || self.image_selection.as_ref().is_some_and(crate::edit_text_ui::ImageSelection::dragging)
     }
 
     /// How large the page grid draws its pages (1.0 = the usual thumbnails).
@@ -2106,6 +2117,9 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     // a word, as phone readers do (`phone.rs`).
     let phone = app.phone_layout();
     let touch_view = phone && app.quick_tool == QuickTool::Select && !preparing && !editing_content;
+    // Editing on a phone, a finger scrolls the pages too, and a tap picks what to change (the
+    // typing happens on a screen of its own: `phone_edit.rs`).
+    let tap_edit = phone && matches!(app.quick_tool, QuickTool::EditText | QuickTool::AddText);
     // The phone layout's bars float over the top of the page view: its notices go below them.
     let notice_top = if phone && app.phone_bars_shown() { crate::phone::PAGE_PAD.0 } else { 0.0 };
     let text_style = app.text_style.clone();
@@ -2307,9 +2321,11 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     };
 
     let mut scroll = egui::ScrollArea::both().auto_shrink([false, false]).scroll_source(egui::scroll_area::ScrollSource {
-        drag: if middle_gesture {
+        // (While a finger carries something on a phone it moves that, never the pages: a guard
+        // for touch input, which the tests' mouse input can't show.)
+        drag: if middle_gesture || tap_edit && view.carrying() {
             egui::scroll_area::DragScroll::Never
-        } else if app.quick_tool == QuickTool::Hand || touch_view {
+        } else if app.quick_tool == QuickTool::Hand || touch_view || tap_edit {
             egui::scroll_area::DragScroll::Always
         } else {
             egui::scroll_area::DragScroll::OnTouch
@@ -2420,7 +2436,10 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         view.prepare.selected = None;
     }
     view.objects.prepare(doc, tool == QuickTool::EditText && can_modify, ui.ctx());
-    view.text_background.prepare(ui.ctx(), doc, view.line_editor.as_ref(), scale);
+    // (On a phone the paragraph is typed on a screen of its own: no page without it to draw.)
+    if !phone {
+        view.text_background.prepare(ui.ctx(), doc, view.line_editor.as_ref(), scale);
+    }
     let added = doc.added.clone();
     let doc_links = if tool == QuickTool::Link { doc.links.clone() } else { Vec::new() };
     if editing_content {
@@ -2459,11 +2478,14 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         }
         // Two fingers pan the pages while a tool takes one finger's drags (drawing, editing,
         // placing fields); when reading, the scroll area already follows the finger.
-        if !touch_view && let Some(touch) = ui.input(|i| i.multi_touch()) {
+        if !touch_view
+            && !tap_edit
+            && let Some(touch) = ui.input(|i| i.multi_touch())
+        {
             ui.scroll_with_delta_animation(touch.translation_delta, egui::style::ScrollAnimation::none());
         }
         // Reading on a phone the pages take taps only, so a drag reaches the scroll area under them.
-        let sense = if touch_view { Sense::click() } else { Sense::click_and_drag() };
+        let sense = if touch_view || tap_edit { Sense::click() } else { Sense::click_and_drag() };
         let (resp_rect, resp) = ui.allocate_exact_size(vec2(content_w, content_h), sense);
         // The Hand tool pans: the content widget takes every drag, so scroll by its delta.
         if hand {
@@ -2761,11 +2783,18 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                 };
                 crate::redact_ui::page_input(ui, &resp, &xf, i, info, over_text, view)
             };
+            if tap_edit && tool == QuickTool::EditText && can_modify {
+                crate::phone_edit::long_press(ui, &resp, &xf, i, info, &added, doc.edit_generation(), view);
+            }
             let image_owns_pointer = tool == QuickTool::EditText && crate::edit_text_ui::image_owns_pointer(ui, &xf, i, info, view);
-            let on_objects =
-                !image_owns_pointer && tool == QuickTool::EditText && can_modify && crate::object_ui::page_input(ui, &resp, &xf, i, doc, view);
+            // Several objects at once are a mouse's (Shift-click, a box dragged): not a phone's.
+            let on_objects = !phone
+                && !image_owns_pointer
+                && tool == QuickTool::EditText
+                && can_modify
+                && crate::object_ui::page_input(ui, &resp, &xf, i, doc, view);
             let on_content = !on_objects && editing_content && can_modify && {
-                crate::content_ui::page_input(ui, &resp, &xf, i, info, &added, tool == QuickTool::AddText, &text_style, view)
+                crate::content_ui::page_input(ui, &resp, &xf, i, info, &added, tool == QuickTool::AddText, &text_style, phone, view)
                     || tool == QuickTool::AddText
             };
             // Added content owns its gesture; its source text must not queue a second edit.
@@ -2789,7 +2818,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                 };
                 // Editable text takes precedence over background/overlapping artwork. Both
                 // inventories are painted every frame, even when text owns the pointer.
-                let text_used = crate::edit_text_ui::page_input(ui, &resp, &xf, i, doc, &lines, view, !image_owns_pointer);
+                let text_used = crate::edit_text_ui::page_input(ui, &resp, &xf, i, doc, &lines, view, !image_owns_pointer, !phone);
                 let image_used =
                     crate::edit_text_ui::image_input(ui, &resp, &xf, i, info, &images, view, &mut image_action, image_owns_pointer || !text_used);
                 text_used || image_used
@@ -3074,6 +3103,8 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                 }
             }
         }
+        // (What a long press carried lands on the release, in its own branch, before anything
+        // else sees the release as a tap.)
         // The page navigated to stays current while no page shows more of itself, so the next
         // page step starts from it rather than from a page further down the screen (#188).
         // It also stays current while it is wholly on screen: a short page (a cheque) gone to
@@ -3110,7 +3141,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                 word_pressed = view.select_word_at(p);
             }
         }
-        if !word_pressed {
+        if !word_pressed && !tap_edit {
             resp.context_menu(|ui| {
                 // Preparing a form: the selected field's menu.
                 if preparing && let Some((name, wi)) = view.prepare.selected.clone() {
@@ -3338,7 +3369,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     if let Some(e) = comments::composer(ui.ctx(), view, info, prefs) {
         view.pending_edit = Some(e);
     }
-    if let Some(e) = crate::edit_text_ui::overlay(ui.ctx(), view, info) {
+    if !phone && let Some(e) = crate::edit_text_ui::overlay(ui.ctx(), view, info) {
         view.pending_edit = Some(e);
     }
     if let Some(e) = crate::forms_ui::overlay(ui.ctx(), view, info, &form, today) {
@@ -3347,7 +3378,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     if let Some(e) = crate::fill_sign::type_box(ui.ctx(), view, info, &author) {
         view.pending_edit = Some(e);
     }
-    let (typed, text_done) = crate::content_ui::editor(ui.ctx(), view, info, &added);
+    let (typed, text_done) = if phone { (None, false) } else { crate::content_ui::editor(ui.ctx(), view, info, &added) };
     if typed.is_some() {
         view.pending_edit = typed;
     }

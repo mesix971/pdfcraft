@@ -432,6 +432,12 @@ fn back_closes_one_thing_at_a_time_and_never_leaves_home() {
     assert_eq!(h.state().quick_tool, QuickTool::Select);
     assert_eq!(h.state().active, Some(0));
     click(&mut h, "Edit");
+    assert_eq!(h.state().phone_tool(), Some(ToolMode::Edit));
+    back(&mut h);
+    assert_eq!(h.state().phone_tool(), None, "Back leaves Edit");
+    assert_eq!(h.state().active, Some(0));
+    click(&mut h, "Tools");
+    click(&mut h, "Protect a PDF");
     assert!(h.state().phone_drawer());
     back(&mut h);
     assert!(!h.state().phone_drawer(), "Back closes the tool drawer");
@@ -477,18 +483,6 @@ fn every_tool_opens_in_the_drawer_under_the_page() {
     assert!(pages.bottom() < 892.0 * 0.7, "the pages stay above the drawer: {pages:?}");
     click(&mut h, "Done");
     assert!(!h.state().phone_drawer());
-    assert_eq!(h.state().quick_tool, QuickTool::Select);
-}
-
-#[test]
-fn edit_puts_the_edit_tools_under_the_page() {
-    let mut h = harness(true);
-    click(&mut h, "Edit");
-    assert!(h.state().phone_drawer());
-    click(&mut h, "Edit text & images");
-    assert_eq!(h.state().quick_tool, QuickTool::EditText);
-    assert!(h.state().phone_drawer(), "the drawer stays while the tool works on the page");
-    click(&mut h, "Done");
     assert_eq!(h.state().quick_tool, QuickTool::Select);
 }
 
@@ -678,7 +672,7 @@ fn a_quick_action_opens_a_file_then_its_tool() {
     let mut h = harness_with(None, move |app| app.pick_override = Some(vec![file]));
     click(&mut h, "Edit a PDF");
     wait(&mut h, |app| app.active.is_some());
-    assert!(h.state().phone_drawer(), "the file opens with Edit under the page");
+    assert_eq!(h.state().phone_tool(), Some(ToolMode::Edit), "the file opens ready to edit");
     // With a document open, an action asks which one first.
     back(&mut h);
     back(&mut h);
@@ -1087,4 +1081,365 @@ fn an_earlier_theme_choice_stays_and_dark_pages_leave_other_colours_alone() {
     app.set_dark_pages(false);
     assert_eq!(app.reading_colors, pdfcraft_render::ReadingColors::WHITE_ON_BLACK);
     assert!(app.set_option("dark_pages", "maybe").is_err());
+}
+
+/// The texts of page 1's paragraphs, and the size of the one with `word` in it.
+fn page_one(h: &Harness<'static, PdfCraftApp>, word: &str) -> (Vec<String>, Option<f64>) {
+    let id = h.state().views[0].id;
+    let blocks = h.state().session.get(id).expect("the document").text_blocks(0);
+    let size = blocks.iter().find(|b| b.text.contains(word)).map(|b| b.size);
+    (blocks.into_iter().map(|b| b.text).collect(), size)
+}
+
+/// Replace everything in the focused field with `text`.
+fn retype(h: &mut Harness<'static, PdfCraftApp>, text: &str) {
+    h.key_press_modifiers(Modifiers::COMMAND, Key::A);
+    h.run_steps(1);
+    h.event(Event::Text(text.to_owned()));
+    h.run_steps(3);
+}
+
+/// Edit goes straight to changing the page: no list of tools first, the paragraphs ready for a
+/// tap, which opens the text large on a screen of its own; Done changes the paragraph.
+#[test]
+fn edit_goes_straight_to_the_text_and_types_it_on_a_screen_of_its_own() {
+    let mut h = harness(true);
+    click(&mut h, "Edit");
+    assert_eq!(h.state().phone_tool(), Some(ToolMode::Edit));
+    assert_eq!(h.state().quick_tool, QuickTool::EditText, "ready for a tap");
+    assert!(!h.state().phone_drawer(), "no list of tools to go through");
+    let p = at(&h, 0, 60.0, 254.0);
+    tap(&mut h, p);
+    assert!(h.state().phone_text_editing(), "the tap opened the paragraph");
+    assert!(h.query_by_label("Larger text").is_some(), "with the formats over it");
+    retype(&mut h, "The quick red fox");
+    click(&mut h, "Larger text");
+    click(&mut h, "Done");
+    assert!(!h.state().phone_text_editing());
+    h.run_steps(4);
+    let (texts, size) = page_one(&h, "red");
+    assert!(texts.iter().any(|t| t.contains("The quick red fox")), "{texts:?}");
+    assert_eq!(size, Some(16.0), "14 points, one step larger");
+    assert_eq!(h.state().quick_tool, QuickTool::EditText, "still editing, for the next paragraph");
+    click(&mut h, "Undo");
+    assert!(page_one(&h, "brown").0.iter().any(|t| t.contains("The quick brown fox")), "one undo takes it back");
+}
+
+/// Back keeps what was typed; ✕ throws it away.
+#[test]
+fn back_keeps_the_typing_and_cancel_throws_it_away() {
+    let mut h = harness(true);
+    click(&mut h, "Edit");
+    let p = at(&h, 0, 60.0, 254.0);
+    tap(&mut h, p);
+    retype(&mut h, "Kept by Back");
+    // The field gives up the keyboard first (Android's own Back does that), then Back.
+    h.ctx.memory_mut(|m| m.request_focus(egui::Id::NULL));
+    h.run_steps(2);
+    back(&mut h);
+    h.run_steps(4);
+    assert!(!h.state().phone_text_editing());
+    assert!(page_one(&h, "Kept").0.iter().any(|t| t.contains("Kept by Back")));
+    let p = at(&h, 0, 60.0, 254.0);
+    tap(&mut h, p);
+    retype(&mut h, "Thrown away");
+    click(&mut h, "Cancel");
+    h.run_steps(4);
+    assert!(!page_one(&h, "Thrown").0.iter().any(|t| t.contains("Thrown away")));
+    assert_eq!(h.state().phone_tool(), Some(ToolMode::Edit), "still in Edit");
+}
+
+/// In Edit a finger scrolls the pages: it never drags a paragraph along.
+#[test]
+fn a_finger_scrolls_the_pages_while_editing() {
+    let mut h = harness(true);
+    click(&mut h, "Edit");
+    let id = h.state().views[0].id;
+    let generation = h.state().session.get(id).unwrap().edit_generation();
+    let before = h.state().views[0].page_screen_rect(0).unwrap().top();
+    let from = at(&h, 0, 60.0, 254.0);
+    finger_drag(&mut h, from, from - vec2(0.0, 220.0));
+    h.run_steps(6);
+    let after = h.state().views[0].page_screen_rect(0).unwrap().top();
+    assert!(after < before - 100.0, "the pages scrolled: {before} → {after}");
+    assert_eq!(h.state().session.get(id).unwrap().edit_generation(), generation, "nothing moved on the page");
+    assert!(!h.state().phone_text_editing());
+}
+
+/// Add text: a tap where it goes, then the same typing screen; the text lands there.
+#[test]
+fn add_text_types_new_text_where_the_page_was_tapped() {
+    let mut h = harness(true);
+    click(&mut h, "Edit");
+    click(&mut h, "Add text");
+    assert_eq!(h.state().quick_tool, QuickTool::AddText);
+    let p = at(&h, 0, 100.0, 100.0);
+    tap(&mut h, p);
+    assert!(h.state().phone_text_editing());
+    h.event(Event::Text("New words".to_owned()));
+    h.run_steps(3);
+    click(&mut h, "Done");
+    h.run_steps(4);
+    let id = h.state().views[0].id;
+    let added = h.state().session.get(id).unwrap().added.clone();
+    assert!(added.iter().any(|a| matches!(&a.content, pdfcraft_engine::AddedContent::Text(t) if t.text == "New words") && a.page == 0), "{added:?}");
+    assert_eq!(h.state().quick_tool, QuickTool::EditText, "back to changing what is on the page");
+}
+
+/// More has the rest of Edit a PDF, and nothing a phone can't use.
+#[test]
+fn more_has_the_rest_of_edit_a_pdf() {
+    let mut h = harness(true);
+    click(&mut h, "Edit");
+    click(&mut h, "More");
+    assert_eq!(h.state().phone_sheet(), Some(Sheet::EditMore));
+    for label in ["Watermark", "Header and footer", "Rotate pages"] {
+        assert!(h.query_by_label(label).is_some(), "{label}");
+    }
+    assert!(h.query_by_label("Link").is_none(), "links are drawn with a mouse");
+    // (The sheet scrolls: the pages' rows come after the content's.)
+    h.get_by_label("Organize pages").scroll_to_me();
+    h.run_steps(3);
+    click(&mut h, "Organize pages");
+    assert_eq!(h.state().phone_tool(), None, "the page grid is a screen of its own");
+    assert!(h.state().views[0].organize);
+}
+
+/// A picture tapped in Edit: a bar of what can be done to it (turn, flip, replace, save,
+/// delete) in place of the tools, and Back lets go of it.
+#[test]
+fn a_picture_tapped_in_edit_gets_a_bar_of_what_can_be_done_to_it() {
+    let mut png = Vec::new();
+    image::RgbImage::from_pixel(80, 40, image::Rgb([200, 40, 40])).write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
+    let mut h = harness_with(None, move |app| {
+        app.open_bytes("picture.png", None, png.clone()).expect("a picture opens as a page");
+    });
+    let id = h.state().views[0].id;
+    let size = |h: &Harness<'static, PdfCraftApp>| {
+        let r = h.state().session.get(id).unwrap().page_images(0).first().map(|i| i.rect);
+        r.map(|r| ((r[2] - r[0]).abs().round(), (r[3] - r[1]).abs().round()))
+    };
+    let before = size(&h).expect("the picture");
+    click(&mut h, "Edit");
+    let c = h.state().views[0].page_screen_rect(0).unwrap().center();
+    tap(&mut h, c);
+    assert!(h.state().views[0].image_selection.is_some(), "the tap picked the picture");
+    assert!(h.query_by_label("Edit text").is_none(), "its bar replaces the tools");
+    click(&mut h, "Rotate");
+    h.run_steps(4);
+    assert_eq!(size(&h), Some((before.1, before.0)), "a quarter turn");
+    back(&mut h);
+    assert!(h.state().views[0].image_selection.is_none(), "Back lets go of it");
+    assert_eq!(h.state().phone_tool(), Some(ToolMode::Edit), "and stays in Edit");
+    tap(&mut h, c);
+    click(&mut h, "Delete");
+    h.run_steps(4);
+    assert_eq!(size(&h), None, "gone");
+    assert!(h.query_by_label("Edit text").is_some(), "the tools are back");
+}
+
+/// Text added earlier, tapped in Edit: its own bar (Edit text, Delete), and the typing screen's
+/// formats reach it as well as its words.
+#[test]
+fn added_text_is_retyped_and_restyled_from_its_bar() {
+    let mut h = harness(true);
+    click(&mut h, "Edit");
+    click(&mut h, "Add text");
+    let p = at(&h, 0, 100.0, 100.0);
+    tap(&mut h, p);
+    h.event(Event::Text("Added".to_owned()));
+    h.run_steps(3);
+    click(&mut h, "Done");
+    h.run_steps(4);
+    let id = h.state().views[0].id;
+    let first = |h: &Harness<'static, PdfCraftApp>| match h.state().session.get(id).unwrap().added.first().map(|a| a.content.clone()) {
+        Some(pdfcraft_engine::AddedContent::Text(t)) => Some((t.text, t.size, t.bold)),
+        _ => None,
+    };
+    let (_, size, _) = first(&h).expect("the text was added");
+    // Selected once it exists: its bar.
+    assert!(h.query_by_label("Delete").is_some(), "the added text's bar");
+    click(&mut h, "Edit text");
+    assert!(h.state().phone_text_editing());
+    retype(&mut h, "Added, then changed");
+    click(&mut h, "Bold");
+    click(&mut h, "Larger text");
+    click(&mut h, "Done");
+    h.run_steps(4);
+    let (text, bigger, bold) = first(&h).expect("still there");
+    assert_eq!(text, "Added, then changed");
+    assert!(bold && bigger > size, "the formats reached it: {size} → {bigger}, bold {bold}");
+}
+
+/// One thing picked at a time: an added item tapped lets go of the page's picture, so its bar is
+/// the item's (Delete deletes the item, not the picture); leaving Edit lets go of what was picked.
+#[test]
+fn a_picture_and_an_added_item_are_never_picked_together() {
+    let mut png = Vec::new();
+    image::RgbImage::from_pixel(80, 40, image::Rgb([200, 40, 40])).write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
+    let mut h = harness_with(None, move |app| {
+        app.open_bytes("picture.png", None, png.clone()).expect("a picture opens as a page");
+    });
+    click(&mut h, "Edit");
+    let r = h.state().views[0].page_screen_rect(0).unwrap();
+    let (c, corner) = (r.center(), r.left_bottom() + vec2(8.0, -8.0));
+    click(&mut h, "Add text");
+    tap(&mut h, c);
+    h.event(Event::Text("Over it".to_owned()));
+    h.run_steps(3);
+    click(&mut h, "Done");
+    h.run_steps(6);
+    assert!(h.query_by_label("Delete").is_some(), "the new text is picked, with its bar");
+    tap(&mut h, corner);
+    assert!(h.state().views[0].image_selection.is_some(), "now the picture");
+    assert!(h.query_by_label("Rotate").is_some());
+    // The text again: the middle of its box (display space, y up, on the 80 × 40 point page).
+    let id = h.state().views[0].id;
+    let rect = match h.state().session.get(id).unwrap().added.first().map(|a| a.content.clone()) {
+        Some(pdfcraft_engine::AddedContent::Text(t)) => t.rect,
+        other => panic!("the text was added: {other:?}"),
+    };
+    let (w, ht) = (h.state().session.get(id).unwrap().info.pages[0].width, h.state().session.get(id).unwrap().info.pages[0].height);
+    assert!(rect[2] <= f64::from(w), "the box stays on the page: {rect:?}");
+    let mid =
+        pos2(r.left() + ((rect[0] + rect[2]) / 2.0) as f32 / w * r.width(), r.top() + (ht - ((rect[1] + rect[3]) / 2.0) as f32) / ht * r.height());
+    tap(&mut h, mid);
+    assert!(h.state().phone_text_editing(), "a tap on added text opens it to retype");
+    assert!(h.state().views[0].image_selection.is_none(), "and lets go of the picture");
+    click(&mut h, "Cancel");
+    assert!(h.state().views[0].content.selected.is_some(), "the text stays picked");
+    assert!(h.query_by_label("Rotate").is_none(), "its bar, not the picture's");
+    tap(&mut h, corner);
+    assert!(h.state().views[0].image_selection.is_some());
+    // Done ends Edit.
+    click(&mut h, "Done");
+    assert_eq!(h.state().phone_tool(), None);
+    assert!(h.state().views[0].image_selection.is_none(), "leaving Edit lets go of the picture");
+}
+
+/// A tap on a format leaves the keyboard with the text, so typing carries on.
+#[test]
+fn the_keyboard_stays_with_the_text_after_a_format() {
+    let mut h = harness(true);
+    click(&mut h, "Edit");
+    let p = at(&h, 0, 60.0, 254.0);
+    tap(&mut h, p);
+    click(&mut h, "Italic");
+    h.run_steps(2);
+    assert!(h.ctx.memory(|m| m.has_focus(egui::Id::new("phone-typing-input"))), "the text has the keyboard again");
+}
+
+/// Hold a finger at `from` long enough to pick up what is there, move it to `to`, lift it.
+fn long_press_drag(h: &mut Harness<'static, PdfCraftApp>, from: Pos2, to: Pos2) {
+    h.hover_at(from);
+    h.run_steps(1);
+    press(h, from, true);
+    // 0.6 s: a long press.
+    h.run_steps(12);
+    for k in 1..=6 {
+        h.hover_at(from + (to - from) * (k as f32 / 6.0));
+        h.run_steps(1);
+    }
+    press(h, to, false);
+    h.run_steps(6);
+}
+
+/// The paragraph with `word` in it on page 1: its box (user space, y up).
+fn paragraph_box(h: &Harness<'static, PdfCraftApp>, word: &str) -> [f64; 4] {
+    let id = h.state().views[0].id;
+    h.state().session.get(id).unwrap().text_blocks(0).into_iter().find(|b| b.text.contains(word)).map(|b| b.rect).expect("the paragraph")
+}
+
+/// In Edit a long press picks a paragraph up: it follows the finger, and lands where it lifts.
+#[test]
+fn a_long_press_moves_a_paragraph_with_the_finger() {
+    let mut h = harness(true);
+    click(&mut h, "Edit");
+    let before = paragraph_box(&h, "quick");
+    let top = h.state().views[0].page_screen_rect(0).unwrap().top();
+    let from = at(&h, 0, 60.0, 254.0);
+    long_press_drag(&mut h, from, from + vec2(60.0, 80.0));
+    assert_eq!(h.state().views[0].page_screen_rect(0).unwrap().top(), top, "the pages held still while it moved");
+    assert!(!h.state().phone_text_editing(), "the drop opens nothing to type in");
+    let after = paragraph_box(&h, "quick");
+    assert!(after[0] > before[0] + 20.0 && after[1] < before[1] - 20.0, "moved right and down: {before:?} → {after:?}");
+    assert!(page_one(&h, "quick").0.iter().any(|t| t.contains("The quick brown fox")), "the same words");
+    click(&mut h, "Undo");
+    assert_eq!(paragraph_box(&h, "quick"), before, "one undo puts it back");
+}
+
+/// A long press let go without moving drops it where it was: nothing moves, nothing opens.
+#[test]
+fn a_long_press_let_go_in_place_changes_nothing() {
+    let mut h = harness(true);
+    click(&mut h, "Edit");
+    let id = h.state().views[0].id;
+    let generation = h.state().session.get(id).unwrap().edit_generation();
+    let from = at(&h, 0, 60.0, 254.0);
+    // Lifted soon after it became a long press: soon enough for egui to call it a tap too.
+    h.hover_at(from);
+    h.run_steps(1);
+    press(&h, from, true);
+    h.run_steps(10);
+    press(&h, from, false);
+    h.run_steps(6);
+    assert!(!h.state().phone_text_editing(), "the lift isn't also a tap");
+    assert_eq!(h.state().session.get(id).unwrap().edit_generation(), generation);
+    // A tap afterwards still opens the paragraph.
+    tap(&mut h, from);
+    assert!(h.state().phone_text_editing());
+}
+
+/// Text added earlier, and a picture, move the same way.
+#[test]
+fn a_long_press_moves_added_text_and_pictures() {
+    let mut h = harness(true);
+    click(&mut h, "Edit");
+    click(&mut h, "Add text");
+    let p = at(&h, 0, 150.0, 60.0);
+    tap(&mut h, p);
+    h.event(Event::Text("Moved".to_owned()));
+    h.run_steps(3);
+    click(&mut h, "Done");
+    h.run_steps(4);
+    let id = h.state().views[0].id;
+    let rect = |h: &Harness<'static, PdfCraftApp>| match h.state().session.get(id).unwrap().added.first().map(|a| a.content.clone()) {
+        Some(pdfcraft_engine::AddedContent::Text(t)) => t.rect,
+        other => panic!("the text: {other:?}"),
+    };
+    let before = rect(&h);
+    // Its box hangs below where the page was tapped.
+    let on_it = p + vec2(12.0, 8.0);
+    long_press_drag(&mut h, on_it, on_it - vec2(40.0, 60.0));
+    let after = rect(&h);
+    assert!(after[0] < before[0] - 15.0 && after[3] > before[3] + 15.0, "moved left and up: {before:?} → {after:?}");
+    assert!(!h.state().phone_text_editing());
+
+    let mut png = Vec::new();
+    image::RgbImage::from_pixel(80, 40, image::Rgb([200, 40, 40])).write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
+    let mut h = harness_with(None, move |app| {
+        app.open_bytes("picture.png", None, png.clone()).expect("a picture opens as a page");
+    });
+    let id = h.state().views[0].id;
+    let left = |h: &Harness<'static, PdfCraftApp>| h.state().session.get(id).unwrap().page_images(0)[0].rect[0];
+    let before = left(&h);
+    click(&mut h, "Edit");
+    let c = h.state().views[0].page_screen_rect(0).unwrap().center();
+    long_press_drag(&mut h, c, c + vec2(60.0, 0.0));
+    assert!(left(&h) > before + 5.0, "the picture moved right: {before} → {}", left(&h));
+}
+
+/// A long press on something over the page (a sheet, a bar) is that thing's: the paragraph
+/// under it stays where it is.
+#[test]
+fn a_long_press_over_a_sheet_leaves_the_page_alone() {
+    let mut h = harness(true);
+    click(&mut h, "Edit");
+    click(&mut h, "More");
+    let id = h.state().views[0].id;
+    let generation = h.state().session.get(id).unwrap().edit_generation();
+    // The sheet's dimmed cover lies over the paragraph.
+    let from = at(&h, 0, 60.0, 254.0);
+    long_press_drag(&mut h, from, from + vec2(60.0, 80.0));
+    assert_eq!(h.state().session.get(id).unwrap().edit_generation(), generation, "nothing moved under the sheet");
 }

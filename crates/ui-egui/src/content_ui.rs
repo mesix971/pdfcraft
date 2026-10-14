@@ -89,6 +89,16 @@ pub struct ContentView {
 }
 
 impl ContentView {
+    /// An added item is being moved or resized.
+    pub(crate) fn grabbing(&self) -> bool {
+        self.grab.is_some()
+    }
+
+    /// Stop moving or resizing it, where it was.
+    pub(crate) fn cancel_grab(&mut self) {
+        self.grab = None;
+    }
+
     /// The draft's first character the standard fonts can't draw. Such a draft is kept open, and
     /// counts as unsaved work, until it is corrected or discarded.
     pub(crate) fn blocked(&self) -> Option<char> {
@@ -169,6 +179,7 @@ pub(crate) fn page_input(
     added: &[Added],
     adding_text: bool,
     style: &AddedText,
+    tap_edits: bool,
     view: &mut DocView,
 ) -> bool {
     let mut consumed = false;
@@ -225,14 +236,14 @@ pub(crate) fn page_input(
             let at = to_display(xf, info, page, p);
             let mut style = style.clone();
             style.text.clear();
-            cv.draft = Some(TextDraft {
-                page,
-                index: None,
-                rect: [at[0], at[1] - style.size * 1.2, at[0] + 200.0, at[1]],
-                text: String::new(),
-                style,
-                focus: true,
-            });
+            // 200 points wide; on a phone, no wider than what is left of the page (its text is
+            // typed on a screen of its own, where the box can't be seen or resized).
+            let right = match info.pages.get(page).map(|p| f64::from(p.width)) {
+                Some(width) if tap_edits && width.is_finite() => (at[0] + 200.0).min(width - 4.0).max(at[0] + 24.0),
+                _ => at[0] + 200.0,
+            };
+            cv.draft =
+                Some(TextDraft { page, index: None, rect: [at[0], at[1] - style.size * 1.2, right, at[1]], text: String::new(), style, focus: true });
             consumed = true;
             if typed.is_some() {
                 view.pending_edit = typed;
@@ -257,7 +268,8 @@ pub(crate) fn page_input(
         }
         return consumed;
     }
-    if resp.double_clicked()
+    // Double-click retypes text (a phone: a tap does).
+    if (resp.double_clicked() || tap_edits && resp.clicked())
         && let Some((i, a)) = hit
         && let AddedContent::Text(t) = &a.content
     {
@@ -266,6 +278,7 @@ pub(crate) fn page_input(
         }
         cv.draft = Some(TextDraft { page, index: Some(i), rect: t.rect, text: t.text.clone(), style: t.clone(), focus: true });
         cv.selected = Some((page, i));
+        view.image_selection = None;
         consumed = true;
         return consumed;
     }
@@ -273,6 +286,7 @@ pub(crate) fn page_input(
         match hit {
             Some((i, _)) => {
                 cv.selected = Some((page, i));
+                view.image_selection = None;
                 consumed = true;
             }
             None if corner.is_none() => cv.selected = None,
@@ -404,6 +418,49 @@ pub(crate) fn editor(ctx: &egui::Context, view: &mut DocView, info: &DocInfo, ad
     }
     let edit = view.content.draft.take().and_then(|d| finish(&mut view.content, d, added));
     (edit, done)
+}
+
+/// The topmost added item on `page` under `p` (screen), by its place among the page's items.
+pub(crate) fn item_at(xf: &PageXform, info: &DocInfo, page: usize, added: &[Added], p: Pos2) -> Option<usize> {
+    on_page(added, page).into_iter().rev().find(|(_, a)| screen_rect(xf, info, page, a.content.rect()).expand(2.0).contains(p)).map(|(i, _)| i)
+}
+
+/// Pick up added item `i` of `page` with a finger at `at` (a long press on a phone): it moves
+/// with the finger and lands where it is let go, as a mouse drag does.
+pub(crate) fn carry(view: &mut DocView, page: usize, i: usize, at: Pos2) {
+    view.content.selected = Some((page, i));
+    view.content.grab = Some((page, Grab::Move, at));
+    view.image_selection = None;
+}
+
+/// The draft, finished as an edit (the phone's typing screen's Done): see [`finish`]. With
+/// `restyled`, retyped text takes the draft's look too (the phone formats it on its typing
+/// screen; the desktop's Format panel changes the item itself).
+pub(crate) fn finish_draft(view: &mut DocView, added: &[Added], restyled: bool) -> Option<Edit> {
+    let d = view.content.draft.take()?;
+    if restyled && let Some(i) = d.index {
+        let text = d.text.trim_end().to_string();
+        if text.trim().is_empty() {
+            return Some(Edit::DeleteContent { page: d.page, index: i });
+        }
+        let (_, a) = on_page(added, d.page).into_iter().find(|(k, _)| *k == i)?;
+        let AddedContent::Text(old) = &a.content else { return None };
+        let new = AddedText { text, rect: old.rect, ..d.style };
+        let changed = new != *old;
+        return changed.then_some(Edit::UpdateContent { page: d.page, index: i, content: AddedContent::Text(new) });
+    }
+    finish(&mut view.content, d, added)
+}
+
+/// Retype the added text selected on document `index` (the phone's Edit text for it).
+pub(crate) fn retype_selected(app: &mut crate::PdfCraftApp, index: usize) {
+    let added = app.views.get(index).and_then(|v| app.session.get(v.id)).map(|d| d.added.clone()).unwrap_or_default();
+    let Some(view) = app.views.get_mut(index) else { return };
+    let Some((page, i)) = view.content.selected else { return };
+    let Some((_, a)) = on_page(&added, page).into_iter().find(|(k, _)| *k == i) else { return };
+    if let AddedContent::Text(t) = &a.content {
+        view.content.draft = Some(TextDraft { page, index: Some(i), rect: t.rect, text: t.text.clone(), style: t.clone(), focus: true });
+    }
 }
 
 /// A finished draft as an edit: new text is added (and selected once it exists), retyped text

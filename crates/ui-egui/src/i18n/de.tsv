@@ -2459,3 +2459,9 @@ decimal separator	.	,
 	Combined from top to bottom. Use the arrows to change the order.	Von oben nach unten kombiniert. Mit den Pfeilen änderst du die Reihenfolge.
 	PDFs and pictures, combined into one PDF in the order you choose.	PDFs und Bilder, in der von dir gewählten Reihenfolge zu einer PDF kombiniert.
 @plural	{n} byte|{n} bytes	{n} Byte|{n} Byte
+	Smaller text	Kleinerer Text
+	Larger text	Größerer Text
+	Flip	Spiegeln
+	Tap text or a picture to change it	Tippe auf Text oder ein Bild, um es zu ändern
+	Tap where the text goes	Tippe dorthin, wo der Text hin soll
+	White	Weiß

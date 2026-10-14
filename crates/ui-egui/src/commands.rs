@@ -389,7 +389,11 @@ impl PdfCraftApp {
                 self.quick_tool = crate::QuickTool::EditText;
                 self.left = crate::LeftPanel::Tool("edit");
                 self.reveal_tools();
-                self.notify_tr("Click text or an image to edit it");
+                if self.phone_layout() {
+                    self.notify_tr("Tap text or a picture to change it");
+                } else {
+                    self.notify_tr("Click text or an image to edit it");
+                }
             }
             "edit.advanced_search" => {
                 if let Some(i) = self.active {

@@ -525,7 +525,9 @@ pub fn toast(app: &mut PdfCraftApp, ctx: &egui::Context) {
     let screen = ctx.content_rect();
     // Above the progress notice while a job runs.
     let card = if app.progress_notice.is_some() { ctx.data(|d| d.get_temp::<f32>(egui::Id::new(PROGRESS_HEIGHT))).unwrap_or(0.0) } else { 0.0 };
-    let lift = if card > 0.0 { 28.0 + card + 10.0 } else { 28.0 };
+    // On a phone, above the bars along the bottom (a tool's, Home's tabs).
+    let bars = if app.phone_layout() { 72.0 } else { 0.0 };
+    let lift = if card > 0.0 { 28.0 + card + 10.0 } else { 28.0 } + bars;
     egui::Area::new(egui::Id::new("toast"))
         .order(egui::Order::Tooltip)
         .pivot(Align2::CENTER_BOTTOM)

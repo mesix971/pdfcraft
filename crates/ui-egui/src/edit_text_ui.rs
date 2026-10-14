@@ -354,6 +354,31 @@ pub struct BlockDrag {
     grip: Grip,
 }
 
+impl BlockDrag {
+    /// Paragraph `block` of `page`, picked up by a long press at `start` (the phone's Edit): it
+    /// moves with the finger, and lands where it is let go.
+    pub(crate) fn carried(page: usize, block: usize, generation: u64, start: Pos2) -> Self {
+        BlockDrag { page, block, generation, start, grip: Grip::Move }
+    }
+}
+
+impl ImageSelection {
+    /// Picture `index` of `page`, picked up by a long press at `start` (the phone's Edit).
+    pub(crate) fn carried(page: usize, index: usize, start: Pos2) -> Self {
+        ImageSelection { page, index, drag: Some((start, None)) }
+    }
+
+    /// It is being moved or resized.
+    pub(crate) fn dragging(&self) -> bool {
+        self.drag.is_some()
+    }
+
+    /// Stop moving or resizing it, where it was.
+    pub(crate) fn cancel_drag(&mut self) {
+        self.drag = None;
+    }
+}
+
 /// How far an edge grip reaches either side of a box's edge (screen pixels).
 const EDGE_REACH: f32 = 6.0;
 
@@ -625,6 +650,7 @@ pub(crate) fn page_input(
     lines: &[pdfcraft_engine::TextBlock],
     view: &mut DocView,
     allow_interaction: bool,
+    in_place: bool,
 ) -> bool {
     let info = &doc.info;
     if view.block_drag.is_some_and(|d| d.generation != doc.edit_generation()) {
@@ -737,7 +763,8 @@ pub(crate) fn page_input(
             source_rect: l.rect.map(|v| v as f32),
             multiline: l.rows.len() > 1,
             source: Some((l.clone(), source_lines)),
-            fonts: install_source_fonts(ui.ctx(), doc, page),
+            // The phone types it on a screen of its own, in the interface's font.
+            fonts: if in_place { install_source_fonts(ui.ctx(), doc, page) } else { BTreeMap::new() },
             overflow: false,
             max_width,
             size: (l.size as f32 * scale).clamp(8.0, 72.0),
