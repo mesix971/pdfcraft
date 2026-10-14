@@ -179,6 +179,8 @@ pub struct PhoneState {
     text_focused: bool,
     /// Home: its tab, lists, profile and previews.
     pub(crate) home: crate::phone_home::HomeState,
+    /// The colours of the screen's top and bottom this frame, for the system's bars around it.
+    pub(crate) system_bars: Option<(Color32, Color32)>,
 }
 
 impl PdfCraftApp {
@@ -337,6 +339,29 @@ impl PdfCraftApp {
         self.close_phone_ai();
     }
 
+    /// Open one of the phone layout's screens or sheets by name (tests, automation and screenshots):
+    /// `menu`, `tools`, `new`, `profile`, `photos`, `ai` (the assistant, over the document)
+    /// or `ai_settings`.
+    pub(crate) fn open_phone_screen(&mut self, name: &str) -> Result<(), String> {
+        match name {
+            "menu" => self.phone.sheet = Some(Sheet::Menu),
+            "tools" => self.phone.sheet = Some(Sheet::Tools),
+            "new" => self.phone.sheet = Some(Sheet::New),
+            "profile" => self.phone.home.profile = true,
+            "photos" => {
+                self.phone.home.profile = true;
+                self.phone.home.picking = cfg!(not(target_arch = "wasm32"));
+            }
+            "ai" => self.phone.ai_open = cfg!(not(target_arch = "wasm32")),
+            "ai_settings" => self.phone.home.ai_settings = cfg!(not(target_arch = "wasm32")),
+            other => return Err(format!("phone must be menu, tools, new, profile, photos, ai or ai_settings, not {other:?}")),
+        }
+        // The reader starts a document plain (its first frame closes sheets and the assistant):
+        // this one is already the shown one.
+        self.phone.doc = self.active.and_then(|i| self.views.get(i)).map(|v| v.id);
+        Ok(())
+    }
+
     /// Back to Home. The document stays open there, with its place kept.
     fn go_home(&mut self) {
         self.leave_phone_tool();
@@ -398,15 +423,29 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
         None => crate::phone_home::show(app, ui, screen, &t),
         Some(index) => reader(app, index, ui, screen, &t),
     });
-    // Android draws its status bar over PdfCraft's window (a NativeActivity's takes the whole
-    // screen): the strip above the content is ours to fill, in the green its white icons stand
-    // out on, whatever the theme.
-    let whole = ctx.input(|i| i.viewport_rect());
-    if screen.top() > whole.top() {
-        let strip = Rect::from_min_max(whole.min, pos2(whole.right(), screen.top()));
-        ctx.layer_painter(egui::LayerId::background()).rect_filled(strip, CornerRadius::ZERO, t.accent);
-    }
     app.phone.text_focused = ctx.text_edit_focused();
+    // The system's bars take the colours of the screen's top and bottom, so they read as part of
+    // it: the Android shell gives them to the bars (and their icons a shade that reads on them).
+    let (top, bottom) = match app.active {
+        None if app.combine_showing() => (t.chrome, t.pasteboard),
+        None => crate::phone_home::system_bars(app, &t),
+        Some(_) if app.phone.ai_open => (t.chrome, t.pasteboard),
+        Some(_) if app.phone.bars_hidden => (t.pasteboard, t.pasteboard),
+        Some(_) => (t.chrome, t.chrome),
+    };
+    app.phone.system_bars = Some((top, bottom));
+    // Where the window reaches under a bar (a NativeActivity's takes the whole screen, so Android's
+    // own bar colours don't show), the strip is PdfCraft's to paint: in the same colour, so it
+    // looks the same either way. Above the panel that fills the window (it would cover the strip),
+    // and outside the content, so it covers nothing of it.
+    let whole = ctx.input(|i| i.viewport_rect());
+    let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("phone-system-strips")));
+    if screen.top() > whole.top() {
+        painter.rect_filled(Rect::from_min_max(whole.min, pos2(whole.right(), screen.top())), CornerRadius::ZERO, top);
+    }
+    if screen.bottom() < whole.bottom() {
+        painter.rect_filled(Rect::from_min_max(pos2(whole.left(), screen.bottom()), whole.max), CornerRadius::ZERO, bottom);
+    }
 }
 
 /// A top bar with Back and a title (Combine files, panels). Returns whether Back was tapped.
@@ -1047,6 +1086,8 @@ enum MenuPick {
     Panel(RightPanel),
     GoTo,
     Continuous,
+    /// The night reading colours on or off.
+    DarkPages,
 }
 
 fn menu_sheet(app: &mut PdfCraftApp, index: usize, ctx: &egui::Context, screen: Rect, t: &Tokens) {
@@ -1065,7 +1106,8 @@ fn menu_sheet(app: &mut PdfCraftApp, index: usize, ctx: &egui::Context, screen: 
         ("bookmark", tl!("Bookmarks").to_owned(), true, None, MenuPick::Panel(RightPanel::Bookmarks)),
         ("message-square-text", tl!("Comments").to_owned(), true, None, MenuPick::Panel(RightPanel::Comments)),
         ("arrow-up-down", command_label(app, "view.continuous"), true, Some(continuous), MenuPick::Continuous),
-        ("moon", command_label(app, "view.theme"), true, None, MenuPick::Command("view.theme")),
+        ("moon", tl!("Dark mode").to_owned(), true, Some(app.theme == crate::theme::ThemeKind::Dark), MenuPick::Command("view.theme")),
+        ("book-open", tl!("Dark pages").to_owned(), true, Some(app.dark_pages()), MenuPick::DarkPages),
         ("info", command_label(app, "file.properties"), command_enabled(app, "file.properties"), None, MenuPick::Command("file.properties")),
         ("settings", command_label(app, "app.preferences"), true, None, MenuPick::Command("app.preferences")),
         ("x", command_label(app, "file.close"), true, None, MenuPick::Command("file.close")),
@@ -1091,6 +1133,10 @@ fn menu_sheet(app: &mut PdfCraftApp, index: usize, ctx: &egui::Context, screen: 
         }
         Some(MenuPick::Continuous) => {
             app.execute("view.continuous");
+        }
+        Some(MenuPick::DarkPages) => {
+            let on = !app.dark_pages();
+            app.set_dark_pages(on);
         }
         None => {}
     }

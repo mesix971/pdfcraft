@@ -790,21 +790,35 @@ fn a_photo_is_chosen_from_a_picture_and_a_wrong_file_says_why() {
     let dir = folder("photo");
     let picture = dir.join("me.png");
     image::RgbaImage::from_pixel(640, 480, image::Rgba([200, 40, 40, 255])).save(&picture).unwrap();
-    let chosen = picture.to_string_lossy().into_owned();
-    let mut h = harness_with(None, move |app| app.pick_override = Some(vec![chosen]));
+    std::fs::write(dir.join("notes.txt"), b"not a picture").unwrap();
+    let photos = vec![dir.clone()];
+    let mut h = harness_with(None, move |app| app.photo_folders = photos);
     click(&mut h, "Profile");
+    // The device's photos, in a grid (not a folder to find them in).
     h.query_all_by_label("Choose a photo").last().unwrap().click();
-    // Made small on a thread: the screen goes on meanwhile.
+    for _ in 0..500 {
+        h.run_steps(1);
+        if h.query_by_label("me.png").is_some() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    assert!(h.query_by_label("notes.txt").is_none(), "pictures only");
+    click(&mut h, "me.png");
+    // Made small on a thread: the screen goes on meanwhile, back on the profile.
     wait(&mut h, |app| app.profile_photo.is_some());
+    assert!(h.query_by_role_and_label(Role::TextInput, "Your name").is_some());
     assert_eq!(
         pdfcraft_engine::signature_image::profile_picture_pixels(h.state().profile_photo.as_ref().unwrap()).map(|(w, h, _)| (w, h)),
         Some((256, 256))
     );
-    // A file that isn't a picture is refused in plain words, and the photo stays.
+    // Other folders: a file that isn't a picture is refused in plain words, and the photo stays.
     let text = dir.join("notes.png");
     std::fs::write(&text, b"not a picture").unwrap();
     h.state_mut().pick_override = Some(vec![text.to_string_lossy().into_owned()]);
     h.query_all_by_label("Choose a photo").last().unwrap().click();
+    h.run_steps(2);
+    click(&mut h, "Other folders…");
     wait(&mut h, |app| app.toast.is_some());
     assert_eq!(h.state().toast.as_ref().map(|t| t.0.as_str()), Some("Choose a PNG or JPEG picture."));
     assert!(h.state().profile_photo.is_some());
@@ -814,10 +828,57 @@ fn a_photo_is_chosen_from_a_picture_and_a_wrong_file_says_why() {
     h.state_mut().toast = None;
     h.state_mut().pick_override = Some(vec![damaged.to_string_lossy().into_owned()]);
     h.query_all_by_label("Choose a photo").last().unwrap().click();
+    h.run_steps(2);
+    click(&mut h, "Other folders…");
     wait(&mut h, |app| app.toast.is_some());
     let said = h.state().toast.as_ref().map(|t| t.0.clone()).unwrap_or_default();
     assert!(said.starts_with("Couldn't use this picture") && !said.contains("signature"), "{said}");
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A tip is one big button: a tap anywhere on it (not only on its link) does what it offers.
+#[test]
+fn a_tip_card_is_tapped_anywhere() {
+    // With a key, the assistant's tip is gone and this one comes first.
+    let mut h = harness_with(None, |app| {
+        app.comment_prefs.author = "Guest".into();
+        app.ai.key = "sk-ant-test".into();
+    });
+    // On its words, away from its link and its ✕.
+    let words = h.get_by_role_and_label(Role::Label, "Make PdfCraft yours").rect().center();
+    let link = h.get_by_label("Add my name").rect();
+    assert!(!link.contains(words));
+    tap(&mut h, words);
+    assert!(h.query_by_role_and_label(Role::TextInput, "Your name").is_some(), "the profile opened");
+}
+
+/// With a touch screen, taps in the rows that swipe (the tips, the quick actions) are still taps.
+#[test]
+fn taps_in_the_swiping_rows_reach_their_buttons() {
+    let mut h = harness(false);
+    for phase in [egui::TouchPhase::Start, egui::TouchPhase::End] {
+        h.event(Event::Touch { device_id: egui::TouchDeviceId(0), id: egui::TouchId(0), phase, pos: pos2(4.0, 4.0), force: None });
+    }
+    h.run_steps(2);
+    let set_up = h.get_by_label("Set up").rect().center();
+    tap(&mut h, set_up);
+    h.run_steps(3);
+    assert!(h.query_by_label("Save").is_some(), "the tip's link opened the assistant's settings");
+}
+
+/// With a touch screen, a quick action tapped with a finger does what it says (with a document
+/// open, it asks which one).
+#[test]
+fn a_quick_action_is_tapped_with_a_finger() {
+    let mut h = harness(true);
+    click(&mut h, "Back");
+    for phase in [egui::TouchPhase::Start, egui::TouchPhase::End] {
+        h.event(Event::Touch { device_id: egui::TouchDeviceId(0), id: egui::TouchId(0), phase, pos: pos2(4.0, 4.0), force: None });
+    }
+    h.run_steps(2);
+    let tile = h.get_by_label("Comments").rect().center();
+    tap(&mut h, tile);
+    assert_eq!(h.state().phone_sheet(), Some(Sheet::Pick));
 }
 
 #[test]
@@ -938,4 +999,85 @@ fn a_swipe_on_a_row_moves_the_page_or_the_row() {
     assert!(row_now - row(&h) > 100.0, "the row moved left: {} → {}", row_now, row(&h));
     assert!((page(&h) - page_now).abs() < 2.0, "the page stayed put");
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The profile chooses the theme (and the choice is kept, so a phone stops following the
+/// system's), and turns the pages dark for reading at night.
+#[test]
+fn the_profile_chooses_the_theme_and_dark_pages() {
+    let mut h = harness(false);
+    click(&mut h, "Profile");
+    h.get_by_role_and_label(Role::RadioButton, "Dark").click();
+    h.run_steps(3);
+    assert_eq!(h.state().theme_preference, pdfcraft_ui_egui::theme::ThemePreference::Dark);
+    assert_eq!(h.state().theme, pdfcraft_ui_egui::theme::ThemeKind::Dark);
+    assert!(h.state().theme_chosen);
+    let saved = h.state().persist();
+    let mut again = PdfCraftApp::new();
+    again.restore(&saved);
+    assert!(again.theme_chosen, "the choice is kept");
+    assert_eq!(again.theme_preference, pdfcraft_ui_egui::theme::ThemePreference::Dark);
+    assert!(!h.state().dark_pages());
+    h.get_by_role_and_label(Role::CheckBox, "Dark pages").click();
+    h.run_steps(3);
+    assert!(h.state().dark_pages());
+    assert_eq!(h.state().reading_colors, pdfcraft_render::ReadingColors::NIGHT);
+    h.get_by_role_and_label(Role::CheckBox, "Dark pages").click();
+    h.run_steps(3);
+    assert!(!h.state().dark_pages(), "and back");
+}
+
+/// The reader's menu switches the dark mode and the dark pages while reading.
+#[test]
+fn the_readers_menu_switches_dark_mode_and_dark_pages() {
+    let mut h = harness(true);
+    // Low in the menu: scrolled to, as a finger would.
+    let pick = |h: &mut Harness<'static, PdfCraftApp>, label: &str| {
+        click(h, "Menu");
+        h.get_by_label(label).scroll_to_me();
+        h.run_steps(4);
+        click(h, label);
+    };
+    pick(&mut h, "Dark mode");
+    assert_eq!(h.state().theme, pdfcraft_ui_egui::theme::ThemeKind::Dark);
+    pick(&mut h, "Dark pages");
+    assert!(h.state().dark_pages());
+}
+
+/// The system's bars take the colours of the screen's top and bottom: Home's ground and tab bar,
+/// the reader's bars (the page's surround when they hide), dark in the dark theme.
+#[test]
+fn the_system_bars_follow_the_screen() {
+    use pdfcraft_ui_egui::theme::{ThemeKind, Tokens};
+    let light = Tokens::for_kind(ThemeKind::Light);
+    let mut h = harness(true);
+    assert_eq!(h.state().phone_system_bars(), Some((light.chrome, light.chrome)), "the reader's bars");
+    let p = at(&h, 0, 150.0, 120.0);
+    tap(&mut h, p);
+    assert_eq!(h.state().phone_system_bars(), Some((light.pasteboard, light.pasteboard)), "bars hidden: the page's surround");
+    tap(&mut h, p);
+    click(&mut h, "Back");
+    assert_eq!(h.state().phone_system_bars(), Some((egui::Color32::from_rgb(0xf5, 0xf8, 0xf7), egui::Color32::WHITE)), "Home's ground and tab bar");
+    click(&mut h, "Profile");
+    assert_eq!(h.state().phone_system_bars(), Some((light.chrome, light.pasteboard)), "a screen with a top bar");
+    h.state_mut().set_option("theme", "dark").unwrap();
+    h.run_steps(3);
+    let dark = Tokens::for_kind(ThemeKind::Dark);
+    assert_eq!(h.state().phone_system_bars(), Some((dark.chrome, dark.pasteboard)), "dark in the dark theme");
+}
+
+/// Settings from before the choice was kept: a theme other than the system's was the user's
+/// choice, and stays one. Dark pages switched off leave other reading colours alone.
+#[test]
+fn an_earlier_theme_choice_stays_and_dark_pages_leave_other_colours_alone() {
+    let mut app = PdfCraftApp::new();
+    app.restore(r#"{"theme": "Dark"}"#);
+    assert!(app.theme_chosen);
+    let mut app = PdfCraftApp::new();
+    app.restore(r#"{"theme": "System"}"#);
+    assert!(!app.theme_chosen, "the system's theme is what a phone follows anyway");
+    app.set_reading_colors(pdfcraft_render::ReadingColors::WHITE_ON_BLACK);
+    app.set_dark_pages(false);
+    assert_eq!(app.reading_colors, pdfcraft_render::ReadingColors::WHITE_ON_BLACK);
+    assert!(app.set_option("dark_pages", "maybe").is_err());
 }

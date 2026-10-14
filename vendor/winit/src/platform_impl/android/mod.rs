@@ -34,6 +34,11 @@ pub(crate) use crate::icon::NoIcon as PlatformIcon;
 
 static HAS_FOCUS: AtomicBool = AtomicBool::new(true);
 
+/// While set, key events (all but Back) are left to the activity's own views instead of going to
+/// the app: an Android text view the app shows over its window has the keyboard, and gets every
+/// input method's keys (Delete, Enter) that way. PdfCraft patch (13), see vendor/README.md.
+pub(crate) static KEYS_TO_VIEWS: AtomicBool = AtomicBool::new(false);
+
 /// Returns the minimum `Option<Duration>`, taking into account that `None`
 /// equates to an infinite timeout, not a zero timeout (so can't just use
 /// `Option::min`)
@@ -433,6 +438,11 @@ impl<T: 'static> EventLoop<T> {
                 }
             },
             InputEvent::KeyEvent(key) => {
+                // PdfCraft patch (13): the app's text view takes the keys (Back stays the app's,
+                // which closes what is open rather than the activity).
+                if KEYS_TO_VIEWS.load(Ordering::Relaxed) && key.key_code() != Keycode::Back {
+                    return InputStatus::Unhandled;
+                }
                 match key.key_code() {
                     // Flag keys related to volume as unhandled. While winit does not have a way for
                     // applications to configure what keys to flag as handled,

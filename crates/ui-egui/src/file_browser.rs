@@ -100,6 +100,11 @@ pub struct Host {
     pub access_granted: Option<Arc<dyn Fn() -> bool + Send + Sync>>,
     /// Shows the system page where the user allows that access.
     pub request_access: Option<Arc<dyn Fn() + Send + Sync>>,
+    /// Whether the app may read the device's photos (Android's photos permission, or all files
+    /// access). `None` when the system has no such permission.
+    pub photos_granted: Option<Arc<dyn Fn() -> bool + Send + Sync>>,
+    /// Asks for it: the system's own question, as other apps ask.
+    pub request_photos: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
 impl std::fmt::Debug for Host {

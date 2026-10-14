@@ -2512,3 +2512,14 @@ file state	Open	Otevřeno
 	{n} MB	{n} MB
 	{n} KB	{n} kB
 decimal separator	.	,
+	Other folders…	Další složky…
+	Looking for photos…	Hledání fotek…
+	See your photos	Zobrazte své fotky
+	Allow PdfCraft to see your photos, and choose one here.	Povolte aplikaci PdfCraft přístup k fotkám a vyberte jednu tady.
+	No photos found.	Nebyly nalezeny žádné fotky.
+	PdfCraft shows the photos in Camera, Pictures and Download.	PdfCraft zobrazuje fotky ze složek Fotoaparát, Obrázky a Stažené.
+	Automatic	Automaticky
+	Dark mode	Tmavý režim
+	Dark pages	Tmavé stránky
+	Light text on a dark page, for reading at night.	Světlý text na tmavé stránce, pro čtení v noci.
+	Night	Noc

@@ -491,6 +491,9 @@ pub struct PdfCraftApp {
     pub profile_photo: Option<std::sync::Arc<Vec<u8>>>,
     /// The files starred on Home, newest first.
     pub starred: Vec<String>,
+    /// The folders the phone's photo grid looks in, instead of the device's camera folder,
+    /// Pictures and Download (tests and automation).
+    pub photo_folders: Vec<std::path::PathBuf>,
     /// Where Home looks for the device's PDFs; empty: the in-app browser's Download, Documents
     /// and PdfCraft's own folder (Android).
     pub device_folders: Vec<std::path::PathBuf>,
@@ -504,6 +507,8 @@ pub struct PdfCraftApp {
     /// Resolved colours, including the current OS theme when following the system.
     pub theme: ThemeKind,
     pub theme_preference: ThemePreference,
+    /// The user chose the theme (a phone otherwise follows the system's).
+    pub theme_chosen: bool,
     /// The reading-colours preference (Preferences ▸ Reading colours): applied to every open
     /// document, and documents open with it (Acrobat's Replace Document Colors).
     pub reading_colors: pdfcraft_render::ReadingColors,
@@ -872,6 +877,7 @@ impl PdfCraftApp {
             comments_panel_closed: false,
             profile_photo: None,
             starred: Vec::new(),
+            photo_folders: Vec::new(),
             device_folders: Vec::new(),
             home_tips_dismissed: Vec::new(),
             quick_tool: QuickTool::Select,
@@ -879,6 +885,7 @@ impl PdfCraftApp {
             comment_prefs: Default::default(),
             theme: ThemeKind::Light,
             theme_preference: ThemePreference::Light,
+            theme_chosen: false,
             reading_colors: Default::default(),
             #[cfg(target_os = "linux")]
             desktop_theme: None,
@@ -1644,6 +1651,27 @@ impl PdfCraftApp {
         self.notify(i18n::fmt(tl!(template), args));
     }
 
+    /// Whether pages are shown dark (the night reading colours).
+    pub fn dark_pages(&self) -> bool {
+        self.reading_colors == pdfcraft_render::ReadingColors::NIGHT
+    }
+
+    /// Show pages dark (light grey text on a dark grey page), or no longer: other reading colours
+    /// chosen in Preferences are left as they are.
+    pub fn set_dark_pages(&mut self, on: bool) {
+        if on {
+            self.set_reading_colors(pdfcraft_render::ReadingColors::NIGHT);
+        } else if self.dark_pages() {
+            self.set_reading_colors(pdfcraft_render::ReadingColors::default());
+        }
+    }
+
+    /// The colours the phone layout wants for the system's status bar (above) and navigation bar
+    /// (below), as this frame drew the screen's top and bottom; `None` outside the phone layout.
+    pub fn phone_system_bars(&self) -> Option<(egui::Color32, egui::Color32)> {
+        self.phone.system_bars
+    }
+
     pub fn set_theme_preference(&mut self, preference: ThemePreference) {
         self.theme_preference = preference;
         if let Some(ctx) = self.ctx.clone() {
@@ -1856,6 +1884,7 @@ impl PdfCraftApp {
             "reload_changed_files": self.reload_changed_files,
             "pinned_folders": self.pinned.folders,
             "theme": self.theme_preference,
+            "theme_chosen": self.theme_chosen,
             "scroll_speed": self.scroll_speed,
             "animation_effects": self.animation_effects,
             "default_mode": self.default_mode,
@@ -1957,6 +1986,8 @@ impl PdfCraftApp {
         }
         self.pinned.restore(&v["pinned_folders"]);
         if let Ok(preference) = serde_json::from_value::<ThemePreference>(v["theme"].clone()) {
+            // Settings from before the choice was kept: a theme other than the system's was one.
+            self.theme_chosen = v["theme_chosen"].as_bool().unwrap_or(preference != ThemePreference::System);
             self.set_theme_preference(preference);
         }
         if let Ok(speed) = serde_json::from_value::<scroll_speed::ScrollSpeed>(v["scroll_speed"].clone()) {
@@ -2135,6 +2166,8 @@ impl PdfCraftApp {
                     "dark" => ThemePreference::Dark,
                     _ => return Err("theme must be light, dark, or system".into()),
                 };
+                // A theme set from outside (automation, a script) is a choice too.
+                self.theme_chosen = true;
                 self.set_theme_preference(preference);
             }
             ("scroll_speed", _) => {
@@ -2177,6 +2210,12 @@ impl PdfCraftApp {
             ("left", _) => self.left_open = value != "closed",
             ("shell", _) => self.shell = phone::ShellPref::parse(value).ok_or("shell must be auto or phone")?,
             ("home", _) => self.active = None,
+            ("phone", _) => self.open_phone_screen(value)?,
+            ("dark_pages", _) => match value {
+                "on" => self.set_dark_pages(true),
+                "off" => self.set_dark_pages(false),
+                _ => return Err("dark_pages must be on or off".into()),
+            },
             ("home_tab", _) => {
                 // A wrong value changes nothing, not even the document shown.
                 let tab = phone_home::HomeTab::parse(value).ok_or("home_tab must be home, files, create or tools")?;

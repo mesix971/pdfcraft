@@ -2438,3 +2438,14 @@ file state	Open	開いています
 	{n} MB	{n} MB
 	{n} KB	{n} KB
 decimal separator	.	.
+	Other folders…	ほかのフォルダー…
+	Looking for photos…	写真を探しています…
+	See your photos	写真を表示
+	Allow PdfCraft to see your photos, and choose one here.	PdfCraft に写真へのアクセスを許可して、ここで 1 枚選んでください。
+	No photos found.	写真が見つかりませんでした。
+	PdfCraft shows the photos in Camera, Pictures and Download.	PdfCraft はカメラ、画像、ダウンロードの写真を表示します。
+	Automatic	自動
+	Dark mode	ダークモード
+	Dark pages	ダークページ
+	Light text on a dark page, for reading at night.	暗いページに明るい文字。夜の読書に。
+	Night	夜間

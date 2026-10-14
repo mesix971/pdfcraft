@@ -65,14 +65,16 @@ Android 8.0 (API 26) or later, 64-bit ARM by default.
   window, which hands the document to the running PdfCraft, brings it forward and closes.
 - **Back key** closes the open menu or dialog, like Escape. It never closes the app, so unsaved work
   isn't dropped without the usual question.
-- **Typing.** Tapping a text field opens Android's own text box with the field's text, so every
-  keyboard works: accents, other alphabets, predictive text, voice typing (a `NativeActivity`'s
-  window only gets key events, and loses the characters a keyboard map can't produce). **OK** puts
-  the text back and acts as the keyboard's Done: in a one-line field it also presses Enter, so a page
-  number, a zoom, a search or a file name takes effect (in the command palette, it runs the top
-  match). **Cancel** leaves the field as it was. A password is never shown in the box's prefill.
-  With a hardware keyboard, typing goes straight to the field; the window keeps the part the soft
-  keyboard leaves free.
+- **Typing.** Typing goes into the field itself. An Android text view out of sight takes the
+  keyboard, so every keyboard works: accents, other alphabets, predictive text, voice typing (a
+  `NativeActivity`'s window only gets key events, and loses the characters a keyboard map can't
+  produce). What it holds shows in the field as it is typed, caret included, and a caret moved in
+  the field moves the view's. The window leaves the keys to that view meanwhile (a patched winit,
+  vendor/README.md, patch 13), all but Back, which closes the keyboard. Enter in a one-line field
+  is its Done, so a page number, a zoom, a search or a file name takes effect (in the command
+  palette, it runs the top match). A password is typed in Android's own text box instead, never in
+  the field's place, and is never shown in its prefill. With a hardware keyboard, typing goes
+  straight to the field. The window keeps the part the soft keyboard leaves free.
 - **Clipboard.** Copied text goes to the system clipboard and pasted text comes from it. Images and
   files copied in PdfCraft stay in PdfCraft (Android takes those only from a content provider, which
   needs Java); use Save Image As.
@@ -94,9 +96,11 @@ Android 8.0 (API 26) or later, 64-bit ARM by default.
     device (Download, Documents and PdfCraft's folder, scanned on a thread), each with a preview
     of its first page, made for the rows on screen (the ArtCraft mark over "PDF" until it is
     ready, and for a file that can't show one). A tab bar switches
-    between Home, Files, Create and Tools; "+" opens, creates and combines. The profile sets the
-    name and a photo (its centred square, 256 pixels, made on a thread and kept with the
-    settings).
+    between Home, Files, Create and Tools; "+" opens, creates and combines. A tip is tapped
+    anywhere on it. The profile sets the name and a photo, chosen in a grid of the device's
+    photos (Camera, Pictures and Download, newest first, with the folders a row away); its centred
+    square, 256 pixels, is made on a thread and kept with the settings. A swipe up or down that
+    starts on a row that scrolls sideways (the tips, the quick actions) moves the page.
   - The reader shows the page across the screen. A tap hides or shows the bars, one finger
     scrolls, two fingers zoom, a double tap zooms in on the point (and back), and a long press
     selects a word.
@@ -122,7 +126,11 @@ Android 8.0 (API 26) or later, 64-bit ARM by default.
   paragraph in its own font, size and colour, rewrapped in its box, as one step that Undo (in
   the ⋮ menu) takes back. It is the only reason the app has the INTERNET permission: nothing is
   sent until a key is entered and a question asked.
-- **Dark theme** follows the system's.
+- **Dark mode.** Profile ▸ Appearance chooses Automatic (the phone's theme), Light or Dark; until
+  it is chosen, PdfCraft follows the phone. **Dark pages** shows documents as light grey text on
+  dark grey pages (pictures keep their colours, and the file isn't changed), from the same place or
+  the reader's ⋮ menu, which also switches the dark mode. Android's status and navigation bars take
+  the colours of the screen's top and bottom, with icons that read on them.
 
 ## Known limits
 
@@ -130,10 +138,10 @@ Android 8.0 (API 26) or later, 64-bit ARM by default.
 - In the phone layout, the tool drawer shows the desktop tool panels as they are: they work, but
   most aren't designed for touch yet (rows are 34 points tall).
 - No screen reader: eframe's AccessKit bridge needs `GameActivity` (Java), not `NativeActivity`.
-- A text field takes typing through Android's text box, not in place: the box covers the page while
-  it shows, and the field's text is replaced as a whole when OK is pressed.
-- If the text box can't be shown, typing falls back to key events for the session, where keyboards
+- If the text view can't be shown, typing falls back to key events for the session, where keyboards
   that compose words (accents, other alphabets, predictive text) may lose characters.
+- A word being composed shows in the field without the keyboard's underline, and a field's
+  selection handles are egui's, not Android's.
 - Images and files can't go to the system clipboard; printing goes through another app rather than
   a printer list; "Reveal in file manager" is unavailable.
 - `targetSdkVersion` is 34: Android 15 makes apps targeting 35 draw under the system bars, and a
@@ -161,9 +169,9 @@ allow unsafe code.
 - `src/shell.rs`: the `eframe::App` around `PdfCraftApp` (input, keyboard, clipboard, insets, saving
   on suspend), the file browser's places, OCR model unpacking, and the start-up document.
 - `src/jvm.rs`: JNI (storage access, the start-up intent and `ContentResolver`, handing a document to
-  the running window, the clipboard, the system text box).
-- `src/typing.rs`: typing through the system text box (the egui side, host-tested on real egui text
-  fields with a stand-in box).
+  the running window, the clipboard, the text view typing goes through, the system text box).
+- `src/typing.rs`: typing through the system's text views (the egui side, host-tested on real egui
+  text fields with stand-in views).
 - `src/storage.rs`, `src/screen.rs`: plain functions with host tests (which `content://` and
   `file://` addresses are shared-storage paths, confined to `/storage` without `..`; display names;
   removable cards; the keyboard's inset).

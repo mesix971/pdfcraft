@@ -12,6 +12,9 @@
     <!-- Open and save documents anywhere on shared storage: the storage permissions up to
          Android 10, "all files access" from Android 11 (the app asks in its file browser). -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- The profile photo's grid: the device's photos, asked for as other apps ask (Android 13 and
+         later; the storage permission above before). -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <!-- Bring PdfCraft forward when another app opens a document in it while it runs. -->

@@ -2401,3 +2401,14 @@ file state	Open	Отворен
 	{n} MB	{n} МБ
 	{n} KB	{n} КБ
 decimal separator	.	,
+	Other folders…	Други папки…
+	Looking for photos…	Търсене на снимки…
+	See your photos	Вижте снимките си
+	Allow PdfCraft to see your photos, and choose one here.	Позволете на PdfCraft да вижда снимките ви и изберете една тук.
+	No photos found.	Не са намерени снимки.
+	PdfCraft shows the photos in Camera, Pictures and Download.	PdfCraft показва снимките в „Камера“, „Изображения“ и „Изтегляния“.
+	Automatic	Автоматично
+	Dark mode	Тъмен режим
+	Dark pages	Тъмни страници
+	Light text on a dark page, for reading at night.	Светъл текст на тъмна страница, за четене нощем.
+	Night	Нощ

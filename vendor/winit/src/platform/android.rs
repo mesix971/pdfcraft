@@ -75,6 +75,13 @@ use crate::window::{Window, WindowAttributes};
 
 use self::activity::{AndroidApp, ConfigurationRef, Rect};
 
+/// Leave key events (all but Back) to the activity's own views while `on`, instead of sending
+/// them to the app: for an app that shows an Android text view over its window to take typing
+/// from every input method. PdfCraft patch (13), see vendor/README.md.
+pub fn set_keys_to_views(on: bool) {
+    crate::platform_impl::KEYS_TO_VIEWS.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// Additional methods on [`EventLoop`] that are specific to Android.
 pub trait EventLoopExtAndroid {
     /// Get the [`AndroidApp`] which was used to create this event loop.

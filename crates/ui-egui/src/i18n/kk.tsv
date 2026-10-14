@@ -2436,3 +2436,14 @@ file state	Open	Ашық
 	{n} MB	{n} МБ
 	{n} KB	{n} КБ
 decimal separator	.	,
+	Other folders…	Басқа қалталар…
+	Looking for photos…	Фотосуреттер ізделуде…
+	See your photos	Фотосуреттеріңізді көріңіз
+	Allow PdfCraft to see your photos, and choose one here.	PdfCraft-ке фотосуреттеріңізді көруге рұқсат беріп, осы жерден біреуін таңдаңыз.
+	No photos found.	Фотосурет табылмады.
+	PdfCraft shows the photos in Camera, Pictures and Download.	PdfCraft «Камера», «Суреттер» және «Жүктеулер» қалталарындағы фотосуреттерді көрсетеді.
+	Automatic	Автоматты
+	Dark mode	Қараңғы режим
+	Dark pages	Қараңғы беттер
+	Light text on a dark page, for reading at night.	Қараңғы беттегі ашық мәтін, түнде оқуға арналған.
+	Night	Түн

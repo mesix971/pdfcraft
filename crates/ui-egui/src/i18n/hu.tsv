@@ -2437,3 +2437,14 @@ file state	Open	Megnyitva
 	{n} MB	{n} MB
 	{n} KB	{n} KB
 decimal separator	.	,
+	Other folders…	Más mappák…
+	Looking for photos…	Fényképek keresése…
+	See your photos	Lásd a fényképeidet
+	Allow PdfCraft to see your photos, and choose one here.	Engedd, hogy a PdfCraft lássa a fényképeidet, és válassz egyet itt.
+	No photos found.	Nem található fénykép.
+	PdfCraft shows the photos in Camera, Pictures and Download.	A PdfCraft a Kamera, a Képek és a Letöltések mappa fényképeit mutatja.
+	Automatic	Automatikus
+	Dark mode	Sötét mód
+	Dark pages	Sötét oldalak
+	Light text on a dark page, for reading at night.	Világos szöveg sötét oldalon, éjszakai olvasáshoz.
+	Night	Éjszaka

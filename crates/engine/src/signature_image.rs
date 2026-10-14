@@ -127,18 +127,33 @@ pub const PROFILE_SIDE: u32 = 256;
 /// orientation), [`PROFILE_SIDE`] pixels, as a PNG without metadata. The picture is decoded within
 /// the same pixel and allocation limits as an image signature.
 pub fn profile_picture(bytes: &[u8]) -> Result<Vec<u8>, SignatureImageError> {
-    let image = decode_limited(bytes, MAX_PROFILE_SOURCE_BYTES)?;
-    let (w, h) = (image.width(), image.height());
-    let side = w.min(h);
-    if side == 0 {
-        return Err(SignatureImageError::Format);
-    }
-    // `side` is at most each dimension, so the crop stays inside the picture.
-    let square = image.crop_imm((w - side) / 2, (h - side) / 2, side, side);
-    let small = square.thumbnail(PROFILE_SIDE, PROFILE_SIDE).into_rgba8();
+    let small = centred_square(bytes, PROFILE_SIDE)?;
     let mut png = Cursor::new(Vec::new());
     DynamicImage::ImageRgba8(small).write_to(&mut png, ImageFormat::Png)?;
     Ok(png.into_inner())
+}
+
+/// A picture's centred square, `side` pixels at most (width, height and RGBA, not premultiplied):
+/// a photo's tile in a gallery, cut as [`profile_picture`] cuts it. `None` for anything that
+/// refuses.
+pub fn picture_thumbnail(bytes: &[u8], side: u32) -> Option<(usize, usize, Vec<u8>)> {
+    let small = centred_square(bytes, side.clamp(1, PROFILE_SIDE)).ok()?;
+    let (w, h) = (usize::try_from(small.width()).ok()?, usize::try_from(small.height()).ok()?);
+    Some((w, h, small.into_raw()))
+}
+
+/// The centred square of the PNG or JPEG in `bytes` (upright, as its orientation says), made
+/// `side` pixels at most.
+fn centred_square(bytes: &[u8], side: u32) -> Result<image::RgbaImage, SignatureImageError> {
+    let image = decode_limited(bytes, MAX_PROFILE_SOURCE_BYTES)?;
+    let (w, h) = (image.width(), image.height());
+    let square = w.min(h);
+    if square == 0 {
+        return Err(SignatureImageError::Format);
+    }
+    // `square` is at most each dimension, so the crop stays inside the picture.
+    let cut = image.crop_imm((w - square) / 2, (h - square) / 2, square, square);
+    Ok(cut.thumbnail(side, side).into_rgba8())
 }
 
 /// The pixels of a profile photo [`profile_picture`] made (its width, height and RGBA, at most
@@ -310,6 +325,12 @@ mod tests {
         assert_eq!(profile_picture_pixels(source.get_ref()), None, "a 900 x 300 picture isn't a profile photo");
         assert!(matches!(profile_picture(b"not a picture"), Err(SignatureImageError::Format)));
         assert!(matches!(profile_picture(&vec![0u8; MAX_PROFILE_SOURCE_BYTES + 1]), Err(SignatureImageError::Size)));
+        // A gallery's tile: the same square, smaller, as pixels.
+        let (w, h, tile) = picture_thumbnail(source.get_ref(), 96).unwrap();
+        assert_eq!((w, h, tile.len()), (96, 96, 96 * 96 * 4));
+        assert!(tile.as_chunks::<4>().0.iter().all(|p| *p == [0, 255, 0, 255]));
+        assert_eq!(picture_thumbnail(b"not a picture", 96), None);
+        assert_eq!(picture_thumbnail(source.get_ref(), 0).map(|(w, h, _)| (w, h)), Some((1, 1)), "a side of 0 is one pixel");
     }
 
     /// A 300 x 400 page shown turned `rotation` degrees clockwise.

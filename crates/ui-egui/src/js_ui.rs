@@ -254,6 +254,7 @@ fn reading_mode_label(mode: &str) -> &'static str {
         "white-on-black" => "White on black",
         "yellow-on-black" => "Yellow on black",
         "green-on-black" => "Green on black",
+        "night" => "Night",
         "custom" => "Custom",
         _ => "Off",
     }
@@ -407,6 +408,7 @@ pub(crate) fn preferences_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tok
                 ("white-on-black", "White on black"),
                 ("yellow-on-black", "Yellow on black"),
                 ("green-on-black", "Green on black"),
+                ("night", "Night"),
                 ("custom", "Custom"),
             ] {
                 if ui.selectable_label(mode == m, tl!(label)).clicked() {

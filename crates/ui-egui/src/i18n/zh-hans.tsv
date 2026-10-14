@@ -2402,3 +2402,14 @@ file state	Open	已打开
 	{n} MB	{n} MB
 	{n} KB	{n} KB
 decimal separator	.	.
+	Other folders…	其他文件夹…
+	Looking for photos…	正在查找照片…
+	See your photos	查看您的照片
+	Allow PdfCraft to see your photos, and choose one here.	允许 PdfCraft 查看您的照片，然后在此选择一张。
+	No photos found.	未找到照片。
+	PdfCraft shows the photos in Camera, Pictures and Download.	PdfCraft 会显示“相机”“图片”和“下载”中的照片。
+	Automatic	自动
+	Dark mode	深色模式
+	Dark pages	深色页面
+	Light text on a dark page, for reading at night.	深色页面上的浅色文字，适合夜间阅读。
+	Night	夜间

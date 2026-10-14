@@ -19,6 +19,8 @@ const MAX_DOCUMENT_BYTES: usize = 512 << 20;
 const CHUNK: usize = 1 << 16;
 /// Android 11 (API 30): "all files access" replaced the storage permissions.
 const API_R: i32 = 30;
+/// Android 13 (API 33): photos have a permission of their own.
+const API_T: i32 = 33;
 
 /// A JNI call that failed, or a read that did.
 #[derive(Debug)]
@@ -89,6 +91,97 @@ pub fn storage_access(app: &AndroidApp) -> bool {
         log::warn!("storage access check: {e}");
         false
     })
+}
+
+/// The permission that lets the app read the device's photos: their own from Android 13, the
+/// storage one before.
+fn photos_permission() -> &'static str {
+    if AndroidApp::sdk_version() >= API_T { "android.permission.READ_MEDIA_IMAGES" } else { "android.permission.READ_EXTERNAL_STORAGE" }
+}
+
+/// Whether the app may read the device's photos (all files access covers them too).
+pub fn photos_access(app: &AndroidApp) -> bool {
+    if storage_access(app) {
+        return true;
+    }
+    let result = with_activity(app, |env, activity| {
+        let permission = env.new_string(photos_permission())?;
+        let granted =
+            env.call_method(activity, jni_str!("checkSelfPermission"), jni_sig!("(Ljava/lang/String;)I"), &[JValue::Object(&permission)])?.i()?;
+        // PackageManager.PERMISSION_GRANTED
+        Ok(granted == 0)
+    });
+    result.unwrap_or_else(|e| {
+        log::warn!("photos access check: {e}");
+        false
+    })
+}
+
+/// The photos permission was asked for in this run.
+static PHOTOS_ASKED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Ask for the photos permission: the system's own question ("Allow PdfCraft to access photos?").
+/// Refused for good (the system asks no more), the app's page in the settings opens instead, where
+/// it can still be allowed. The answer is read again by [`photos_access`] (a NativeActivity never
+/// hears it directly).
+pub fn request_photos_access(app: &AndroidApp) {
+    let main = app.clone();
+    let asked_before = PHOTOS_ASKED.swap(true, std::sync::atomic::Ordering::SeqCst);
+    app.run_on_java_main_thread(Box::new(move || {
+        let result = with_activity(&main, |env, activity| {
+            let name = env.new_string(photos_permission())?;
+            // After a first refusal the system asks again (and says so here); after the second,
+            // or "don't ask again", it doesn't.
+            let can_ask = !asked_before
+                || env
+                    .call_method(
+                        activity,
+                        jni_str!("shouldShowRequestPermissionRationale"),
+                        jni_sig!("(Ljava/lang/String;)Z"),
+                        &[JValue::Object(&name)],
+                    )?
+                    .z()?;
+            if !can_ask {
+                return open_app_settings(env, activity);
+            }
+            let class = env.find_class(jni_str!("java/lang/String"))?;
+            let permissions = env.new_object_array(1, &class, JObject::null())?;
+            permissions.set_element(env, 0, &name)?;
+            env.call_method(
+                activity,
+                jni_str!("requestPermissions"),
+                jni_sig!("([Ljava/lang/String;I)V"),
+                &[JValue::Object(&permissions), JValue::Int(2)],
+            )?;
+            Ok(())
+        });
+        if let Err(e) = result {
+            log::warn!("asking for the photos: {e}");
+        }
+    }));
+}
+
+/// Open PdfCraft's page in the system settings (its permissions are a tap away there).
+fn open_app_settings(env: &mut Env, activity: &JObject) -> Jni<()> {
+    let package = env.call_method(activity, jni_str!("getPackageName"), jni_sig!("()Ljava/lang/String;"), &[])?.l()?;
+    let package = string_of(env, &package)?.unwrap_or_default();
+    let action = env.new_string("android.settings.APPLICATION_DETAILS_SETTINGS")?;
+    let address = env.new_string(format!("package:{package}"))?;
+    let uri = env
+        .call_static_method(
+            jni_str!("android/net/Uri"),
+            jni_str!("parse"),
+            jni_sig!("(Ljava/lang/String;)Landroid/net/Uri;"),
+            &[JValue::Object(&address)],
+        )?
+        .l()?;
+    let intent = env.new_object(
+        jni_str!("android/content/Intent"),
+        jni_sig!("(Ljava/lang/String;Landroid/net/Uri;)V"),
+        &[JValue::Object(&action), JValue::Object(&uri)],
+    )?;
+    env.call_method(activity, jni_str!("startActivity"), jni_sig!("(Landroid/content/Intent;)V"), &[JValue::Object(&intent)])?;
+    Ok(())
 }
 
 /// Show the system page where the user allows that access (Android 11 and later), or ask for the
@@ -581,6 +674,331 @@ fn check_dialog(env: &mut Env, dialog: &OpenDialog) -> Jni<Option<Option<String>
     let cancelled = env.call_method(&*dialog.cancel, jni_str!("isDone"), jni_sig!("()Z"), &[])?.z()?;
     let showing = env.call_method(&*dialog.dialog, jni_str!("isShowing"), jni_sig!("()Z"), &[])?.z()?;
     Ok((cancelled || !showing).then_some(None))
+}
+
+/// An `EditText` out of sight in the activity's window that has the keyboard while an egui text
+/// field is typed in ([`crate::typing`]): every input method works there, and what it holds is
+/// copied into the field as it changes. The window leaves it the keys meanwhile (winit's
+/// `set_keys_to_views`). Built and read on the Java UI thread, from framework classes only.
+pub struct TextMirror {
+    app: AndroidApp,
+    shared: std::sync::Arc<std::sync::Mutex<MirrorShared>>,
+    /// A read is queued on the Java thread (one at a time).
+    checking: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+struct MirrorShared {
+    phase: MirrorPhase,
+    seen: Option<crate::typing::Seen>,
+    /// How many times the keyboard has been asked for (the view takes the focus a moment after
+    /// it is added, so the first asks can come too early).
+    asks: u32,
+}
+
+enum MirrorPhase {
+    Opening,
+    Open(Global<JObject<'static>>),
+    Failed,
+    /// Closed, or gone with its window.
+    Gone,
+}
+
+/// `Context.INPUT_METHOD_SERVICE`.
+const INPUT_METHOD_SERVICE: &str = "input_method";
+/// How many reads ask for the keyboard again.
+const KEYBOARD_ASKS: u32 = 4;
+/// `EditorInfo.TYPE_TEXT_FLAG_CAP_SENTENCES`: a capital to start each sentence, as phone apps do.
+const TYPE_TEXT_FLAG_CAP_SENTENCES: i32 = 0x4000;
+
+fn lock(shared: &std::sync::Mutex<MirrorShared>) -> std::sync::MutexGuard<'_, MirrorShared> {
+    shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+impl TextMirror {
+    /// Add the view with `request`'s text and give it the keyboard (on the Java UI thread; it
+    /// shows a moment later).
+    pub fn open(app: &AndroidApp, request: crate::typing::Request) -> TextMirror {
+        let shared = std::sync::Arc::new(std::sync::Mutex::new(MirrorShared { phase: MirrorPhase::Opening, seen: None, asks: 0 }));
+        let for_java = shared.clone();
+        let main = app.clone();
+        app.run_on_java_main_thread(Box::new(move || {
+            let mut state = lock(&for_java);
+            // Closed before it could open: nothing to add.
+            if !matches!(state.phase, MirrorPhase::Opening) {
+                return;
+            }
+            state.phase = match with_activity(&main, |env, activity| build_mirror(env, activity, &request)) {
+                Ok(edit) => {
+                    winit::platform::android::set_keys_to_views(true);
+                    MirrorPhase::Open(edit)
+                }
+                Err(e) => {
+                    log::warn!("showing the text view: {e}");
+                    MirrorPhase::Failed
+                }
+            };
+        }));
+        TextMirror { app: app.clone(), shared, checking: std::sync::Arc::default() }
+    }
+
+    /// How the view is doing; each call asks the Java UI thread to read it again, and its answer
+    /// shows on a later call.
+    pub fn poll(&self) -> crate::typing::MirrorPoll {
+        use crate::typing::MirrorPoll;
+        let seen = {
+            let state = lock(&self.shared);
+            match &state.phase {
+                MirrorPhase::Opening => return MirrorPoll::Opening,
+                MirrorPhase::Failed => return MirrorPoll::Failed,
+                MirrorPhase::Gone => return MirrorPoll::Gone,
+                MirrorPhase::Open(_) => state.seen.clone(),
+            }
+        };
+        if !self.checking.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            let shared = self.shared.clone();
+            let checking = self.checking.clone();
+            let main = self.app.clone();
+            self.app.run_on_java_main_thread(Box::new(move || {
+                let mut state = lock(&shared);
+                let ask = state.asks < KEYBOARD_ASKS;
+                let read = match &state.phase {
+                    MirrorPhase::Open(edit) => Some(with_activity(&main, |env, activity| read_mirror(env, activity, edit, ask))),
+                    _ => None,
+                };
+                match read {
+                    Some(Ok(Some(seen))) => {
+                        state.seen = Some(seen);
+                        state.asks = state.asks.saturating_add(u32::from(ask));
+                    }
+                    Some(Ok(None)) => {
+                        winit::platform::android::set_keys_to_views(false);
+                        state.phase = MirrorPhase::Gone;
+                    }
+                    Some(Err(e)) => {
+                        log::warn!("reading the text view: {e}");
+                        winit::platform::android::set_keys_to_views(false);
+                        // Out of the window too: left there, it would keep the keyboard from the
+                        // window that typing now falls back to.
+                        if let MirrorPhase::Open(edit) = std::mem::replace(&mut state.phase, MirrorPhase::Failed) {
+                            discard_mirror(&main, &edit);
+                        }
+                    }
+                    None => {}
+                }
+                checking.store(false, std::sync::atomic::Ordering::SeqCst);
+            }));
+        }
+        MirrorPoll::Open(seen)
+    }
+
+    /// Give the view the keyboard again (its field was tapped after the keyboard went, with Back
+    /// or the keyboard's own button).
+    pub fn show_keyboard(&self) {
+        let shared = self.shared.clone();
+        let main = self.app.clone();
+        self.app.run_on_java_main_thread(Box::new(move || {
+            let state = lock(&shared);
+            if let MirrorPhase::Open(edit) = &state.phase {
+                let shown = with_activity(&main, |env, activity| {
+                    env.call_method(edit, jni_str!("requestFocus"), jni_sig!("()Z"), &[])?;
+                    show_keyboard(env, activity, edit)
+                });
+                if let Err(e) = shown {
+                    log::warn!("showing the keyboard again: {e}");
+                }
+            }
+        }));
+    }
+
+    /// Select `start..end` (UTF-16 units) in the view.
+    pub fn select(&self, start: usize, end: usize) {
+        let shared = self.shared.clone();
+        let main = self.app.clone();
+        self.app.run_on_java_main_thread(Box::new(move || {
+            let state = lock(&shared);
+            if let MirrorPhase::Open(edit) = &state.phase
+                && let Err(e) = with_activity(&main, |env, _| select_mirror(env, edit, start, end))
+            {
+                log::warn!("selecting in the text view: {e}");
+            }
+        }));
+    }
+}
+
+impl Drop for TextMirror {
+    /// However typing ends, the keyboard goes, the view with it, and the window takes the keys
+    /// back at once.
+    fn drop(&mut self) {
+        let edit = {
+            let mut state = lock(&self.shared);
+            // Under the lock: a view still being built gives itself the keys when it is done, so
+            // they come back after that, not before.
+            winit::platform::android::set_keys_to_views(false);
+            match std::mem::replace(&mut state.phase, MirrorPhase::Gone) {
+                MirrorPhase::Open(edit) => Some(edit),
+                _ => None,
+            }
+        };
+        if let Some(edit) = edit {
+            let main = self.app.clone();
+            self.app.run_on_java_main_thread(Box::new(move || {
+                if let Err(e) = with_activity(&main, |env, activity| remove_mirror(env, activity, &edit)) {
+                    log::warn!("removing the text view: {e}");
+                }
+            }));
+        }
+    }
+}
+
+fn build_mirror(env: &mut Env, activity: &JObject, request: &crate::typing::Request) -> Jni<Global<JObject<'static>>> {
+    let edit = env.new_object(jni_str!("android/widget/EditText"), jni_sig!("(Landroid/content/Context;)V"), &[JValue::Object(activity)])?;
+    // Multi-line for every field: Enter arrives as a line break, which a one-line field takes as
+    // its Done (`typing`).
+    let kind = TYPE_CLASS_TEXT | TYPE_TEXT_FLAG_MULTI_LINE | TYPE_TEXT_FLAG_CAP_SENTENCES;
+    env.call_method(&edit, jni_str!("setInputType"), jni_sig!("(I)V"), &[JValue::Int(kind)])?;
+    let text = env.new_string(&request.text)?;
+    env.call_method(&edit, jni_str!("setText"), jni_sig!("(Ljava/lang/CharSequence;)V"), &[JValue::Object(&text)])?;
+    let end = i32::try_from(request.text.encode_utf16().count()).unwrap_or(0);
+    env.call_method(&edit, jni_str!("setSelection"), jni_sig!("(I)V"), &[JValue::Int(end)])?;
+    // Out of sight: a pixel, transparent, in the window's corner (the field shows the text).
+    env.call_method(&edit, jni_str!("setAlpha"), jni_sig!("(F)V"), &[JValue::Float(0.0)])?;
+    let params = env.new_object(jni_str!("android/view/ViewGroup$LayoutParams"), jni_sig!("(II)V"), &[JValue::Int(1), JValue::Int(1)])?;
+    env.call_method(
+        activity,
+        jni_str!("addContentView"),
+        jni_sig!("(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V"),
+        &[JValue::Object(&edit), JValue::Object(&params)],
+    )?;
+    let focused = (|| -> Jni<()> {
+        env.call_method(&edit, jni_str!("setFocusable"), jni_sig!("(Z)V"), &[JValue::Bool(true)])?;
+        env.call_method(&edit, jni_str!("setFocusableInTouchMode"), jni_sig!("(Z)V"), &[JValue::Bool(true)])?;
+        env.call_method(&edit, jni_str!("requestFocus"), jni_sig!("()Z"), &[])?;
+        show_keyboard(env, activity, &edit)
+    })();
+    if let Err(e) = focused {
+        // Added but not working: out of the window again, so it doesn't keep the keyboard.
+        env.exception_clear();
+        let _ = remove_mirror(env, activity, &edit);
+        return Err(e);
+    }
+    Ok(env.new_global_ref(&edit)?)
+}
+
+/// Take `edit` out of its window after a failure, as well as it goes (a Java exception may be
+/// pending from the call that failed).
+fn discard_mirror(app: &AndroidApp, edit: &JObject) {
+    let removed = with_activity(app, |env, activity| {
+        env.exception_clear();
+        remove_mirror(env, activity, edit)
+    });
+    if let Err(e) = removed {
+        log::warn!("removing the text view after a failure: {e}");
+    }
+}
+
+/// The input method manager.
+fn input_methods<'local>(env: &mut Env<'local>, activity: &JObject) -> Jni<JObject<'local>> {
+    let name = env.new_string(INPUT_METHOD_SERVICE)?;
+    Ok(env.call_method(activity, jni_str!("getSystemService"), jni_sig!("(Ljava/lang/String;)Ljava/lang/Object;"), &[JValue::Object(&name)])?.l()?)
+}
+
+/// Ask for the keyboard for `edit`.
+fn show_keyboard(env: &mut Env, activity: &JObject, edit: &JObject) -> Jni<()> {
+    let imm = input_methods(env, activity)?;
+    if !imm.is_null() {
+        env.call_method(&imm, jni_str!("showSoftInput"), jni_sig!("(Landroid/view/View;I)Z"), &[JValue::Object(edit), JValue::Int(0)])?;
+    }
+    Ok(())
+}
+
+/// What the view holds, or `None` once it is gone from its window. `ask` asks for the keyboard
+/// again (the first reads).
+fn read_mirror(env: &mut Env, activity: &JObject, edit: &JObject, ask: bool) -> Jni<Option<crate::typing::Seen>> {
+    if !env.call_method(edit, jni_str!("isAttachedToWindow"), jni_sig!("()Z"), &[])?.z()? {
+        return Ok(None);
+    }
+    let focused = env.call_method(edit, jni_str!("hasFocus"), jni_sig!("()Z"), &[])?.z()?;
+    if ask && focused {
+        show_keyboard(env, activity, edit)?;
+    }
+    let text = env.call_method(edit, jni_str!("getText"), jni_sig!("()Landroid/text/Editable;"), &[])?.l()?;
+    let text = string_of(env, &text)?.unwrap_or_default();
+    let start = env.call_method(edit, jni_str!("getSelectionStart"), jni_sig!("()I"), &[])?.i()?;
+    let end = env.call_method(edit, jni_str!("getSelectionEnd"), jni_sig!("()I"), &[])?.i()?;
+    // -1 (no selection) reads as past the end: the end of the text.
+    let units = |i: i32| usize::try_from(i).unwrap_or(usize::MAX);
+    let (start, end) = (units(start.min(end)), units(start.max(end)));
+    Ok(Some(crate::typing::Seen { text, start, end, focused }))
+}
+
+fn select_mirror(env: &mut Env, edit: &JObject, start: usize, end: usize) -> Jni<()> {
+    let length = env.call_method(edit, jni_str!("length"), jni_sig!("()I"), &[])?.i()?;
+    let at = |i: usize| i32::try_from(i).unwrap_or(i32::MAX).clamp(0, length.max(0));
+    env.call_method(edit, jni_str!("setSelection"), jni_sig!("(II)V"), &[JValue::Int(at(start)), JValue::Int(at(end))])?;
+    Ok(())
+}
+
+/// Put the keyboard away and take the view out of its window.
+fn remove_mirror(env: &mut Env, activity: &JObject, edit: &JObject) -> Jni<()> {
+    let imm = input_methods(env, activity)?;
+    let token = env.call_method(edit, jni_str!("getWindowToken"), jni_sig!("()Landroid/os/IBinder;"), &[])?.l()?;
+    if !imm.is_null() && !token.is_null() {
+        env.call_method(&imm, jni_str!("hideSoftInputFromWindow"), jni_sig!("(Landroid/os/IBinder;I)Z"), &[JValue::Object(&token), JValue::Int(0)])?;
+    }
+    let parent = env.call_method(edit, jni_str!("getParent"), jni_sig!("()Landroid/view/ViewParent;"), &[])?.l()?;
+    if !parent.is_null() {
+        env.call_method(&parent, jni_str!("removeView"), jni_sig!("(Landroid/view/View;)V"), &[JValue::Object(edit)])?;
+    }
+    Ok(())
+}
+
+/// `WindowManager.LayoutParams` flags: the window paints the system bars' backgrounds (in the
+/// colours it sets), and they aren't translucent.
+const FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS: i32 = i32::MIN; // 0x8000_0000
+const FLAG_TRANSLUCENT_STATUS: i32 = 0x0400_0000;
+const FLAG_TRANSLUCENT_NAVIGATION: i32 = 0x0800_0000;
+/// `View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR`, `SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR`: dark icons, for
+/// a light bar.
+const SYSTEM_UI_FLAG_LIGHT_STATUS_BAR: i32 = 0x2000;
+const SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR: i32 = 0x10;
+
+/// Paint the status bar `top` and the navigation bar `bottom` (the colours of the screen's top and
+/// bottom), each with icons that read on it. Android draws the bars; the window says in which
+/// colours.
+pub fn set_system_bars(app: &AndroidApp, top: [u8; 3], bottom: [u8; 3], failed: std::sync::Arc<std::sync::atomic::AtomicBool>) {
+    use crate::screen::is_light;
+    let main = app.clone();
+    app.run_on_java_main_thread(Box::new(move || {
+        let painted = with_activity(&main, |env, activity| {
+            let window = env.call_method(activity, jni_str!("getWindow"), jni_sig!("()Landroid/view/Window;"), &[])?.l()?;
+            if window.is_null() {
+                return Ok(());
+            }
+            let argb = |[r, g, b]: [u8; 3]| i32::from_be_bytes([0xff, r, g, b]);
+            env.call_method(
+                &window,
+                jni_str!("clearFlags"),
+                jni_sig!("(I)V"),
+                &[JValue::Int(FLAG_TRANSLUCENT_STATUS | FLAG_TRANSLUCENT_NAVIGATION)],
+            )?;
+            env.call_method(&window, jni_str!("addFlags"), jni_sig!("(I)V"), &[JValue::Int(FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)])?;
+            env.call_method(&window, jni_str!("setStatusBarColor"), jni_sig!("(I)V"), &[JValue::Int(argb(top))])?;
+            env.call_method(&window, jni_str!("setNavigationBarColor"), jni_sig!("(I)V"), &[JValue::Int(argb(bottom))])?;
+            let decor = env.call_method(&window, jni_str!("getDecorView"), jni_sig!("()Landroid/view/View;"), &[])?.l()?;
+            if !decor.is_null() {
+                let mut flags = env.call_method(&decor, jni_str!("getSystemUiVisibility"), jni_sig!("()I"), &[])?.i()?;
+                for (light, flag) in [(is_light(top), SYSTEM_UI_FLAG_LIGHT_STATUS_BAR), (is_light(bottom), SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR)] {
+                    flags = if light { flags | flag } else { flags & !flag };
+                }
+                env.call_method(&decor, jni_str!("setSystemUiVisibility"), jni_sig!("(I)V"), &[JValue::Int(flags)])?;
+            }
+            Ok(())
+        });
+        if let Err(e) = painted {
+            log::warn!("painting the system bars: {e}");
+            failed.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+    }));
 }
 
 /// Android 10 (API 29): `MediaStore.Downloads`, where an app adds files without a permission.

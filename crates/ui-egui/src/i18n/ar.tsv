@@ -2460,3 +2460,14 @@ file state	Open	مفتوح
 	{n} MB	{n} ميغابايت
 	{n} KB	{n} كيلوبايت
 decimal separator	.	.
+	Other folders…	مجلدات أخرى…
+	Looking for photos…	جارٍ البحث عن الصور…
+	See your photos	اعرض صورك
+	Allow PdfCraft to see your photos, and choose one here.	اسمح لـ PdfCraft برؤية صورك، واختر واحدة هنا.
+	No photos found.	لم يُعثر على صور.
+	PdfCraft shows the photos in Camera, Pictures and Download.	يعرض PdfCraft الصور الموجودة في الكاميرا والصور والتنزيلات.
+	Automatic	تلقائي
+	Dark mode	الوضع الداكن
+	Dark pages	صفحات داكنة
+	Light text on a dark page, for reading at night.	نص فاتح على صفحة داكنة، للقراءة ليلًا.
+	Night	ليلي

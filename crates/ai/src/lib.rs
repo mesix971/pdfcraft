@@ -181,9 +181,12 @@ impl Task {
     /// The instruction the model gets (kept with the answer for the next turn).
     pub fn prompt(&self) -> String {
         match self {
-            Self::Summarize => {
-                "Summarize this document: what it is, its main points, and anything it asks of the reader (dates, amounts, obligations).".into()
-            }
+            // Short, for a phone, and quicker to write: the user can ask for more.
+            Self::Summarize => concat!(
+                "Summarize this document briefly: one sentence on what it is, then at most five short \"- \" points with its main points ",
+                "and anything it asks of the reader (dates, amounts, obligations). Stay under 120 words."
+            )
+            .into(),
             Self::Ask(question) => question.trim().to_owned(),
             Self::Translate { page, language } => {
                 format!("Translate page {page} of this document into {language}. Reply with the translation only, keeping its paragraphs and lists.")
@@ -610,6 +613,8 @@ mod tests {
         assert_eq!(content[0]["title"], "report.pdf");
         assert_eq!(content[0]["cache_control"]["type"], "ephemeral");
         assert!(content[1]["text"].as_str().unwrap().starts_with("Summarize this document"));
+        // Short, for a phone (a long summary also takes long to write).
+        assert!(content[1]["text"].as_str().unwrap().contains("under 120 words"));
         // Thinking is left to the model (it can't be turned off on Opus 5.5), and nothing is prefilled.
         assert!(body.get("thinking").is_none());
     }

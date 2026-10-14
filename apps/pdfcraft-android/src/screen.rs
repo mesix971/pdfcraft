@@ -20,8 +20,25 @@ pub fn insets(content: [i32; 4], window: [i32; 2], points: [f32; 2]) -> [f32; 4]
     [left as f32 * sx, top as f32 * sy, (w - right) as f32 * sx, (h - bottom) as f32 * sy]
 }
 
+/// Whether white icons would be hard to read on `rgb` (so a system bar in that colour gets dark
+/// ones).
+pub fn is_light([r, g, b]: [u8; 3]) -> bool {
+    0.2126 * f32::from(r) + 0.7152 * f32::from(g) + 0.0722 * f32::from(b) > 0.6 * 255.0
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_bar_gets_icons_that_read_on_it() {
+        // Home's grounds and the bars' colours, light and dark.
+        assert!(super::is_light([0xf5, 0xf8, 0xf7]));
+        assert!(super::is_light([0xff, 0xff, 0xff]));
+        assert!(!super::is_light([0x0d, 0x11, 0x10]));
+        assert!(!super::is_light([0x26, 0x26, 0x2a]));
+        // The accent green takes white icons.
+        assert!(!super::is_light([0x0e, 0x7f, 0x6a]));
+    }
+
     use super::insets;
 
     #[test]

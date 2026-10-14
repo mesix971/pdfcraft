@@ -58,6 +58,10 @@ pub fn run(android: AndroidApp) {
             // Always the phone layout: it has every tool, and draws at the phone's own points.
             app.phone_screen = true;
         }
+        // Light or dark as the phone is, until the user chooses (Profile ▸ Appearance).
+        if !app.theme_chosen {
+            app.set_theme_preference(pdfcraft_ui_egui::theme::ThemePreference::System);
+        }
         app.file_browser_host = browser_host(&android);
         let clipboard = android.clone();
         app.clipboard_text = Some(Box::new(move || jvm::clipboard_text(&clipboard)));
@@ -69,7 +73,14 @@ pub fn run(android: AndroidApp) {
         }
         app.os_events = Some(launch_document(&android, &app, &cc.egui_ctx));
         app.reopen_last_files(&[]);
-        Ok(Box::new(Shell { app, android: android.clone(), typing: Default::default() }))
+        Ok(Box::new(Shell {
+            app,
+            android: android.clone(),
+            typing: Default::default(),
+            bars: None,
+            bars_failed: std::sync::Arc::default(),
+            bars_tries: 0,
+        }))
     });
     if let Err(e) = eframe::run_native("PdfCraft", options, creator) {
         log::error!("PdfCraft stopped: {e}");
@@ -131,10 +142,14 @@ fn browser_host(android: &AndroidApp) -> pdfcraft_ui_egui::file_browser::Host {
     }
     let granted = android.clone();
     let request = android.clone();
+    let photos = android.clone();
+    let ask_photos = android.clone();
     pdfcraft_ui_egui::file_browser::Host {
         places,
         access_granted: Some(Arc::new(move || jvm::storage_access(&granted))),
         request_access: Some(Arc::new(move || jvm::request_storage_access(&request))),
+        photos_granted: Some(Arc::new(move || jvm::photos_access(&photos))),
+        request_photos: Some(Arc::new(move || jvm::request_photos_access(&ask_photos))),
     }
 }
 
@@ -247,15 +262,42 @@ fn poll(receive: &Receiver<String>) -> Vec<OsEvent> {
 struct Shell {
     app: PdfCraftApp,
     android: AndroidApp,
-    /// Text entry through the system's text dialog (`typing`).
-    typing: crate::typing::Typing<jvm::TextDialog>,
+    /// Text entry through the system's text views (`typing`).
+    typing: crate::typing::Typing<jvm::TextDialog, jvm::TextMirror>,
+    /// The colours last given to the system's bars (status, navigation).
+    bars: Option<([u8; 3], [u8; 3])>,
+    /// A paint of the bars failed: they are painted again, a few times at most.
+    bars_failed: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    bars_tries: u8,
 }
 
-/// The system text dialog and the window's keyboard, for [`crate::typing`].
+/// The system's text views and the window's keyboard, for [`crate::typing`].
 struct TypingHost<'a>(&'a AndroidApp);
 
 impl crate::typing::Host for TypingHost<'_> {
     type Dialog = jvm::TextDialog;
+    type Mirror = jvm::TextMirror;
+
+    fn open_mirror(&mut self, request: crate::typing::Request) -> jvm::TextMirror {
+        jvm::TextMirror::open(self.0, request)
+    }
+
+    fn poll_mirror(&mut self, mirror: &jvm::TextMirror) -> crate::typing::MirrorPoll {
+        mirror.poll()
+    }
+
+    fn select_mirror(&mut self, mirror: &jvm::TextMirror, start: usize, end: usize) {
+        mirror.select(start, end);
+    }
+
+    fn reshow_mirror(&mut self, mirror: &jvm::TextMirror) {
+        mirror.show_keyboard();
+    }
+
+    fn close_mirror(&mut self, mirror: jvm::TextMirror) {
+        // Dropping it puts it away.
+        drop(mirror);
+    }
 
     fn open(&mut self, request: crate::typing::Request) -> jvm::TextDialog {
         let t = |s: &str| pdfcraft_ui_egui::i18n::t(s).to_owned();
@@ -339,8 +381,21 @@ impl eframe::App for Shell {
         if !reading && let Some(text) = &copied {
             jvm::set_clipboard_text(&self.android, text.clone());
         }
-        let dialog = !hardware_keyboard(&self.android);
-        self.typing.frame(&ctx, copied.filter(|_| reading), dialog, &mut TypingHost(&self.android));
+        // The system's bars in the colours of the screen's top and bottom, when they change.
+        let bars = self.app.phone_system_bars().map(|(top, bottom)| ([top.r(), top.g(), top.b()], [bottom.r(), bottom.g(), bottom.b()]));
+        // A paint that failed is tried again on a later frame (three tries for the same colours).
+        if self.bars_failed.swap(false, std::sync::atomic::Ordering::SeqCst) && self.bars_tries < 3 {
+            self.bars = None;
+        }
+        if let Some((top, bottom)) = bars
+            && self.bars != bars
+        {
+            self.bars_tries = if self.bars.is_none() { self.bars_tries.saturating_add(1) } else { 0 };
+            self.bars = bars;
+            jvm::set_system_bars(&self.android, top, bottom, self.bars_failed.clone());
+        }
+        let system_views = !hardware_keyboard(&self.android);
+        self.typing.frame(&ctx, copied.filter(|_| reading), system_views, &mut TypingHost(&self.android));
     }
 }
 

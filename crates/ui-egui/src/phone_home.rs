@@ -106,6 +106,8 @@ pub struct HomeState {
     name_draft: Option<String>,
     /// The assistant's settings screen is open (from Home: it needs no document).
     pub ai_settings: bool,
+    /// The grid of the device's photos is open, to choose the profile's (over the profile).
+    pub picking: bool,
     /// The profile photo as a texture (`None`: it doesn't read as one), and the PNG it was made from.
     photo: Option<(Arc<Vec<u8>>, Option<TextureHandle>)>,
     /// A chosen picture being made into the profile photo, on a worker thread.
@@ -118,13 +120,29 @@ pub struct HomeState {
     thumbs: Thumbs,
     #[cfg(not(target_arch = "wasm32"))]
     device: DeviceScan,
+    /// The device's photos and their tiles, while the photo grid shows (made when it first does).
+    #[cfg(not(target_arch = "wasm32"))]
+    photos: Option<(DeviceScan, Thumbs)>,
+    /// Whether PdfCraft may read the device's photos, and when that was last asked.
+    photos_access: Option<(f64, Option<bool>)>,
 }
 
 impl HomeState {
+    /// Close the photo grid, and let its photos and their tiles go.
+    fn leave_grid(&mut self) {
+        self.picking = false;
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.photos = None;
+        }
+    }
+
     /// Something of Home's is open over it (Back closes it first).
     pub(crate) fn back(&mut self) -> bool {
-        // The assistant's settings may be open over the profile.
-        if self.ai_settings {
+        // The photo grid and the assistant's settings open over the profile.
+        if self.picking {
+            self.leave_grid();
+        } else if self.ai_settings {
             self.ai_settings = false;
         } else if self.profile {
             self.profile = false;
@@ -170,6 +188,26 @@ impl PdfCraftApp {
             self.phone.home.thumbs.forget_failures();
         }
         self.phone.home.access = Some((now, known));
+        known
+    }
+
+    /// Whether PdfCraft may read the device's photos (`None`: it needs no permission), asked of
+    /// the system every second at most while the grid shows: the answer to the system's question
+    /// comes back on its own. Once it is allowed, the photos are looked for again.
+    fn home_photos_access(&mut self, now: f64) -> Option<bool> {
+        const RECHECK_SECS: f64 = 1.0;
+        if let Some((at, known)) = self.phone.home.photos_access
+            && now - at < RECHECK_SECS
+            && now >= at
+        {
+            return known;
+        }
+        let known = photos_access(self);
+        #[cfg(not(target_arch = "wasm32"))]
+        if known == Some(true) && self.phone.home.photos_access.is_some_and(|(_, was)| was == Some(false)) {
+            self.phone.home.photos = None;
+        }
+        self.phone.home.photos_access = Some((now, known));
         known
     }
 
@@ -264,7 +302,12 @@ pub(crate) fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui, screen: Rect, t: &T
         app.phone.home.device.poll();
         poll_photo(app, ui.ctx());
     }
-    // The assistant's settings may be open over the profile, which shows again after them.
+    // The photo grid and the assistant's settings open over the profile, which shows again after.
+    #[cfg(not(target_arch = "wasm32"))]
+    if app.phone.home.picking {
+        photo_grid(app, ui, screen, t);
+        return;
+    }
     #[cfg(not(target_arch = "wasm32"))]
     if app.phone.home.ai_settings {
         if crate::ai_ui::settings_page(app, ui, screen) {
@@ -546,13 +589,16 @@ fn avatar(ui: &egui::Ui, rect: Rect, photo: Option<&TextureHandle>, initials: &s
 /// The glow at the top of Home: the icon's green at the left and the mark's blue at the right,
 /// fading out downwards (eased, so it has no edge).
 fn glow(painter: &egui::Painter, body: Rect, t: &Tokens) {
-    const BANDS: u32 = 16;
+    const BANDS: u32 = 20;
     let strength = if t.dark() { 0.62 } else { 0.30 };
     let height = body.height().min(320.0);
     let mut mesh = egui::Mesh::default();
     for i in 0..=BANDS {
         let f = i as f32 / BANDS as f32;
-        let fade = (1.0 - f) * (1.0 - f) * strength;
+        // It rises from nothing over the first few points, so the status bar above (in the
+        // ground's colour) meets it without an edge, then fades out downwards.
+        let rise = (f / 0.12).min(1.0);
+        let fade = rise * (2.0 - rise) * (1.0 - f) * (1.0 - f) * strength;
         let y = body.top() + height * f;
         mesh.colored_vertex(pos2(body.left(), y), t.brand.gamma_multiply(fade));
         mesh.colored_vertex(pos2(body.right(), y), MARK_BLUE.gamma_multiply(fade * 0.85));
@@ -604,6 +650,72 @@ fn gradient_ring(painter: &egui::Painter, center: egui::Pos2, inner: f32, outer:
         }
     }
     painter.add(egui::Shape::mesh(mesh));
+}
+
+/// The colours of Home's top and bottom this frame (for the system's bars around them).
+pub(crate) fn system_bars(app: &PdfCraftApp, t: &Tokens) -> (Color32, Color32) {
+    let home = &app.phone.home;
+    if home.profile || home.picking || home.ai_settings {
+        (t.chrome, t.pasteboard)
+    } else {
+        let look = look(t);
+        (look.ground, look.surface)
+    }
+}
+
+/// A row of choices, one of them taken (the theme): the taken one in the accent.
+fn segmented(ui: &mut egui::Ui, choices: &[(&str, &str)], taken: usize, t: &Tokens) -> Option<usize> {
+    let look = look(t);
+    // The icon above its name, so a long name (Automatique, Automatisch) has the cell's width.
+    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 64.0), Sense::hover());
+    ui.painter().rect(rect, CornerRadius::same(14), look.surface, Stroke::new(1.0, look.edge), egui::StrokeKind::Inside);
+    let n = choices.len().max(1) as f32;
+    let w = rect.width() / n;
+    let mut chosen = None;
+    for (i, (icon, label)) in choices.iter().enumerate() {
+        let cell = Rect::from_min_size(pos2(rect.left() + w * i as f32, rect.top()), vec2(w, rect.height())).shrink(4.0);
+        let resp = ui.interact(cell, egui::Id::new(("phone-segment", *label)), Sense::click());
+        let on = i == taken;
+        resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::RadioButton, true, on, *label));
+        if on {
+            phone::vivid_tile(ui.painter(), cell, 10.0, t.accent);
+        } else {
+            theme::Press::track(ui, &resp).wash(ui, cell, 10, false);
+        }
+        let ink = if on { Color32::WHITE } else { t.text };
+        icons::paint(ui, Rect::from_center_size(pos2(cell.center().x, cell.top() + 18.0), Vec2::splat(20.0)), icon, 20.0, ink);
+        let mut job = egui::text::LayoutJob::simple_singleline((*label).to_owned(), theme::semibold(13.5), ink);
+        job.wrap = egui::text::TextWrapping::truncate_at_width((cell.width() - 8.0).max(0.0));
+        job.halign = egui::Align::Center;
+        let galley = ui.painter().layout_job(job);
+        ui.painter().galley(pos2(cell.center().x, cell.bottom() - 22.0), galley, ink);
+        if theme::hand(resp).clicked() {
+            chosen = Some(i);
+        }
+    }
+    chosen
+}
+
+/// An on/off row: a title and what it does, and a switch.
+fn switch_row(ui: &mut egui::Ui, title: &str, detail: &str, on: bool, t: &Tokens) -> egui::Response {
+    let width = ui.available_width();
+    let mut job = egui::text::LayoutJob::simple(detail.to_owned(), theme::regular(12.5), t.text_muted, (width - 72.0).max(0.0));
+    job.wrap.max_rows = 2;
+    let detail = ui.painter().layout_job(job);
+    let height = (detail.size().y + 34.0).max(TARGET);
+    let (rect, resp) = ui.allocate_exact_size(vec2(width, height), Sense::click());
+    resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Checkbox, true, on, title));
+    theme::Press::track(ui, &resp).wash(ui, rect, 10, false);
+    widgets::row_text(ui, pos2(rect.left(), rect.top() + 14.0), title, theme::medium(15.5), t.text, (width - 72.0).max(0.0));
+    ui.painter().galley(pos2(rect.left(), rect.top() + 26.0), detail, t.text_muted);
+    // The switch: a track, and a knob at the side it is on.
+    let track = Rect::from_center_size(pos2(rect.right() - 28.0, rect.center().y), vec2(46.0, 26.0));
+    // Off, a track dark enough for the white knob (and the track itself) to show on a light page.
+    let fill = if on { t.accent } else { t.text_faint };
+    ui.painter().rect_filled(track, CornerRadius::same(13), fill);
+    let knob = if on { track.right() - 13.0 } else { track.left() + 13.0 };
+    ui.painter().circle_filled(pos2(knob, track.center().y), 10.0, Color32::WHITE);
+    theme::hand(resp)
 }
 
 /// The first word of a name ("Ana Diaz" → "Ana").
@@ -697,6 +809,16 @@ fn tips(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
             ui.add_space(16.0);
             ui.spacing_mut().item_spacing.x = 12.0;
             for (id, icon, hue, title, text, action) in &cards {
+                // The whole card is its action; its button and ✕, drawn over it, keep theirs. It is
+                // laid out below, so it takes taps where it was last frame.
+                let card_key = egui::Id::new(("phone-tip-card", *id));
+                if let Some(was) = ui.data(|d| d.get_temp::<Rect>(card_key)) {
+                    let whole = ui.interact(was, card_key, Sense::click());
+                    whole.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, *title));
+                    if theme::hand(whole).clicked() {
+                        act = Some(*id);
+                    }
+                }
                 let card = egui::Frame::NONE
                     .fill(look.surface)
                     .stroke(Stroke::new(1.0, look.edge))
@@ -712,8 +834,15 @@ fn tips(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
                                 // Room for the ✕.
                                 ui.set_width(ui.available_width() - TARGET);
                                 ui.add_space(2.0);
-                                ui.add(egui::Label::new(egui::RichText::new(*title).font(theme::semibold(16.0)).color(t.text)).wrap());
-                                ui.add(egui::Label::new(egui::RichText::new(*text).font(theme::regular(13.5)).color(t.text_muted)).wrap());
+                                // Not selectable: a tap on the words is a tap on the card.
+                                ui.add(
+                                    egui::Label::new(egui::RichText::new(*title).font(theme::semibold(16.0)).color(t.text)).wrap().selectable(false),
+                                );
+                                ui.add(
+                                    egui::Label::new(egui::RichText::new(*text).font(theme::regular(13.5)).color(t.text_muted))
+                                        .wrap()
+                                        .selectable(false),
+                                );
                                 ui.add_space(4.0);
                                 let r = ui.add(
                                     egui::Button::new(egui::RichText::new(*action).font(theme::semibold(15.0)).color(t.accent_text))
@@ -730,6 +859,7 @@ fn tips(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
                             }
                         });
                     });
+                ui.data_mut(|d| d.insert_temp(card_key, card.response.rect));
                 // The tip's colour as a block at the card's left, as tall as the card came out.
                 let r = card.response.rect.shrink(8.0);
                 let panel = Rect::from_min_size(r.min, vec2(PANEL - 14.0, r.height()));
@@ -752,9 +882,10 @@ fn tips(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
 }
 
 /// A row that scrolls sideways (the tips, the quick actions) in Home's page, which scrolls up and
-/// down. egui gives a drag to the innermost scroll area, so a swipe up or down that starts on a
-/// row would move nothing: here a finger's swipe goes one way or the other, as its first few
-/// points say, and keeps going for a moment after it lifts, as a scroll area's does.
+/// down. egui gives a drag to the innermost scroll area, so the row doesn't drag itself: a swipe
+/// up or down goes to the page (its own scrolling, fling and all), and one sideways is read from
+/// the finger here and moves the row. Nothing is laid over the row's buttons, so taps stay
+/// theirs (a widget sensing drags over them took their taps on a touch screen).
 fn swipe_row<R>(ui: &mut egui::Ui, id: &str, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
     let source = egui::scroll_area::ScrollSource { drag: egui::scroll_area::DragScroll::Never, ..Default::default() };
     egui::ScrollArea::horizontal()
@@ -762,72 +893,75 @@ fn swipe_row<R>(ui: &mut egui::Ui, id: &str, add: impl FnOnce(&mut egui::Ui) -> 
         .auto_shrink([false, true])
         .scroll_source(source)
         .show(ui, |ui| {
-            // Under the row's contents: their taps are theirs, the drags are the swipe's.
             if ui.input(|i| i.has_touch_screen()) {
                 // The row's own: inside a scroll area `ui.id()` is the same for every row.
-                let key = egui::Id::new(("phone-swipe", id));
-                let drag = ui.interact(ui.clip_rect(), key, Sense::DRAG);
-                swipe(ui, &drag, key);
+                swipe(ui, ui.clip_rect(), egui::Id::new(("phone-swipe", id)));
             }
             add(ui)
         })
         .inner
 }
 
-/// A swipe in progress, or a fling after one.
+/// A finger on a row, or a fling after one.
 #[derive(Clone, Copy, Default)]
 struct Swipe {
+    /// The finger went down on the row and hasn't lifted.
+    tracking: bool,
     /// 0: sideways, 1: up and down; `None` until the finger has moved enough to tell.
     axis: Option<usize>,
     /// How far the finger has moved since it went down.
     moved: Vec2,
-    /// After it lifts: the speed along `fling`'s axis, slowing down.
+    /// After a sideways swipe: the row's speed, slowing down.
     speed: f32,
-    fling: usize,
 }
 
-/// Turn `drag` into scrolling: the row's sideways, the page's up and down (the row's scroll area
-/// takes the sideways part of a delta, its parent the rest).
-fn swipe(ui: &egui::Ui, drag: &egui::Response, key: egui::Id) {
+/// Move the row at `row` (the visible part of its scroll area) with a finger swiping sideways on
+/// it: the row's scroll area takes the sideways part of the delta given to it.
+fn swipe(ui: &egui::Ui, row: Rect, key: egui::Id) {
     // How far a finger moves before its direction counts, and the fling's slowing (a scroll
     // area's own figures).
     const DECIDE: f32 = 6.0;
     const FRICTION: f32 = 1000.0;
     const STOP: f32 = 20.0;
     let mut s: Swipe = ui.data(|d| d.get_temp(key)).unwrap_or_default();
-    let along = |axis: usize, amount: f32| {
-        let mut delta = Vec2::ZERO;
-        delta[axis] = amount;
-        ui.scroll_with_delta_animation(delta, egui::style::ScrollAnimation::none());
-    };
-    if drag.drag_started() {
-        s = Swipe::default();
+    let (pressed, origin, down, delta, velocity, dt) = ui.input(|i| {
+        (i.pointer.any_pressed(), i.pointer.press_origin(), i.pointer.primary_down(), i.pointer.delta(), i.pointer.velocity(), i.stable_dt)
+    });
+    let sideways = |amount: f32| ui.scroll_with_delta_animation(vec2(amount, 0.0), egui::style::ScrollAnimation::none());
+    if pressed {
+        // On the row itself, not on something drawn over it (a sheet, the "+").
+        let on_row = origin.is_some_and(|p| row.contains(p) && ui.ctx().layer_id_at(p) == Some(ui.layer_id()));
+        s = Swipe { tracking: on_row, ..Swipe::default() };
     }
-    if drag.dragged() {
-        let delta = ui.input(|i| i.pointer.delta());
+    if s.tracking && down {
         s.moved += delta;
         match s.axis {
-            Some(axis) => along(axis, delta[axis]),
+            Some(0) => sideways(delta.x),
+            Some(_) => {}
             None if s.moved.length() > DECIDE => {
-                let axis = if s.moved.x.abs() > s.moved.y.abs() { 0 } else { 1 };
+                let axis = usize::from(s.moved.x.abs() <= s.moved.y.abs());
                 s.axis = Some(axis);
                 // What moved before the direction was known goes that way too.
-                along(axis, s.moved[axis]);
+                if axis == 0 {
+                    sideways(s.moved.x);
+                }
             }
             None => {}
         }
-    } else if drag.drag_stopped() {
-        if let Some(axis) = s.axis.take() {
-            s.speed = ui.input(|i| i.pointer.velocity()[axis]);
-            s.fling = axis;
+    } else if s.tracking {
+        // Lifted: a sideways swipe carries on for a moment.
+        if s.axis == Some(0) && velocity.x.is_finite() {
+            s.speed = velocity.x;
         }
+        s.tracking = false;
+        s.axis = None;
     } else if s.speed != 0.0 {
-        let dt = ui.input(|i| i.stable_dt).min(0.1);
+        let dt = dt.min(0.1);
         if !s.speed.is_finite() || s.speed.abs() < STOP || FRICTION * dt > s.speed.abs() {
             s.speed = 0.0;
         } else {
             s.speed -= FRICTION * dt * s.speed.signum();
-            along(s.fling, s.speed * dt);
+            sideways(s.speed * dt);
             ui.ctx().request_repaint();
         }
     }
@@ -1490,6 +1624,8 @@ fn profile(app: &mut PdfCraftApp, ui: &mut egui::Ui, screen: Rect, t: &Tokens) {
     let mut choose = false;
     let mut remove = false;
     let mut run = None;
+    let mut theme_choice: Option<&'static str> = None;
+    let mut dark_pages: Option<bool> = None;
     #[cfg(not(target_arch = "wasm32"))]
     let mut ai = false;
     ui.scope_builder(egui::UiBuilder::new().max_rect(rest), |ui| {
@@ -1515,14 +1651,15 @@ fn profile(app: &mut PdfCraftApp, ui: &mut egui::Ui, screen: Rect, t: &Tokens) {
                     }
                     choose |= theme::hand(resp).clicked();
                     ui.add_space(8.0);
-                    ui.horizontal_wrapped(|ui| {
-                        if can_choose {
-                            choose |= ui.add_enabled(!making, egui::Button::new(tl!("Choose a photo"))).clicked();
-                        }
-                        if app.profile_photo.is_some() {
-                            remove = ui.add_enabled(!making, egui::Button::new(tl!("Remove the photo"))).clicked();
-                        }
-                    });
+                    if can_choose && !making {
+                        ui.add_space(4.0);
+                        choose |= pill(ui, "image", tl!("Choose a photo"), t).clicked();
+                    }
+                    if app.profile_photo.is_some() && !making {
+                        ui.add_space(2.0);
+                        let label = egui::RichText::new(tl!("Remove the photo")).font(theme::medium(14.5)).color(t.text_muted);
+                        remove = ui.add(egui::Button::new(label).frame(false).min_size(vec2(0.0, TARGET))).clicked();
+                    }
                 });
                 ui.add_space(18.0);
                 let l = ui.label(egui::RichText::new(tl!("Your name")).font(theme::semibold(14.0)));
@@ -1543,7 +1680,23 @@ fn profile(app: &mut PdfCraftApp, ui: &mut egui::Ui, screen: Rect, t: &Tokens) {
                     app.phone.home.name_draft = Some(name);
                 }
                 ui.label(egui::RichText::new(tl!("It shows on Home and signs your comments.")).small().color(t.text_muted));
-                ui.add_space(14.0);
+                ui.add_space(18.0);
+                ui.label(egui::RichText::new(tl!("Appearance")).font(theme::semibold(14.0)));
+                ui.add_space(6.0);
+                let choices = [("contrast", tl!("Automatic")), ("sun", tl!("Light")), ("moon", tl!("Dark"))];
+                let taken = match app.theme_preference {
+                    crate::theme::ThemePreference::System => 0,
+                    crate::theme::ThemePreference::Light => 1,
+                    crate::theme::ThemePreference::Dark => 2,
+                };
+                if let Some(i) = segmented(ui, &choices, taken, t) {
+                    theme_choice = Some(["view.theme.system", "view.theme.light", "view.theme.dark"].get(i).copied().unwrap_or("view.theme.system"));
+                }
+                ui.add_space(6.0);
+                if switch_row(ui, tl!("Dark pages"), tl!("Light text on a dark page, for reading at night."), app.dark_pages(), t).clicked() {
+                    dark_pages = Some(!app.dark_pages());
+                }
+                ui.add_space(8.0);
             });
             if phone::sheet_row(ui, "settings", &phone::command_label(app, "app.preferences"), true, None, t).clicked() {
                 run = Some("app.preferences");
@@ -1565,11 +1718,19 @@ fn profile(app: &mut PdfCraftApp, ui: &mut egui::Ui, screen: Rect, t: &Tokens) {
             });
         });
     });
+    // The grid of the device's photos, as phone apps choose one (the folders are a tap away there).
+    #[cfg(not(target_arch = "wasm32"))]
     if choose {
-        choose_photo(app);
+        app.phone.home.picking = true;
     }
     if remove {
         app.profile_photo = None;
+    }
+    if let Some(command) = theme_choice {
+        app.execute(command);
+    }
+    if let Some(on) = dark_pages {
+        app.set_dark_pages(on);
     }
     // The settings open over the profile, which Back shows again.
     #[cfg(not(target_arch = "wasm32"))]
@@ -1581,25 +1742,171 @@ fn profile(app: &mut PdfCraftApp, ui: &mut egui::Ui, screen: Rect, t: &Tokens) {
     }
 }
 
-/// Choose a picture for the profile: its centred square, made small on a worker thread (a
-/// phone's photo takes a moment to decode), is kept in the settings.
+/// Choose a picture for the profile in the file browser (the photo grid's "Other folders…").
+#[cfg(not(target_arch = "wasm32"))]
 fn choose_photo(app: &mut PdfCraftApp) {
-    #[cfg(not(target_arch = "wasm32"))]
+    let dialog = crate::file_dialog::AsyncFileDialog::new().add_filter(tl!("Pictures"), &["png", "jpg", "jpeg"]);
+    app.ask_one(crate::pickers::Ask::File(dialog), None, start_photo);
+}
+
+/// Make the picture at `path` the profile photo: its centred square, made small on a worker
+/// thread (a phone's photo takes a moment to decode), is kept in the settings.
+#[cfg(not(target_arch = "wasm32"))]
+fn start_photo(app: &mut PdfCraftApp, path: std::path::PathBuf) {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let spawned = std::thread::Builder::new().name("pdfcraft-photo".into()).spawn(move || {
+        let _ = tx.send(make_photo(&path));
+    });
+    match spawned {
+        Ok(_) => app.phone.home.photo_job = Some(rx),
+        Err(e) => app.notify(crate::i18n::fmt(tl!("Couldn't use this picture: {e}"), &[("e", &e.to_string())])),
+    }
+}
+
+/// The side of a photo's tile in the grid, in pixels.
+#[cfg(not(target_arch = "wasm32"))]
+const PHOTO_TILE_PX: u32 = 192;
+
+/// A photo's tile: its centred square, small, premultiplied as the previews are uploaded.
+#[cfg(not(target_arch = "wasm32"))]
+fn photo_tile(path: &str) -> Option<Pixels> {
+    use std::io::Read as _;
+    let limit = pdfcraft_engine::signature_image::MAX_PROFILE_SOURCE_BYTES;
+    let mut bytes = Vec::new();
+    std::fs::File::open(path).ok()?.take(limit as u64 + 1).read_to_end(&mut bytes).ok()?;
+    let (w, h, mut rgba) = pdfcraft_engine::signature_image::picture_thumbnail(&bytes, PHOTO_TILE_PX)?;
+    for [r, g, b, a] in rgba.as_chunks_mut::<4>().0 {
+        let alpha = u16::from(*a);
+        for c in [r, g, b] {
+            // At most 255 · 255 + 127 before dividing: a u16 holds it.
+            *c = ((u16::from(*c) * alpha + 127) / 255) as u8;
+        }
+    }
+    Some((w, h, rgba))
+}
+
+/// The folders the photo grid looks in: [PdfCraftApp::photo_folders], or the device's camera
+/// folder, Pictures and Download.
+#[cfg(not(target_arch = "wasm32"))]
+fn photo_roots(app: &PdfCraftApp) -> Vec<std::path::PathBuf> {
+    if !app.photo_folders.is_empty() {
+        return app.photo_folders.clone();
+    }
+    #[cfg(any(test, target_os = "android"))]
     {
-        let dialog = crate::file_dialog::AsyncFileDialog::new().add_filter(tl!("Pictures"), &["png", "jpg", "jpeg"]);
-        app.ask_one(crate::pickers::Ask::File(dialog), None, |app, path| {
-            let (tx, rx) = std::sync::mpsc::channel();
-            let spawned = std::thread::Builder::new().name("pdfcraft-photo".into()).spawn(move || {
-                let _ = tx.send(make_photo(&path));
-            });
-            match spawned {
-                Ok(_) => app.phone.home.photo_job = Some(rx),
-                Err(e) => app.notify(crate::i18n::fmt(tl!("Couldn't use this picture: {e}"), &[("e", &e.to_string())])),
+        use crate::file_browser::PlaceKind;
+        app.file_browser_host
+            .places
+            .iter()
+            .filter(|p| matches!(p.kind, PlaceKind::Storage))
+            .flat_map(|p| ["DCIM", "Pictures", "Download"].map(|f| p.path.join(f)))
+            .collect()
+    }
+    #[cfg(not(any(test, target_os = "android")))]
+    Vec::new()
+}
+
+/// The device's photos in a grid, newest first, to choose the profile's; the folders are a row
+/// away.
+#[cfg(not(target_arch = "wasm32"))]
+fn photo_grid(app: &mut PdfCraftApp, ui: &mut egui::Ui, screen: Rect, t: &Tokens) {
+    let top = Rect::from_min_size(screen.min, vec2(screen.width(), TOP_BAR));
+    if phone::top_bar_titled(ui, top, tl!("Choose a photo")) {
+        app.phone.home.leave_grid();
+        ui.ctx().request_repaint();
+        return;
+    }
+    let rest = Rect::from_min_max(pos2(screen.left(), top.bottom()), screen.max);
+    ui.painter().rect_filled(rest, CornerRadius::ZERO, look(t).ground);
+    let now = ui.input(|i| i.time);
+    let roots = photo_roots(app);
+    let access = app.home_photos_access(now);
+    let (scan, tiles) = app.phone.home.photos.get_or_insert_with(|| (DeviceScan::of(Wanted::Pictures), Thumbs::new(photo_tile)));
+    scan.poll();
+    scan.want(roots, ui.ctx());
+    tiles.poll(ui.ctx(), now);
+    tiles.begin_frame();
+    let scanning = scan.scanning();
+    let photos: Vec<(String, String)> = scan.files.iter().map(|f| (f.path.clone(), f.name.clone())).collect();
+    let mut chosen = None;
+    let mut browse = false;
+    let mut allow = false;
+    ui.scope_builder(egui::UiBuilder::new().max_rect(rest), |ui| {
+        egui::ScrollArea::vertical().id_salt("phone-photos").auto_shrink([false, false]).show(ui, |ui| {
+            ui.spacing_mut().item_spacing.y = 0.0;
+            browse = phone::sheet_row(ui, "folder-open", tl!("Other folders…"), true, None, t).clicked();
+            ui.add_space(6.0);
+            if photos.is_empty() {
+                let (title, text) = if scanning {
+                    (tl!("Looking for photos…"), "")
+                } else if access == Some(false) {
+                    (tl!("See your photos"), tl!("Allow PdfCraft to see your photos, and choose one here."))
+                } else {
+                    (tl!("No photos found."), tl!("PdfCraft shows the photos in Camera, Pictures and Download."))
+                };
+                egui::Frame::NONE.inner_margin(egui::Margin { left: 28, right: 28, top: 28, bottom: 8 }).show(ui, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.add(icons::image("image", 40.0, t.text_faint));
+                        ui.add_space(10.0);
+                        ui.label(egui::RichText::new(title).font(theme::semibold(15.5)).color(t.text));
+                        if !text.is_empty() {
+                            ui.add_space(4.0);
+                            ui.add(egui::Label::new(egui::RichText::new(text).color(t.text_muted)).wrap());
+                        }
+                        if access == Some(false) && !scanning {
+                            ui.add_space(16.0);
+                            allow = pill(ui, "image", tl!("Allow access"), t).clicked();
+                        }
+                    });
+                });
+                return;
+            }
+            // Three to a row, a hair apart, as phone galleries show them.
+            const GAP: f32 = 3.0;
+            let side = ((ui.available_width() - 2.0 * GAP) / 3.0).floor().max(1.0);
+            for row in photos.chunks(3) {
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = GAP;
+                    for (path, name) in row {
+                        let (cell, resp) = ui.allocate_exact_size(Vec2::splat(side), Sense::click());
+                        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, name));
+                        // Only the tiles on screen are made.
+                        let tile = if ui.is_rect_visible(cell) {
+                            app.phone.home.photos.as_mut().and_then(|(_, tiles)| tiles.get(path, now, ui.ctx()))
+                        } else {
+                            None
+                        };
+                        let press = theme::Press::track(ui, &resp);
+                        let body = cell.shrink(press.down * 3.0);
+                        match tile {
+                            Some(tex) => {
+                                egui::Image::new((tex.id(), body.size())).paint_at(ui, body);
+                            }
+                            None => {
+                                ui.painter().rect_filled(body, CornerRadius::ZERO, look(t).surface);
+                                icons::paint(ui, body, "image", 24.0, t.text_faint);
+                            }
+                        }
+                        if theme::hand(resp).clicked() {
+                            chosen = Some(path.clone());
+                        }
+                    }
+                });
+                ui.add_space(GAP);
             }
         });
+    });
+    if browse {
+        app.phone.home.leave_grid();
+        choose_photo(app);
     }
-    #[cfg(target_arch = "wasm32")]
-    let _ = app;
+    if allow {
+        ask_photos_access(app);
+    }
+    if let Some(path) = chosen {
+        app.phone.home.leave_grid();
+        start_photo(app, std::path::PathBuf::from(path));
+    }
 }
 
 /// Why a picture couldn't become the profile photo.
@@ -1683,6 +1990,28 @@ fn files_access(app: &PdfCraftApp) -> Option<bool> {
         let _ = app;
         None
     }
+}
+
+/// Whether PdfCraft may read the device's photos; None where it needs no permission.
+fn photos_access(app: &PdfCraftApp) -> Option<bool> {
+    #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+    return app.file_browser_host.photos_granted.as_ref().map(|granted| granted());
+    #[cfg(not(all(not(target_arch = "wasm32"), any(test, target_os = "android"))))]
+    {
+        let _ = app;
+        None
+    }
+}
+
+/// Ask for it: the system's own question.
+#[cfg(not(target_arch = "wasm32"))]
+fn ask_photos_access(app: &PdfCraftApp) {
+    #[cfg(any(test, target_os = "android"))]
+    if let Some(ask) = app.file_browser_host.request_photos.clone() {
+        ask();
+    }
+    #[cfg(not(any(test, target_os = "android")))]
+    let _ = app;
 }
 
 /// Show the system page where the user allows that access.
@@ -1798,10 +2127,12 @@ impl Shared {
     }
 }
 
-/// First-page previews of the rows on screen, made one after another on a worker thread.
+/// Previews of the rows on screen (a PDF's first page, a photo's tile), made one after another on
+/// a worker thread.
 #[cfg(not(target_arch = "wasm32"))]
-#[derive(Default)]
 struct Thumbs {
+    /// What makes a file's preview.
+    make: fn(&str) -> Option<Pixels>,
     ready: std::collections::HashMap<String, Thumb>,
     /// Queued or being made.
     asked: HashSet<String>,
@@ -1815,7 +2146,28 @@ struct Thumbs {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+impl Default for Thumbs {
+    /// PDFs' first pages.
+    fn default() -> Self {
+        Self::new(first_page)
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 impl Thumbs {
+    fn new(make: fn(&str) -> Option<Pixels>) -> Self {
+        Self {
+            make,
+            ready: std::collections::HashMap::new(),
+            asked: HashSet::new(),
+            shown: HashSet::new(),
+            frame: 0,
+            shared: None,
+            done: None,
+            failed: false,
+        }
+    }
+
     /// A new frame: files queued for rows no longer on screen leave the queue (scrolling past
     /// a hundred files doesn't render them all).
     fn begin_frame(&mut self) {
@@ -1868,8 +2220,8 @@ impl Thumbs {
             (None, false) => {
                 let shared = Arc::new(Shared::default());
                 let (outbox, done) = std::sync::mpsc::channel();
-                let (worker, wake) = (shared.clone(), ctx.clone());
-                let spawned = std::thread::Builder::new().name("pdfcraft-thumbs".into()).spawn(move || thumbs_worker(&worker, &outbox, &wake));
+                let (worker, wake, make) = (shared.clone(), ctx.clone(), self.make);
+                let spawned = std::thread::Builder::new().name("pdfcraft-thumbs".into()).spawn(move || thumbs_worker(&worker, &outbox, &wake, make));
                 if spawned.is_err() {
                     self.failed = true;
                     return self.ask(path, now, ctx);
@@ -1930,7 +2282,12 @@ impl Drop for Thumbs {
 
 /// The thumbnails' worker: the queue's files in turn, until Home goes.
 #[cfg(not(target_arch = "wasm32"))]
-fn thumbs_worker(shared: &Shared, outbox: &std::sync::mpsc::Sender<(String, Stamp, Option<Pixels>)>, ctx: &egui::Context) {
+fn thumbs_worker(
+    shared: &Shared,
+    outbox: &std::sync::mpsc::Sender<(String, Stamp, Option<Pixels>)>,
+    ctx: &egui::Context,
+    make: fn(&str) -> Option<Pixels>,
+) {
     let renders = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     loop {
         let path = {
@@ -1955,7 +2312,7 @@ fn thumbs_worker(shared: &Shared, outbox: &std::sync::mpsc::Sender<(String, Stam
         }
         // Looked at before the file is read: a change while it renders is seen next time.
         let stamp = stamp(&path);
-        let made = first_page_within(&path, &renders);
+        let made = made_within(make, &path, &renders);
         if outbox.send((path, stamp, made)).is_err() {
             return;
         }
@@ -1963,10 +2320,10 @@ fn thumbs_worker(shared: &Shared, outbox: &std::sync::mpsc::Sender<(String, Stam
     }
 }
 
-/// [`first_page`] on a thread of its own, given up on (the mark shows) after [`THUMB_TIMEOUT`].
-/// `renders` counts the threads still rendering.
+/// `make`'s preview of `path` on a thread of its own, given up on (the mark shows) after
+/// [`THUMB_TIMEOUT`]. `renders` counts the threads still rendering.
 #[cfg(not(target_arch = "wasm32"))]
-fn first_page_within(path: &str, renders: &Arc<std::sync::atomic::AtomicUsize>) -> Option<Pixels> {
+fn made_within(make: fn(&str) -> Option<Pixels>, path: &str, renders: &Arc<std::sync::atomic::AtomicUsize>) -> Option<Pixels> {
     /// Counts a render thread down when it ends, however it ends.
     struct Running(Arc<std::sync::atomic::AtomicUsize>);
     impl Drop for Running {
@@ -1980,7 +2337,7 @@ fn first_page_within(path: &str, renders: &Arc<std::sync::atomic::AtomicUsize>) 
     let owned = path.to_owned();
     let spawned = std::thread::Builder::new().name("pdfcraft-thumb".into()).spawn(move || {
         let _running = running;
-        let _ = tx.send(first_page(&owned));
+        let _ = tx.send(make(&owned));
     });
     // Not started: the closure (and the count with it) is dropped.
     spawned.ok()?;
@@ -2032,10 +2389,33 @@ struct DeviceFile {
     modified: Option<std::time::SystemTime>,
 }
 
-/// The device's PDFs, looked for on a worker thread.
+/// What a scan looks for.
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum Wanted {
+    #[default]
+    Pdfs,
+    /// The pictures a profile photo can be made from.
+    Pictures,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl Wanted {
+    /// Whether a file named `name` is one (by its extension).
+    fn matches(self, name: &str) -> bool {
+        let name = name.to_ascii_lowercase();
+        match self {
+            Self::Pdfs => name.ends_with(".pdf"),
+            Self::Pictures => [".jpg", ".jpeg", ".png"].iter().any(|e| name.ends_with(e)),
+        }
+    }
+}
+
+/// The device's PDFs (or pictures), looked for on a worker thread.
 #[cfg(not(target_arch = "wasm32"))]
 #[derive(Default)]
 struct DeviceScan {
+    wanted: Wanted,
     files: Vec<DeviceFile>,
     /// The scan under way, and the folders it looks in.
     running: Option<(std::sync::mpsc::Receiver<Vec<DeviceFile>>, Vec<std::path::PathBuf>)>,
@@ -2058,6 +2438,10 @@ const SCAN_FILES: usize = 500;
 
 #[cfg(not(target_arch = "wasm32"))]
 impl DeviceScan {
+    fn of(wanted: Wanted) -> Self {
+        Self { wanted, ..Self::default() }
+    }
+
     fn scanning(&self) -> bool {
         self.running.is_some()
     }
@@ -2072,9 +2456,9 @@ impl DeviceScan {
         }
         let (tx, rx) = std::sync::mpsc::channel();
         let ctx = ctx.clone();
-        let for_thread = roots.clone();
+        let (for_thread, wanted) = (roots.clone(), self.wanted);
         let spawned = std::thread::Builder::new().name("pdfcraft-scan".into()).spawn(move || {
-            let _ = tx.send(scan(&for_thread));
+            let _ = tx.send(scan(&for_thread, wanted));
             ctx.request_repaint();
         });
         match spawned {
@@ -2104,7 +2488,7 @@ impl DeviceScan {
 /// The PDFs in `roots` and the folders under them (not hidden ones), the newest
 /// [`SCAN_FILES`] of the first [`SCAN_SEEN`] found, newest first.
 #[cfg(not(target_arch = "wasm32"))]
-fn scan(roots: &[std::path::PathBuf]) -> Vec<DeviceFile> {
+fn scan(roots: &[std::path::PathBuf], wanted: Wanted) -> Vec<DeviceFile> {
     let mut files = Vec::new();
     let mut folders = 0usize;
     let mut stack: Vec<(std::path::PathBuf, usize)> = roots.iter().map(|r| (r.clone(), 0)).collect();
@@ -2131,7 +2515,7 @@ fn scan(roots: &[std::path::PathBuf]) -> Vec<DeviceFile> {
                 if depth < SCAN_DEPTH && stack.len() < SCAN_FOLDERS {
                     stack.push((entry.path(), depth + 1));
                 }
-            } else if files.len() < SCAN_SEEN && name.to_ascii_lowercase().ends_with(".pdf") {
+            } else if files.len() < SCAN_SEEN && wanted.matches(&name) {
                 let meta = entry.metadata().ok();
                 files.push(DeviceFile {
                     path: entry.path().to_string_lossy().into_owned(),
@@ -2169,11 +2553,11 @@ mod tests {
         std::fs::write(dir.join("Sub/Deeper/b.PDF"), b"%PDF-1.7").unwrap();
         std::fs::write(dir.join(".hidden/c.pdf"), b"%PDF-1.7").unwrap();
         std::fs::write(dir.join("notes.txt"), b"x").unwrap();
-        let mut names: Vec<String> = scan(std::slice::from_ref(&dir)).into_iter().map(|f| f.name).collect();
+        let mut names: Vec<String> = scan(std::slice::from_ref(&dir), Wanted::Pdfs).into_iter().map(|f| f.name).collect();
         names.sort();
         assert_eq!(names, ["a.pdf", "b.PDF"]);
         // The same folder twice is read once.
-        assert_eq!(scan(&[dir.clone(), dir.clone()]).len(), 2);
+        assert_eq!(scan(&[dir.clone(), dir.clone()], Wanted::Pdfs).len(), 2);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -2237,6 +2621,27 @@ mod tests {
         assert!(thumbs.get("/failed.pdf", 1.0, &ctx).is_none());
         assert!(thumbs.asked.contains("/failed.pdf"));
         assert!(thumbs.get("/shown.pdf", 1.0, &ctx).is_some());
+    }
+
+    /// The photos are asked for with the system's question; once the answer is yes, the grid looks
+    /// for them again (they couldn't be read before).
+    #[test]
+    fn allowing_the_photos_looks_for_them_again() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let allowed = Arc::new(AtomicBool::new(false));
+        let asked = Arc::new(AtomicBool::new(false));
+        let mut app = PdfCraftApp::new();
+        let (a, q) = (allowed.clone(), asked.clone());
+        app.file_browser_host.photos_granted = Some(Arc::new(move || a.load(Ordering::SeqCst)));
+        app.file_browser_host.request_photos = Some(Arc::new(move || q.store(true, Ordering::SeqCst)));
+        assert_eq!(app.home_photos_access(0.0), Some(false));
+        app.phone.home.photos = Some((DeviceScan::of(Wanted::Pictures), Thumbs::new(photo_tile)));
+        ask_photos_access(&app);
+        assert!(asked.load(Ordering::SeqCst), "the system's question");
+        allowed.store(true, Ordering::SeqCst);
+        assert_eq!(app.home_photos_access(0.5), Some(false), "not asked again within a second");
+        assert_eq!(app.home_photos_access(1.5), Some(true));
+        assert!(app.phone.home.photos.is_none(), "looked for again");
     }
 
     /// Previews queued for rows scrolled away leave the queue.
