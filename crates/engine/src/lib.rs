@@ -36,6 +36,8 @@ mod text_preview;
 mod upright_image;
 pub mod xfa;
 
+/// A document's reading flow (the phone's reading mode).
+pub use pdfcraft_export::{Flow, heading_level, page_flow};
 pub use signature_image::{ImageSignaturePreview, SignatureImage};
 pub use signature_scan::{PhotoRect, ScanError, SignaturePhoto, Turn};
 pub use text_preview::TextEditPreview;

@@ -155,56 +155,58 @@ impl crate::Document {
     /// The pages as paragraphs and images (for Word, HTML and RTF export), including what
     /// form XObjects draw.
     pub fn export_pages(&self) -> Vec<pdfcraft_export::Page> {
-        let Some(cos) = self.editor.as_ref().map(|e| &e.cos) else { return Vec::new() };
-        self.info
-            .pages
-            .iter()
-            .enumerate()
-            .map(|(i, info)| {
-                // Export uses the visible page in points, y up. Raw PDF coordinates include
-                // CropBox offsets and precede /Rotate and /UserUnit.
-                let visible_rect = |r: [f64; 4]| {
-                    let a = info.user_to_view(r[0] as f32, r[1] as f32);
-                    let b = info.user_to_view(r[2] as f32, r[3] as f32);
-                    [a[0].min(b[0]) as f64, (info.height - a[1].max(b[1])) as f64, a[0].max(b[0]) as f64, (info.height - a[1].min(b[1])) as f64]
-                };
-                let crop_width = f64::from(info.crop[2] - info.crop[0]);
-                let display_width = f64::from(if info.rotation % 180 == 0 { info.width } else { info.height });
-                let unit = if crop_width > 0.0 && crop_width.is_finite() && display_width.is_finite() { display_width / crop_width } else { 1.0 };
-                let blocks = pdfcraft_edit::reading_blocks(cos, i)
-                    .unwrap_or_default()
-                    .into_iter()
-                    .filter(|b| !b.text.trim().is_empty())
-                    .map(|b| {
-                        let f = b.base_font.to_ascii_lowercase();
-                        pdfcraft_export::Block {
-                            text: b.text,
-                            rect: visible_rect(b.rect),
-                            size: b.size * unit,
-                            bold: f.contains("bold") || f.contains("black") || f.contains("heavy"),
-                            italic: f.contains("italic") || f.contains("oblique"),
-                            color: b.color,
-                            rotation: b.rotation - f64::from(info.rotation),
-                        }
+        (0..self.info.pages.len()).filter_map(|i| self.export_page(i)).collect()
+    }
+
+    /// Page `i` as paragraphs and images (a reading view takes the pages one at a time), or
+    /// `None` past the last page or without a parsed document.
+    pub fn export_page(&self, i: usize) -> Option<pdfcraft_export::Page> {
+        let cos = self.editor.as_ref().map(|e| &e.cos)?;
+        let info = self.info.pages.get(i)?;
+        Some({
+            // Export uses the visible page in points, y up. Raw PDF coordinates include
+            // CropBox offsets and precede /Rotate and /UserUnit.
+            let visible_rect = |r: [f64; 4]| {
+                let a = info.user_to_view(r[0] as f32, r[1] as f32);
+                let b = info.user_to_view(r[2] as f32, r[3] as f32);
+                [a[0].min(b[0]) as f64, (info.height - a[1].max(b[1])) as f64, a[0].max(b[0]) as f64, (info.height - a[1].min(b[1])) as f64]
+            };
+            let crop_width = f64::from(info.crop[2] - info.crop[0]);
+            let display_width = f64::from(if info.rotation % 180 == 0 { info.width } else { info.height });
+            let unit = if crop_width > 0.0 && crop_width.is_finite() && display_width.is_finite() { display_width / crop_width } else { 1.0 };
+            let blocks = pdfcraft_edit::reading_blocks(cos, i)
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|b| !b.text.trim().is_empty())
+                .map(|b| {
+                    let f = b.base_font.to_ascii_lowercase();
+                    pdfcraft_export::Block {
+                        text: b.text,
+                        rect: visible_rect(b.rect),
+                        size: b.size * unit,
+                        bold: f.contains("bold") || f.contains("black") || f.contains("heavy"),
+                        italic: f.contains("italic") || f.contains("oblique"),
+                        color: b.color,
+                        rotation: b.rotation - f64::from(info.rotation),
+                    }
+                })
+                .collect();
+            let images = pdfcraft_edit::reading_images(cos, i)
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|im| {
+                    let (ext, bytes) = pdfcraft_create::image_file(cos, im.object?).ok()?;
+                    Some(pdfcraft_export::Image {
+                        ext: if ext == "jpg" { "jpg" } else { "png" },
+                        bytes,
+                        rect: visible_rect(im.rect),
+                        size: [im.matrix[0].hypot(im.matrix[1]) * unit, im.matrix[2].hypot(im.matrix[3]) * unit],
+                        rotation: im.matrix[1].atan2(im.matrix[0]).to_degrees() - f64::from(info.rotation),
                     })
-                    .collect();
-                let images = pdfcraft_edit::reading_images(cos, i)
-                    .unwrap_or_default()
-                    .iter()
-                    .filter_map(|im| {
-                        let (ext, bytes) = pdfcraft_create::image_file(cos, im.object?).ok()?;
-                        Some(pdfcraft_export::Image {
-                            ext: if ext == "jpg" { "jpg" } else { "png" },
-                            bytes,
-                            rect: visible_rect(im.rect),
-                            size: [im.matrix[0].hypot(im.matrix[1]) * unit, im.matrix[2].hypot(im.matrix[3]) * unit],
-                            rotation: im.matrix[1].atan2(im.matrix[0]).to_degrees() - f64::from(info.rotation),
-                        })
-                    })
-                    .collect();
-                pdfcraft_export::Page { width: info.width as f64, height: info.height as f64, blocks, images }
-            })
-            .collect()
+                })
+                .collect();
+            pdfcraft_export::Page { width: info.width as f64, height: info.height as f64, blocks, images }
+        })
     }
 
     /// The document as a Word, PowerPoint, HTML or RTF file.

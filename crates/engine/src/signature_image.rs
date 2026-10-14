@@ -142,6 +142,16 @@ pub fn picture_thumbnail(bytes: &[u8], side: u32) -> Option<(usize, usize, Vec<u
     Some((w, h, small.into_raw()))
 }
 
+/// The PNG or JPEG in `bytes`, upright and at most `side` pixels on its longer side (width,
+/// height and RGBA, not premultiplied): a document's picture in a reading view. `None` for
+/// anything that isn't one, or is beyond the decoder's limits.
+pub fn picture_fitted(bytes: &[u8], side: u32) -> Option<(usize, usize, Vec<u8>)> {
+    let image = decode_limited(bytes, MAX_PROFILE_SOURCE_BYTES).ok()?;
+    let small = image.thumbnail(side.max(1), side.max(1)).into_rgba8();
+    let (w, h) = (usize::try_from(small.width()).ok()?, usize::try_from(small.height()).ok()?);
+    Some((w, h, small.into_raw()))
+}
+
 /// The centred square of the PNG or JPEG in `bytes` (upright, as its orientation says), made
 /// `side` pixels at most.
 fn centred_square(bytes: &[u8], side: u32) -> Result<image::RgbaImage, SignatureImageError> {
@@ -331,6 +341,9 @@ mod tests {
         assert!(tile.as_chunks::<4>().0.iter().all(|p| *p == [0, 255, 0, 255]));
         assert_eq!(picture_thumbnail(b"not a picture", 96), None);
         assert_eq!(picture_thumbnail(source.get_ref(), 0).map(|(w, h, _)| (w, h)), Some((1, 1)), "a side of 0 is one pixel");
+        // A reading view's picture keeps its shape.
+        assert_eq!(picture_fitted(source.get_ref(), 300).map(|(w, h, _)| (w, h)), Some((300, 100)));
+        assert_eq!(picture_fitted(b"not a picture", 300), None);
     }
 
     /// A 300 x 400 page shown turned `rotation` degrees clockwise.
