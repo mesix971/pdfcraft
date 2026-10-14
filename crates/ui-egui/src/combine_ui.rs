@@ -3,6 +3,9 @@
 //! being combined. Rows are selected like files in a file manager (click, Ctrl/⌘+click,
 //! Shift+click), moved with the toolbar, the keyboard or by dragging, and sorted by clicking a
 //! column heading; PDFs dropped on the tab join the list. Every change to the list can be undone.
+//! The phone layout has a list of its own ([`phone`]).
+
+pub(crate) mod phone;
 
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap};
@@ -914,8 +917,8 @@ fn skip_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
         left_out.push((f.name.as_str(), f.problem.as_deref().unwrap_or_default()));
     }
     let mut choice: Option<bool> = None;
-    let modal = egui::Modal::new(egui::Id::new("combine-skip")).show(ctx, |ui| {
-        ui.set_width(460.0);
+    let modal = widgets::show_modal(ctx, "combine-skip", |ui| {
+        widgets::set_dialog_width(ui, 460.0);
         ui.horizontal(|ui| {
             ui.add(icons::image("triangle-alert", 22.0, ERROR));
             ui.add(egui::Label::new(egui::RichText::new(tl!("Leave out files that can't be read?")).font(theme::semibold(16.0))).wrap());
@@ -934,7 +937,7 @@ fn skip_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
             ui.label(egui::RichText::new(crate::i18n::fmt(tl!("and {n} more"), &[("n", &more)])).color(t.text_muted));
         }
         ui.add_space(14.0);
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        widgets::buttons_row(ui, |ui| {
             if widgets::pill_button(ui, tl!("Combine the rest"), true).clicked() {
                 choice = Some(true);
             }
@@ -973,7 +976,7 @@ fn unlock_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
     let (mut submit, mut cancel) = (false, false);
     let area = egui::Area::new(egui::Id::new("combine-unlock")).order(egui::Order::Foreground).fixed_pos(prompt.at).show(ctx, |ui| {
         egui::Frame::popup(ui.style()).inner_margin(egui::Margin::same(14)).show(ui, |ui| {
-            ui.set_width(340.0);
+            ui.set_width(340.0_f32.min(ctx.content_rect().width() - 56.0).max(200.0));
             ui.horizontal(|ui| {
                 ui.add(icons::image("lock", 16.0, t.icon));
                 ui.add(egui::Label::new(egui::RichText::new(&title).font(theme::semibold(14.0))).truncate());
@@ -986,7 +989,12 @@ fn unlock_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 crate::widgets::begin_dialog(ui);
-                let field = ui.add(crate::widgets::line(&mut prompt.input.0).password(!prompt.show).hint_text(tl!("Password")).desired_width(290.0));
+                let field = ui.add(
+                    crate::widgets::line(&mut prompt.input.0)
+                        .password(!prompt.show)
+                        .hint_text(tl!("Password"))
+                        .desired_width((ui.available_width() - 36.0).clamp(120.0, 290.0)),
+                );
                 if !prompt.focused {
                     field.request_focus();
                     prompt.focused = true;

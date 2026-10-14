@@ -33,10 +33,10 @@ impl ReadingColors {
     /// Yellow text on a black page.
     pub const YELLOW_ON_BLACK: Self =
         Self { params: Some(ReadingParams { text: [0xff, 0xff, 0x00], background: [0x00, 0x00, 0x00], only_black: false, line_art: true }) };
-    /// Light grey text on a dark grey page: for reading in the dark, softer on the eyes than white
-    /// on black (the phone's "Dark pages").
+    /// Light grey text on a black page: for reading in the dark, softer on the eyes than white on
+    /// black, and the page's pixels off on an OLED screen (the phone's "Dark pages").
     pub const NIGHT: Self =
-        Self { params: Some(ReadingParams { text: [0xe3, 0xe3, 0xe3], background: [0x1c, 0x1c, 0x1e], only_black: false, line_art: true }) };
+        Self { params: Some(ReadingParams { text: [0xd8, 0xd8, 0xd8], background: [0x00, 0x00, 0x00], only_black: false, line_art: true }) };
     /// Green text on a black page.
     pub const GREEN_ON_BLACK: Self =
         Self { params: Some(ReadingParams { text: [0x00, 0xff, 0x00], background: [0x00, 0x00, 0x00], only_black: false, line_art: true }) };
@@ -165,7 +165,7 @@ mod tests {
             ("white-on-black", "#ffffff", "#000000"),
             ("yellow-on-black", "#ffff00", "#000000"),
             ("green-on-black", "#00ff00", "#000000"),
-            ("night", "#e3e3e3", "#1c1c1e"),
+            ("night", "#d8d8d8", "#000000"),
         ] {
             let colors = ReadingColors::parse(mode, None, None, None, None).unwrap();
             assert_eq!(colors.mode_name(), mode, "{mode}");

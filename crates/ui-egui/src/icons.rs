@@ -16,6 +16,12 @@ fn white_icons() -> &'static SvgIconSet {
     MAP.get_or_init(|| SvgIconSet::new(ICONS, SvgStyle { current_color: "#ffffff", stroke_width: Some("1.75") }, "bytes://icons/", "square"))
 }
 
+/// The same icons drawn bolder, for a white glyph on a coloured tile (the phone's tools).
+fn bold_icons() -> &'static SvgIconSet {
+    static MAP: OnceLock<SvgIconSet> = OnceLock::new();
+    MAP.get_or_init(|| SvgIconSet::new(ICONS, SvgStyle { current_color: "#ffffff", stroke_width: Some("2.25") }, "bytes://icons-bold/", "square"))
+}
+
 pub fn exists(name: &str) -> bool {
     white_icons().contains(name)
 }
@@ -31,6 +37,13 @@ pub fn image(name: &str, size: f32, tint: Color32) -> egui::Image<'static> {
 
 pub fn paint(ui: &egui::Ui, rect: Rect, name: &str, size: f32, tint: Color32) {
     image(name, size, tint).paint_at(ui, Rect::from_center_size(rect.center(), Vec2::splat(size)));
+}
+
+/// [`paint`] with a bolder stroke.
+pub fn paint_bold(ui: &egui::Ui, rect: Rect, name: &str, size: f32, tint: Color32) {
+    let set = bold_icons();
+    let source = set.source(set.canonical_name(name).unwrap_or("square"));
+    egui::Image::new(source).fit_to_exact_size(Vec2::splat(size)).tint(tint).paint_at(ui, Rect::from_center_size(rect.center(), Vec2::splat(size)));
 }
 
 /// Square icon button: transparent until hovered; `selected` gets the accent treatment.

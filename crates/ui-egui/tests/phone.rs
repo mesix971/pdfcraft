@@ -1045,7 +1045,7 @@ fn the_readers_menu_switches_dark_mode_and_dark_pages() {
 }
 
 /// The system's bars take the colours of the screen's top and bottom: Home's ground and tab bar,
-/// the reader's bars (the page's surround when they hide), dark in the dark theme.
+/// the reader's bars (the page's surround when they hide), true black in the dark theme.
 #[test]
 fn the_system_bars_follow_the_screen() {
     use pdfcraft_ui_egui::theme::{ThemeKind, Tokens};
@@ -1062,8 +1062,15 @@ fn the_system_bars_follow_the_screen() {
     assert_eq!(h.state().phone_system_bars(), Some((light.chrome, light.pasteboard)), "a screen with a top bar");
     h.state_mut().set_option("theme", "dark").unwrap();
     h.run_steps(3);
-    let dark = Tokens::for_kind(ThemeKind::Dark);
-    assert_eq!(h.state().phone_system_bars(), Some((dark.chrome, dark.pasteboard)), "dark in the dark theme");
+    // True black on a phone (an OLED screen's pixels off): the bars, and the ground under them.
+    assert_eq!(h.state().phone_system_bars(), Some((egui::Color32::BLACK, egui::Color32::BLACK)), "true black in the dark theme");
+    assert_eq!(pdfcraft_ui_egui::theme::Tokens::get(&h.ctx).pasteboard, egui::Color32::BLACK, "the area behind the pages too");
+    click(&mut h, "Back");
+    assert_eq!(h.state().phone_system_bars(), Some((egui::Color32::BLACK, egui::Color32::BLACK)), "Home's ground and tab bar");
+    // The desktop keeps its dark greys (black there is harsher, and saves nothing).
+    h.state_mut().set_option("shell", "auto").unwrap();
+    h.run_steps(3);
+    assert_eq!(pdfcraft_ui_egui::theme::Tokens::get(&h.ctx).pasteboard, Tokens::for_kind(ThemeKind::Dark).pasteboard);
 }
 
 /// Settings from before the choice was kept: a theme other than the system's was the user's

@@ -29,18 +29,23 @@ const ROW: f32 = 78.0;
 const THUMB: Vec2 = vec2(46.0, 60.0);
 
 /// Home's own surfaces: a deeper ground than the rest of the app (its glow shows on it), cards
-/// a step up from it, and their edges.
-struct Look {
-    ground: Color32,
-    surface: Color32,
-    edge: Color32,
+/// a step up from it, and their edges. The phone's other full screens (the file browser, Combine)
+/// share them.
+pub(crate) struct Look {
+    pub(crate) ground: Color32,
+    pub(crate) surface: Color32,
+    pub(crate) edge: Color32,
+    /// The bars along the bottom (the tab bar, a screen's actions): the surfaces' white in the
+    /// light theme, the ground's black in the dark one, an edge above them.
+    pub(crate) bar: Color32,
 }
 
-fn look(t: &Tokens) -> Look {
+pub(crate) fn look(t: &Tokens) -> Look {
     if t.dark() {
-        Look { ground: Color32::from_rgb(0x0D, 0x11, 0x10), surface: Color32::from_rgb(0x17, 0x1D, 0x1B), edge: Color32::from_rgb(0x28, 0x31, 0x2E) }
+        // True black ground (a phone's OLED pixels off), surfaces a step above it.
+        Look { ground: Color32::BLACK, surface: Color32::from_rgb(0x13, 0x15, 0x15), edge: Color32::from_rgb(0x25, 0x29, 0x28), bar: Color32::BLACK }
     } else {
-        Look { ground: Color32::from_rgb(0xF5, 0xF8, 0xF7), surface: Color32::WHITE, edge: Color32::from_rgb(0xE0, 0xE6, 0xE4) }
+        Look { ground: Color32::from_rgb(0xF5, 0xF8, 0xF7), surface: Color32::WHITE, edge: Color32::from_rgb(0xE0, 0xE6, 0xE4), bar: Color32::WHITE }
     }
 }
 
@@ -170,7 +175,7 @@ impl PdfCraftApp {
     /// Whether PdfCraft may read the device's files (`None`: it needs no permission), asked of the
     /// system every few seconds at most. When it becomes allowed, the device's PDFs are looked
     /// for again.
-    fn home_files_access(&mut self, now: f64) -> Option<bool> {
+    pub(crate) fn home_files_access(&mut self, now: f64) -> Option<bool> {
         const RECHECK_SECS: f64 = 3.0;
         if let Some((at, known)) = self.phone.home.access
             && now - at < RECHECK_SECS
@@ -239,6 +244,24 @@ impl PdfCraftApp {
         return self.phone.home.device.files.iter().map(|f| f.path.clone()).collect();
         #[cfg(target_arch = "wasm32")]
         Vec::new()
+    }
+
+    /// Look for the device's PDFs (as Home's "On this device" does) unless a look is under way or
+    /// recent, and take what the last one found. Returns whether one is under way.
+    #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+    pub(crate) fn look_for_device_pdfs(&mut self, ctx: &egui::Context) -> bool {
+        let now = ctx.input(|i| i.time);
+        self.home_files_access(now);
+        self.phone.home.device.poll();
+        let roots = scan_roots(self);
+        self.phone.home.device.want(roots, ctx);
+        self.phone.home.device.scanning()
+    }
+
+    /// The PDFs the last look found, newest first.
+    #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+    pub(crate) fn device_pdfs(&self) -> &[DeviceFile] {
+        &self.phone.home.device.files
     }
 
     /// Run `then` on a document: one of the open ones, or a file to open (the Pick sheet asks
@@ -612,7 +635,7 @@ fn glow(painter: &egui::Painter, body: Rect, t: &Tokens) {
 }
 
 /// A disc shaded from `from` (top left) to `to` (bottom right).
-fn gradient_disc(painter: &egui::Painter, center: egui::Pos2, radius: f32, from: Color32, to: Color32) {
+pub(crate) fn gradient_disc(painter: &egui::Painter, center: egui::Pos2, radius: f32, from: Color32, to: Color32) {
     const STEPS: u32 = 48;
     let mut mesh = egui::Mesh::default();
     let shade = |p: egui::Pos2| {
@@ -659,7 +682,7 @@ pub(crate) fn system_bars(app: &PdfCraftApp, t: &Tokens) -> (Color32, Color32) {
         (t.chrome, t.pasteboard)
     } else {
         let look = look(t);
-        (look.ground, look.surface)
+        (look.ground, look.bar)
     }
 }
 
@@ -863,8 +886,8 @@ fn tips(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
                 // The tip's colour as a block at the card's left, as tall as the card came out.
                 let r = card.response.rect.shrink(8.0);
                 let panel = Rect::from_min_size(r.min, vec2(PANEL - 14.0, r.height()));
-                phone::vivid_tile(ui.painter(), panel, 13.0, *hue);
-                icons::paint(ui, panel, icon, 32.0, Color32::WHITE);
+                phone::glowing_tile(ui.painter(), panel, 13.0, *hue, t);
+                phone::tile_glyph(ui, panel, icon, 32.0);
             }
             ui.add_space(4.0);
         });
@@ -886,7 +909,7 @@ fn tips(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
 /// up or down goes to the page (its own scrolling, fling and all), and one sideways is read from
 /// the finger here and moves the row. Nothing is laid over the row's buttons, so taps stay
 /// theirs (a widget sensing drags over them took their taps on a touch screen).
-fn swipe_row<R>(ui: &mut egui::Ui, id: &str, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
+pub(crate) fn swipe_row<R>(ui: &mut egui::Ui, id: &str, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
     let source = egui::scroll_area::ScrollSource { drag: egui::scroll_area::DragScroll::Never, ..Default::default() };
     egui::ScrollArea::horizontal()
         .id_salt(id)
@@ -1016,10 +1039,10 @@ fn quick_tile(ui: &mut egui::Ui, icon: &str, hue: Color32, label: &str, t: &Toke
     let press = theme::Press::track(ui, &resp);
     let tile = Rect::from_center_size(rect.center_top() + vec2(0.0, 38.0), Vec2::splat(68.0)).translate(press.offset());
     // The tool's colour at full strength, glowing a little on the ground; deeper while pressed.
-    let glow = egui::Shadow { offset: [0, 5], blur: 14, spread: 0, color: hue.gamma_multiply(if t.dark() { 0.45 } else { 0.35 }) };
+    let glow = egui::Shadow { offset: [0, 5], blur: 18, spread: 1, color: hue.gamma_multiply(if t.dark() { 0.7 } else { 0.42 }) };
     ui.painter().add(glow.as_shape(tile, CornerRadius::same(20)));
     phone::vivid_tile(ui.painter(), tile, 20.0, press.fill(hue, hue.lerp_to_gamma(Color32::BLACK, 0.08), hue.lerp_to_gamma(Color32::BLACK, 0.18)));
-    icons::paint(ui, tile, icon, 32.0, Color32::WHITE);
+    phone::tile_glyph(ui, tile, icon, 32.0);
     // Smaller type, rather than a word cut in two ("Commentaires").
     let widest = label
         .split_whitespace()
@@ -1258,7 +1281,7 @@ fn file_row(ui: &mut egui::Ui, f: &Listed, thumb: Option<&TextureHandle>, t: &To
 
 /// A file's first page in `card`, or, before it's ready (or for a file that can't show one), a
 /// page with the ArtCraft mark over "PDF".
-fn thumbnail(ui: &egui::Ui, card: Rect, thumb: Option<&TextureHandle>, t: &Tokens) {
+pub(crate) fn thumbnail(ui: &egui::Ui, card: Rect, thumb: Option<&TextureHandle>, t: &Tokens) {
     let shadow = egui::Shadow { offset: [0, 1], blur: 4, spread: 0, color: Color32::from_black_alpha(if t.dark() { 90 } else { 30 }) };
     if let Some(tex) = thumb {
         // The page fitted in the card, white behind it.
@@ -1350,8 +1373,8 @@ fn action_row(ui: &mut egui::Ui, icon: &str, hue: Color32, title: &str, detail: 
     press.wash(ui, rect.shrink2(vec2(4.0, 2.0)), 12, false);
     let body = rect.translate(press.offset());
     let disc = Rect::from_center_size(body.left_center() + vec2(36.0, 0.0), Vec2::splat(44.0));
-    phone::vivid_tile(ui.painter(), disc, 14.0, hue);
-    icons::paint(ui, disc, icon, 22.0, Color32::WHITE);
+    phone::glowing_tile(ui.painter(), disc, 14.0, hue, t);
+    phone::tile_glyph(ui, disc, icon, 22.0);
     let top = body.center().y - (detail.size().y + 22.0) / 2.0;
     widgets::row_text(ui, pos2(body.left() + left, top + 10.0), title, theme::medium(15.5), t.text, width);
     ui.painter().galley(pos2(body.left() + left, top + 22.0), detail, t.text_muted);
@@ -1368,7 +1391,7 @@ fn tab_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui, rect: Rect, t: &Tokens) {
     ];
     let mut picked = None;
     let look = look(t);
-    phone::bar_filled(ui, "phone-home-tabs", rect, look.surface, Some(look.edge), false, |ui| {
+    phone::bar_filled(ui, "phone-home-tabs", rect, look.bar, Some(look.edge), false, |ui| {
         let w = (ui.available_width() / tabs.len() as f32).floor();
         for (tab, icon, label) in tabs {
             let selected = app.phone.home.tab == tab;
@@ -1383,8 +1406,11 @@ fn tab_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui, rect: Rect, t: &Tokens) {
             } else {
                 press.wash(ui, pill, 15, false);
             }
-            let color = if selected { Color32::WHITE } else { t.icon };
-            icons::paint(ui, pill, icon, 22.0, color);
+            if selected {
+                phone::tile_glyph(ui, pill, icon, 21.0);
+            } else {
+                icons::paint(ui, pill, icon, 22.0, t.icon);
+            }
             let text = if selected { t.accent_text } else { t.text_muted };
             ui.painter().text(pos2(body.center().x, pill.bottom() + 11.0), Align2::CENTER_CENTER, label, theme::medium(12.0), text);
             if theme::hand(resp).clicked() {
@@ -2130,7 +2156,7 @@ impl Shared {
 /// Previews of the rows on screen (a PDF's first page, a photo's tile), made one after another on
 /// a worker thread.
 #[cfg(not(target_arch = "wasm32"))]
-struct Thumbs {
+pub(crate) struct Thumbs {
     /// What makes a file's preview.
     make: fn(&str) -> Option<Pixels>,
     ready: std::collections::HashMap<String, Thumb>,
@@ -2168,9 +2194,21 @@ impl Thumbs {
         }
     }
 
+    /// PDFs' first pages, for a list of files other than Home's own (the file browser).
+    #[cfg(any(test, target_os = "android"))]
+    pub(crate) fn pdfs() -> Self {
+        Self::new(first_page)
+    }
+
+    /// Pictures' tiles (their centred squares).
+    #[cfg(any(test, target_os = "android"))]
+    pub(crate) fn pictures() -> Self {
+        Self::new(photo_tile)
+    }
+
     /// A new frame: files queued for rows no longer on screen leave the queue (scrolling past
     /// a hundred files doesn't render them all).
-    fn begin_frame(&mut self) {
+    pub(crate) fn begin_frame(&mut self) {
         self.frame = self.frame.wrapping_add(1);
         if let Some(shared) = &self.shared {
             let (shown, asked) = (&self.shown, &mut self.asked);
@@ -2187,7 +2225,7 @@ impl Thumbs {
 
     /// The preview of `path`, whose row is on screen: asked for when there's none yet, and again
     /// when the file changed (the old one shows until then).
-    fn get(&mut self, path: &str, now: f64, ctx: &egui::Context) -> Option<TextureHandle> {
+    pub(crate) fn get(&mut self, path: &str, now: f64, ctx: &egui::Context) -> Option<TextureHandle> {
         // Each file at its own time: the rows on screen don't all look at their files in one frame.
         self.shown.insert(path.to_owned());
         let frame = self.frame;
@@ -2247,7 +2285,7 @@ impl Thumbs {
     }
 
     /// Take the previews made since last frame.
-    fn poll(&mut self, ctx: &egui::Context, now: f64) {
+    pub(crate) fn poll(&mut self, ctx: &egui::Context, now: f64) {
         let Some(done) = self.done.as_ref() else { return };
         let mut made_any = false;
         while let Ok((path, stamp, made)) = done.try_recv() {
@@ -2380,13 +2418,13 @@ fn first_page(path: &str) -> Option<Pixels> {
 /// A PDF found on the device.
 #[cfg(not(target_arch = "wasm32"))]
 #[derive(Clone, Debug)]
-struct DeviceFile {
-    path: String,
-    name: String,
+pub(crate) struct DeviceFile {
+    pub(crate) path: String,
+    pub(crate) name: String,
     /// The folder it is in.
-    folder: String,
-    size: usize,
-    modified: Option<std::time::SystemTime>,
+    pub(crate) folder: String,
+    pub(crate) size: usize,
+    pub(crate) modified: Option<std::time::SystemTime>,
 }
 
 /// What a scan looks for.

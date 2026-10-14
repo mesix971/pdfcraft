@@ -16,16 +16,29 @@ fn hue(g: &ToolGroup) -> Color32 {
 
 pub fn left_panel(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
-    egui::Frame::NONE.fill(t.panel).inner_margin(egui::Margin { left: 14, right: 10, top: 12, bottom: 10 }).stroke(Stroke::new(1.0, t.divider)).show(
-        ui,
-        |ui| match app.left {
-            LeftPanel::AllTools => all_tools(app, ui, &t),
-            LeftPanel::Tool(id) => match catalog::group(id) {
-                Some(g) => tool_detail(app, ui, &t, g),
-                None => app.left = LeftPanel::AllTools,
-            },
+    // On a phone the panel is the drawer under the page: a sheet's rounded top and its handle.
+    let frame = if app.phone_layout() {
+        egui::Frame::NONE.fill(t.panel).corner_radius(CornerRadius { nw: 18, ne: 18, sw: 0, se: 0 }).inner_margin(egui::Margin {
+            left: 10,
+            right: 10,
+            top: 18,
+            bottom: 10,
+        })
+    } else {
+        egui::Frame::NONE.fill(t.panel).inner_margin(egui::Margin { left: 14, right: 10, top: 12, bottom: 10 }).stroke(Stroke::new(1.0, t.divider))
+    };
+    let shown = frame.show(ui, |ui| match app.left {
+        LeftPanel::AllTools => all_tools(app, ui, &t),
+        LeftPanel::Tool(id) => match catalog::group(id) {
+            Some(g) => tool_detail(app, ui, &t, g),
+            None => app.left = LeftPanel::AllTools,
         },
-    );
+    });
+    if app.phone_layout() {
+        let r = shown.response.rect;
+        let handle = Rect::from_center_size(egui::pos2(r.center().x, r.top() + 8.0), vec2(36.0, 4.0));
+        ui.painter().rect_filled(handle, CornerRadius::same(2), t.text_faint);
+    }
 }
 
 fn panel_header(ui: &mut egui::Ui, t: &Tokens, title: &str, back: bool) -> (bool, bool) {
@@ -137,15 +150,22 @@ fn tool_row(ui: &mut egui::Ui, t: &Tokens, g: &ToolGroup) -> egui::Response {
 }
 
 fn tool_detail(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens, g: &'static ToolGroup) {
-    let (back, close) = panel_header(ui, t, g.label, true);
-    if back {
-        app.left = LeftPanel::AllTools;
-        app.mode = crate::Mode::AllTools;
+    // On a phone the drawer's bar above names the tool and has Done: no header, no milestones,
+    // and only what works, a finger tall.
+    let phone = app.phone_layout();
+    if !phone {
+        let (back, close) = panel_header(ui, t, g.label, true);
+        if back {
+            app.left = LeftPanel::AllTools;
+            app.mode = crate::Mode::AllTools;
+        }
+        if close {
+            app.left_open = false;
+        }
     }
-    if close {
-        app.left_open = false;
-    }
-    if let Availability::Planned(m) = g.availability {
+    if let Availability::Planned(m) = g.availability
+        && !phone
+    {
         egui::Frame::NONE.fill(t.accent_soft).corner_radius(CornerRadius::same(8)).inner_margin(egui::Margin::same(10)).show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.label(
@@ -196,12 +216,37 @@ fn tool_detail(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens, g: &'static
     // Redact a PDF has Acrobat's footer: Clear all / Redact all.
     let footer = g.id == "redact";
     let marks = if footer { app.active_ids().and_then(|(_, id)| app.session.get(id)).map_or(0, |d| d.redaction_marks()) } else { 0 };
-    let list_h = if footer { (ui.available_height() - 52.0).max(80.0) } else { ui.available_height() };
+    let list_h = if footer { (ui.available_height() - if phone { 60.0 } else { 52.0 }).max(80.0) } else { ui.available_height() };
     egui::ScrollArea::vertical().auto_shrink([false, false]).max_height(list_h).show(ui, |ui| {
-        for s in g.sections {
-            widgets::section_title(ui, tl!(s.title));
+        // On a phone, Edit a PDF starts with what edits the page's content (text, pictures): the
+        // drawer shows a few rows, and that is what the group is opened for.
+        let mut sections: Vec<&catalog::ToolSection> = g.sections.iter().collect();
+        if phone && g.id == "edit" {
+            sections.reverse();
+        }
+        for s in sections {
+            let skipped = |item: &catalog::ToolItem| {
+                (g.id == "fill_sign" && (item.command.starts_with("sign.fill.signature") || item.command.starts_with("sign.fill.initials")))
+                    || (phone && item.availability != Availability::Ready)
+            };
+            if phone {
+                if s.items.iter().all(skipped) {
+                    continue;
+                }
+                ui.add_space(6.0);
+                ui.label(egui::RichText::new(tl!(s.title)).font(theme::semibold(13.5)).color(t.text_muted));
+                ui.add_space(2.0);
+            } else {
+                widgets::section_title(ui, tl!(s.title));
+            }
             for item in s.items {
-                if g.id == "fill_sign" && (item.command.starts_with("sign.fill.signature") || item.command.starts_with("sign.fill.initials")) {
+                if skipped(item) {
+                    continue;
+                }
+                if phone {
+                    if phone_item(ui, t, g, item).clicked() {
+                        run = Some(item.command);
+                    }
                     continue;
                 }
                 let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 34.0), Sense::click());
@@ -242,7 +287,18 @@ fn tool_detail(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens, g: &'static
             }
         }
     });
-    if footer {
+    if footer && phone {
+        ui.add_space(8.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 8.0;
+            if crate::phone::action_pill(ui, Some("eraser"), tl!("Redact all"), marks > 0, t).clicked() {
+                run = Some("redact.apply");
+            }
+            if marks > 0 && crate::phone::soft_pill(ui, "x", tl!("Clear all"), t).clicked() {
+                run = Some("redact.clear");
+            }
+        });
+    } else if footer {
         ui.add_space(8.0);
         ui.horizontal(|ui| {
             if marks > 0 {
@@ -268,6 +324,20 @@ fn tool_detail(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens, g: &'static
     if let Some(cmd) = run {
         app.run_command(cmd);
     }
+}
+
+/// One of a tool group's actions in the phone's drawer: its icon on a chip of the group's colour,
+/// and its name.
+fn phone_item(ui: &mut egui::Ui, t: &Tokens, g: &ToolGroup, item: &catalog::ToolItem) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 54.0), Sense::click());
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!(item.label)));
+    let press = theme::Press::track(ui, &resp);
+    press.wash(ui, rect, 12, false);
+    let body = rect.translate(press.offset());
+    let chip = Rect::from_center_size(body.left_center() + vec2(24.0, 0.0), vec2(38.0, 38.0));
+    crate::phone::icon_chip(ui, chip, item.icon, 19.0, crate::phone::tool_color(g.id), t);
+    row_label(ui, tl!(item.label), theme::regular(15.5), t.text, body.left_center() + vec2(56.0, 0.0), body.width() - 64.0);
+    theme::hand(resp)
 }
 
 /// Add a stamp: Dynamic, Sign Here and Standard Business stamps; click one, then click on the

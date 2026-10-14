@@ -2463,3 +2463,12 @@ decimal separator	.	,
 	Dark pages	Páginas escuras
 	Light text on a dark page, for reading at night.	Texto claro em página escura, para ler à noite.
 	Night	Noite
+	Downloads	Downloads
+	Choose a file	Escolher um arquivo
+	Choose files	Escolher arquivos
+	Choose a folder	Escolher uma pasta
+	Tap to unlock	Toque para desbloquear
+	Browse folders	Navegar pelas pastas
+	Combined from top to bottom. Use the arrows to change the order.	Combinados de cima para baixo. Use as setas para mudar a ordem.
+	PDFs and pictures, combined into one PDF in the order you choose.	PDFs e imagens combinados em um único PDF na ordem que você escolher.
+@plural	{n} byte|{n} bytes	{n} byte|{n} bytes

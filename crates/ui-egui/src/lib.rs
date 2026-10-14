@@ -737,6 +737,8 @@ pub struct PdfCraftApp {
     /// The egui context, for commands that change window or theme state.
     ctx: Option<egui::Context>,
     styled: bool,
+    /// The palette last given to egui is the phone's (true black in the dark theme).
+    theme_black: bool,
     fonts_ready: bool,
     /// The CJK fallback order the installed fonts follow (see `theme::installed_font_definitions`).
     fonts_cjk: theme::CjkPreference,
@@ -1014,6 +1016,7 @@ impl PdfCraftApp {
             dialog_epoch: 0,
             ctx: None,
             styled: false,
+            theme_black: false,
             fonts_ready: false,
             fonts_cjk: theme::CjkPreference::Default,
             control: None,
@@ -1656,7 +1659,7 @@ impl PdfCraftApp {
         self.reading_colors == pdfcraft_render::ReadingColors::NIGHT
     }
 
-    /// Show pages dark (light grey text on a dark grey page), or no longer: other reading colours
+    /// Show pages dark (light grey text on a black page), or no longer: other reading colours
     /// chosen in Preferences are left as they are.
     pub fn set_dark_pages(&mut self, on: bool) {
         if on {
@@ -1676,7 +1679,7 @@ impl PdfCraftApp {
         self.theme_preference = preference;
         if let Some(ctx) = self.ctx.clone() {
             self.sync_theme(&ctx);
-            theme::apply(&ctx, self.theme);
+            self.apply_theme(&ctx);
         } else {
             self.theme = preference.resolve(None, ThemeKind::Light);
         }
@@ -1729,8 +1732,14 @@ impl PdfCraftApp {
         let kind = self.theme_preference.resolve(system, ThemeKind::Light);
         if kind != self.theme {
             self.theme = kind;
-            theme::apply(ctx, kind);
+            self.apply_theme(ctx);
         }
+    }
+
+    /// Give egui the theme's palette: in true black on a phone (its dark theme's ground and bars).
+    fn apply_theme(&mut self, ctx: &egui::Context) {
+        self.theme_black = self.phone_layout();
+        theme::apply_on(ctx, self.theme, self.theme_black);
     }
 
     /// Run a catalogue command. Commands that aren't implemented yet say which milestone ships them.
@@ -2612,7 +2621,7 @@ impl eframe::App for PdfCraftApp {
             egui_extras::install_image_loaders(ctx);
             theme::install_fonts_for(ctx, cjk);
             self.fonts_cjk = cjk;
-            theme::apply(ctx, self.theme);
+            self.apply_theme(ctx);
             self.styled = true;
         } else {
             self.fonts_ready = true;
@@ -2623,6 +2632,10 @@ impl eframe::App for PdfCraftApp {
             }
         }
         self.sync_theme(ctx);
+        // The shell changed (a preview switched to the phone's): its palette with it.
+        if self.theme_black != self.phone_layout() {
+            self.apply_theme(ctx);
+        }
         let native = ctx.native_pixels_per_point().unwrap_or(1.0);
         ui_scale::sync(ctx, ui_scale::zoom(self.ui_scale, self.auto_text_scale(), native), &mut self.ui_scale_applied);
         // The phone layout shows dialogs as screens of their own.

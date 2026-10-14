@@ -9,6 +9,10 @@
 //! [`crate::PdfCraftApp::ask`] routes a pick here; the choice goes back through the same queue a
 //! native picker's does ([`crate::pickers`]), so it is used on a later frame, and only one
 //! picker shows at a time. Cancelling hands back no paths, which ends the pick the same way.
+//!
+//! In the phone layout it is a screen of its own ([`phone`]); elsewhere a dialog.
+
+mod phone;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -139,7 +143,7 @@ impl PlaceKind {
     pub(crate) fn label(&self) -> String {
         match self {
             Self::Storage => tl!("Internal storage").to_owned(),
-            Self::Downloads => tl!("Download").to_owned(),
+            Self::Downloads => tl!("Downloads").to_owned(),
             Self::Documents => tl!("Documents").to_owned(),
             Self::AppFiles => tl!("PdfCraft files").to_owned(),
             Self::Removable(name) => i18n::fmt(tl!("SD card {name}"), &[("name", name)]),
@@ -162,6 +166,7 @@ pub(crate) struct Entry {
     pub(crate) path: PathBuf,
     pub(crate) dir: bool,
     pub(crate) size: u64,
+    pub(crate) modified: Option<std::time::SystemTime>,
 }
 
 /// The folders and the files with one of `extensions` (any file when `None`) in `dir`: folders
@@ -181,7 +186,7 @@ pub(crate) fn list(dir: &Path, extensions: Option<&[String]>, folders_only: bool
         if !dir && (folders_only || !meta.is_file() || !matches_extension(&path, extensions)) {
             continue;
         }
-        out.push(Entry { name, path, dir, size: if dir { 0 } else { meta.len() } });
+        out.push(Entry { name, path, dir, size: if dir { 0 } else { meta.len() }, modified: meta.modified().ok() });
     }
     out.sort_by(|a, b| b.dir.cmp(&a.dir).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())).then_with(|| a.name.cmp(&b.name)));
     Ok(out)
@@ -252,6 +257,8 @@ pub(crate) struct Browser {
     access: Option<(bool, f64)>,
     /// The pick this browser answers (see [`crate::pickers`]).
     pub(crate) waiting: crate::pickers::Waiting,
+    /// The phone screen's own state.
+    phone: phone::PhoneBrowser,
 }
 
 impl Browser {
@@ -266,6 +273,7 @@ impl Browser {
             .or_else(|| places.iter().map(|p| p.path.clone()).find(|p| p.is_dir()))
             .unwrap_or_else(|| PathBuf::from("/"));
         let name = dialog.file_name.clone().unwrap_or_default().chars().take(MAX_NAME_CHARS).collect();
+        let phone = phone::PhoneBrowser::new(kind, &dialog);
         Self {
             kind,
             dialog,
@@ -280,6 +288,7 @@ impl Browser {
             error: None,
             access: None,
             waiting,
+            phone,
         }
     }
 
@@ -374,9 +383,9 @@ impl Browser {
         }
     }
 
-    /// Draw the browser. Returns the paths to hand back once the user confirms or cancels (an
-    /// empty list), `None` while it stays open.
-    fn ui(&mut self, ctx: &egui::Context, host: &Host) -> Option<Vec<PathBuf>> {
+    /// Before drawing: ask again whether shared storage may be read (about once a second while
+    /// it may not), and list the folder when it hasn't been or its listing failed a while ago.
+    fn refresh(&mut self, ctx: &egui::Context, host: &Host) {
         let now = ctx.input(|i| i.time);
         if let Some(granted) = &host.access_granted {
             let stale = self.access.is_none_or(|(_, at)| now - at >= RECHECK_SECS);
@@ -396,6 +405,13 @@ impl Browser {
         if self.listing.is_err() || self.access.is_some_and(|(g, _)| !g) {
             ctx.request_repaint_after(std::time::Duration::from_secs_f64(RECHECK_SECS));
         }
+    }
+
+    /// Draw the browser. Returns the paths to hand back once the user confirms or cancels (an
+    /// empty list), `None` while it stays open.
+    fn ui(&mut self, ctx: &egui::Context, host: &Host) -> Option<Vec<PathBuf>> {
+        self.refresh(ctx, host);
+        let now = ctx.input(|i| i.time);
         let t = Tokens::get(ctx);
         let screen = ctx.content_rect();
         let width = (screen.width() - 32.0).clamp(240.0, 640.0);
@@ -646,7 +662,8 @@ impl Browser {
 /// Draw the browser while one is open, and hand its answer to the pick that asked.
 pub(crate) fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
     let Some(mut browser) = app.file_browser.take() else { return };
-    match browser.ui(ctx, &app.file_browser_host) {
+    let answer = if app.phone_layout() { phone::page(app, &mut browser, ctx) } else { browser.ui(ctx, &app.file_browser_host) };
+    match answer {
         None => app.file_browser = Some(browser),
         Some(paths) => {
             // The next pick starts where this one ended, unless it names its own folder.

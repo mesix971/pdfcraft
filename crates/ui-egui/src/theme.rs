@@ -132,6 +132,25 @@ impl Tokens {
         }
     }
 
+    /// The dark palette in true black where it is the ground (backgrounds, bars, the area behind
+    /// the pages): a phone's OLED screen leaves those pixels off. Raised surfaces (cards, sheets,
+    /// panels, fields) stay a step above it, so they still read as surfaces. Light is unchanged.
+    pub fn true_black(mut self) -> Self {
+        if self.dark() {
+            self.titlebar = Color32::BLACK;
+            self.chrome = Color32::BLACK;
+            self.pasteboard = Color32::BLACK;
+            self.panel = Color32::from_rgb(0x12, 0x12, 0x14);
+            self.card = Color32::from_rgb(0x18, 0x18, 0x1B);
+            self.field = Color32::from_rgb(0x0C, 0x0C, 0x0E);
+            self.border = Color32::from_rgb(0x2E, 0x2E, 0x34);
+            self.divider = Color32::from_rgb(0x22, 0x22, 0x26);
+            self.hover = Color32::from_rgb(0x1E, 0x1E, 0x22);
+            self.pressed = Color32::from_rgb(0x2A, 0x2A, 0x30);
+        }
+        self
+    }
+
     pub fn get(ctx: &egui::Context) -> Self {
         ctx.data(|d| d.get_temp::<Tokens>(egui::Id::new("pdfcraft-theme"))).unwrap_or_else(|| Self::for_kind(ThemeKind::Light))
     }
@@ -382,11 +401,16 @@ pub fn semibold(size: f32) -> FontId {
 }
 
 pub fn apply(ctx: &egui::Context, kind: ThemeKind) {
+    apply_on(ctx, kind, false);
+}
+
+/// [`apply`], in [`Tokens::true_black`] when `black` (the phone layout).
+pub fn apply_on(ctx: &egui::Context, kind: ThemeKind, black: bool) {
     // Keep the native window inherited. A concrete egui theme pins macOS's
     // NSWindow appearance and prevents winit from delivering ThemeChanged.
     // Our saved choice owns the palette; both egui branches receive it below.
     ctx.set_theme(egui::ThemePreference::System);
-    let t = Tokens::for_kind(kind);
+    let t = if black { Tokens::for_kind(kind).true_black() } else { Tokens::for_kind(kind) };
     ctx.data_mut(|d| d.insert_temp(egui::Id::new("pdfcraft-theme"), t));
     let mut v = if t.dark() { Visuals::dark() } else { Visuals::light() };
     v.panel_fill = t.panel;
@@ -679,8 +703,9 @@ mod tests {
     #[test]
     fn text_is_readable_on_every_surface() {
         // #76: the faintest text (hints, zoom level, captions) was 3.3:1 in the light theme.
-        for kind in [ThemeKind::Light, ThemeKind::Dark] {
-            let t = Tokens::for_kind(kind);
+        for (kind, t) in
+            [ThemeKind::Light, ThemeKind::Dark].into_iter().flat_map(|k| [(k, Tokens::for_kind(k)), (k, Tokens::for_kind(k).true_black())])
+        {
             for (name, fg) in [("text", t.text), ("text_muted", t.text_muted), ("text_faint", t.text_faint)] {
                 for bg in [t.chrome, t.panel, t.card, t.pasteboard] {
                     let r = contrast(fg, bg);

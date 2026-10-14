@@ -284,6 +284,13 @@ impl PdfCraftApp {
         let organizing = self.active.and_then(|i| self.views.get(i)).is_some_and(|v| v.organize);
         if self.phone.sheet.is_some() {
             self.phone.sheet = None;
+        } else if self.combine_showing() {
+            // Combine covers Home: Back is its own. A window over the list (a file shown large,
+            // the password box) takes the key itself.
+            if self.combine_covered() {
+                return false;
+            }
+            self.combine_tab.focused = false;
         } else if self.active.is_none() && self.phone.home.back() {
             // Home's profile, settings, search or another tab. The assistant's settings, when they
             // were what closed, close for the assistant too (they'd show with a stale key draft).
@@ -312,8 +319,6 @@ impl PdfCraftApp {
             }
         } else if self.active.is_some() {
             self.go_home();
-        } else if self.combine_showing() {
-            self.combine_tab.focused = false;
         } else {
             return false;
         }
@@ -340,8 +345,8 @@ impl PdfCraftApp {
     }
 
     /// Open one of the phone layout's screens or sheets by name (tests, automation and screenshots):
-    /// `menu`, `tools`, `new`, `profile`, `photos`, `ai` (the assistant, over the document)
-    /// or `ai_settings`.
+    /// `menu`, `tools`, `new`, `profile`, `photos`, `ai` (the assistant, over the document),
+    /// `ai_settings`, `combine`, or `tool:ID` (a tool group on the open document).
     pub(crate) fn open_phone_screen(&mut self, name: &str) -> Result<(), String> {
         match name {
             "menu" => self.phone.sheet = Some(Sheet::Menu),
@@ -354,7 +359,20 @@ impl PdfCraftApp {
             }
             "ai" => self.phone.ai_open = cfg!(not(target_arch = "wasm32")),
             "ai_settings" => self.phone.home.ai_settings = cfg!(not(target_arch = "wasm32")),
-            other => return Err(format!("phone must be menu, tools, new, profile, photos, ai or ai_settings, not {other:?}")),
+            "combine" => self.open_combine_tab(),
+            // A tool group as a document's tools open it: `tool:compress`.
+            other if other.starts_with("tool:") => {
+                let id = catalog::TOOL_GROUPS
+                    .iter()
+                    .map(|g| g.id)
+                    .find(|id| other.strip_prefix("tool:") == Some(*id))
+                    .ok_or_else(|| format!("no tool group {other:?}"))?;
+                if self.active.is_none() {
+                    return Err("tool: needs an open document".into());
+                }
+                self.open_phone_tool_group(id);
+            }
+            other => return Err(format!("phone must be menu, tools, new, profile, photos, ai, ai_settings, combine or tool:ID, not {other:?}")),
         }
         // The reader starts a document plain (its first frame closes sheets and the assistant):
         // this one is already the shown one.
@@ -413,13 +431,7 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
         app.phone.sheet = None;
     }
     egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.pasteboard)).show(ui, |ui| match app.active {
-        None if app.combine_showing() => {
-            if top_bar_titled(ui, screen, tl!("Combine files")) {
-                app.combine_tab.focused = false;
-            }
-            let rest = Rect::from_min_max(pos2(screen.left(), screen.top() + TOP_BAR), screen.max);
-            ui.scope_builder(egui::UiBuilder::new().max_rect(rest), |ui| crate::combine_ui::page(app, ui));
-        }
+        None if app.combine_showing() => crate::combine_ui::phone::page(app, ui, screen),
         None => crate::phone_home::show(app, ui, screen, &t),
         Some(index) => reader(app, index, ui, screen, &t),
     });
@@ -427,7 +439,10 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
     // The system's bars take the colours of the screen's top and bottom, so they read as part of
     // it: the Android shell gives them to the bars (and their icons a shade that reads on them).
     let (top, bottom) = match app.active {
-        None if app.combine_showing() => (t.chrome, t.pasteboard),
+        // The file browser covers the screen while it shows.
+        #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+        _ if app.file_browser.is_some() => app.file_browser.as_ref().map_or((t.chrome, t.chrome), |b| b.phone_bars(&t)),
+        None if app.combine_showing() => crate::combine_ui::phone::system_bars(app, &t),
         None => crate::phone_home::system_bars(app, &t),
         Some(_) if app.phone.ai_open => (t.chrome, t.pasteboard),
         Some(_) if app.phone.bars_hidden => (t.pasteboard, t.pasteboard),
@@ -532,21 +547,144 @@ pub(crate) fn tool_color(id: &str) -> Color32 {
     Color32::from_rgb(rgb[0], rgb[1], rgb[2])
 }
 
-/// A tile filled with `color`: lit at the top left, deeper at the bottom right, its edge smooth.
+/// A tile filled with `color`: lit at the top left, deeper at the bottom right, its edge smooth,
+/// and a sheen over its top as on a glossy key.
 pub(crate) fn vivid_tile(painter: &egui::Painter, rect: Rect, radius: f32, color: Color32) {
     let (from, to) = (color.lerp_to_gamma(Color32::WHITE, 0.14), color.lerp_to_gamma(Color32::BLACK, 0.26));
     // The plain shape under it gives the edge egui's smoothing; the gradient covers the rest.
     painter.rect_filled(rect, CornerRadius::same(radius.clamp(0.0, 255.0) as u8), from.lerp_to_gamma(to, 0.5));
-    gradient_rect(painter, rect.shrink(0.6), (radius - 0.6).max(0.0), from, to);
+    let inner = rect.shrink(0.6);
+    let radius = (radius - 0.6).max(0.0);
+    gradient_rect(painter, inner, radius, from, to);
+    // The sheen fades out by the middle of the tile.
+    let fade = (inner.height() * 0.6).max(1.0);
+    shaded_rect(painter, inner, radius, |p| {
+        let k = 1.0 - ((p.y - inner.top()) / fade).clamp(0.0, 1.0);
+        Color32::from_white_alpha((k * k * 96.0) as u8)
+    });
+}
+
+/// A [`vivid_tile`] that glows: a halo of its colour around it, brighter on a dark ground (a
+/// tool's tile, the main button).
+pub(crate) fn glowing_tile(painter: &egui::Painter, rect: Rect, radius: f32, color: Color32, t: &Tokens) {
+    let glow = egui::Shadow {
+        offset: [0, 3],
+        blur: (rect.height() * 0.42).clamp(6.0, 24.0) as u8,
+        spread: 1,
+        color: color.gamma_multiply(if t.dark() { 0.62 } else { 0.38 }),
+    };
+    painter.add(glow.as_shape(rect, CornerRadius::same(radius.clamp(0.0, 255.0) as u8)));
+    vivid_tile(painter, rect, radius, color);
+}
+
+/// A white glyph on a [`vivid_tile`]: bold, with a soft shadow under it so it stands off the tile.
+pub(crate) fn tile_glyph(ui: &egui::Ui, tile: Rect, icon: &str, size: f32) {
+    icons::paint_bold(ui, tile.translate(vec2(0.0, size * 0.04 + 0.5)), icon, size, Color32::from_black_alpha(46));
+    icons::paint_bold(ui, tile, icon, size, Color32::WHITE);
+}
+
+/// The colour a row's icon takes, by what the icon shows: so the same action has the same colour
+/// in every menu and list, as in a phone's settings.
+pub(crate) fn icon_hue(icon: &str) -> Color32 {
+    let rgb: [u8; 3] = match icon {
+        "undo-2" | "redo-2" => [0x64, 0x74, 0x8B],
+        "save" | "download" | "file-down" | "file-input" => [0x3A, 0x6F, 0xE8],
+        "printer" => [0x5B, 0x5B, 0xD6],
+        "text-cursor-input" | "hash" | "arrow-up-down" => [0x08, 0x9E, 0xB8],
+        "files" | "layout-grid" | "copy" | "images" | "image" => [0x8B, 0x5C, 0xF6],
+        "bookmark" | "star" => [0xF5, 0x9E, 0x0B],
+        "message-square-text" | "message-square-plus" => [0xE8, 0x8A, 0x00],
+        "moon" => [0x63, 0x66, 0xF1],
+        "book-open" | "file-text" | "file" => [0x25, 0x63, 0xEB],
+        "info" | "circle-help" | "clock" | "history" => [0x0E, 0x9F, 0xD8],
+        "file-search" | "search" => [0x12, 0xA5, 0x8A],
+        "file-spreadsheet" => [0x16, 0xA3, 0x4A],
+        "file-code" => [0x64, 0x74, 0x8B],
+        "type" => [0xEC, 0x48, 0x99],
+        "lock-open" | "lock" => [0xF2, 0x9F, 0x05],
+        "settings" => [0x6B, 0x72, 0x80],
+        "x" | "trash-2" | "circle-x" => [0xE5, 0x48, 0x4D],
+        "folder" | "folder-open" | "folder-plus" | "hard-drive" | "smartphone" => [0xF2, 0x9F, 0x05],
+        "sparkles" => [0xA8, 0x55, 0xF7],
+        "user-round" | "camera" => [0xEC, 0x48, 0x99],
+        _ => [0x12, 0xA5, 0x8A],
+    };
+    Color32::from_rgb(rgb[0], rgb[1], rgb[2])
+}
+
+/// An icon on a chip of its colour: a soft wash of `hue` with the glyph in it, in a shade that
+/// reads on the theme's ground.
+pub(crate) fn icon_chip(ui: &egui::Ui, rect: Rect, icon: &str, size: f32, hue: Color32, t: &Tokens) {
+    let wash = if t.dark() { hue.gamma_multiply(0.30) } else { hue.gamma_multiply(0.15) };
+    ui.painter().rect_filled(rect, CornerRadius::same((rect.height() * 0.32).clamp(0.0, 255.0) as u8), wash);
+    icons::paint_bold(ui, rect, icon, size, icon_ink(hue, t));
+}
+
+/// `hue` as a glyph drawn in it: lighter on a dark ground, a little deeper on a light one.
+pub(crate) fn icon_ink(hue: Color32, t: &Tokens) -> Color32 {
+    if t.dark() { hue.lerp_to_gamma(Color32::WHITE, 0.36) } else { hue.lerp_to_gamma(Color32::BLACK, 0.08) }
+}
+
+/// A screen's main action: a glossy accent pill a finger tall, with an icon; dimmed (and deaf to
+/// taps) while it can't be used.
+pub(crate) fn action_pill(ui: &mut egui::Ui, icon: Option<&str>, label: &str, enabled: bool, t: &Tokens) -> egui::Response {
+    let font = theme::semibold(15.0);
+    let w = widgets::text_width(ui, label, &font) + if icon.is_some() { 62.0 } else { 40.0 };
+    let (r, resp) = ui.allocate_exact_size(vec2(w, TARGET), if enabled { Sense::click() } else { Sense::hover() });
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, label));
+    let press = theme::Press::track(ui, &resp);
+    let body = r.translate(press.offset());
+    if enabled {
+        let deeper = |k: f32| t.accent.lerp_to_gamma(Color32::BLACK, k);
+        glowing_tile(ui.painter(), body, TARGET / 2.0, press.fill(t.accent, deeper(0.08), deeper(0.18)), t);
+    } else {
+        ui.painter().rect_filled(body, CornerRadius::same(24), t.accent.gamma_multiply(0.35));
+    }
+    let ink = if enabled { Color32::WHITE } else { Color32::from_white_alpha(200) };
+    let text_left = match icon {
+        Some(icon) => {
+            icons::paint_bold(ui, Rect::from_center_size(body.left_center() + vec2(26.0, 0.0), Vec2::splat(18.0)), icon, 18.0, ink);
+            body.left() + 42.0
+        }
+        None => body.left() + 20.0,
+    };
+    ui.painter().text(pos2(text_left, body.center().y), Align2::LEFT_CENTER, label, font, ink);
+    if enabled { theme::hand(resp) } else { resp }
+}
+
+/// A second action beside the main one: its icon and name on a pill in the ground's colours.
+pub(crate) fn soft_pill(ui: &mut egui::Ui, icon: &str, label: &str, t: &Tokens) -> egui::Response {
+    let look = crate::phone_home::look(t);
+    let font = theme::medium(14.5);
+    let w = widgets::text_width(ui, label, &font) + 58.0;
+    let (r, resp) = ui.allocate_exact_size(vec2(w, TARGET), Sense::click());
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label));
+    let press = theme::Press::track(ui, &resp);
+    let body = r.translate(press.offset());
+    ui.painter().rect(
+        body,
+        CornerRadius::same(24),
+        press.fill(look.ground, t.hover, t.pressed),
+        Stroke::new(1.0, look.edge),
+        egui::StrokeKind::Inside,
+    );
+    icons::paint_bold(ui, Rect::from_center_size(body.left_center() + vec2(24.0, 0.0), Vec2::splat(18.0)), icon, 18.0, icon_ink(icon_hue(icon), t));
+    ui.painter().text(body.left_center() + vec2(40.0, 0.0), Align2::LEFT_CENTER, label, font, t.text);
+    theme::hand(resp)
 }
 
 /// A rounded rectangle shaded from `from` (top left) to `to` (bottom right).
 pub(crate) fn gradient_rect(painter: &egui::Painter, rect: Rect, radius: f32, from: Color32, to: Color32) {
+    let span = (rect.width() + rect.height()).max(1.0);
+    shaded_rect(painter, rect, radius, |p| from.lerp_to_gamma(to, (((p.x - rect.left()) + (p.y - rect.top())) / span).clamp(0.0, 1.0)));
+}
+
+/// A rounded rectangle whose colour at each point is `shade`'s, blended between its rim and its
+/// centre.
+fn shaded_rect(painter: &egui::Painter, rect: Rect, radius: f32, shade: impl Fn(egui::Pos2) -> Color32) {
     use std::f32::consts::{FRAC_PI_2, PI};
     const ARC: u32 = 8;
     let r = radius.clamp(0.0, rect.width().min(rect.height()).max(0.0) / 2.0);
-    let span = (rect.width() + rect.height()).max(1.0);
-    let shade = |p: egui::Pos2| from.lerp_to_gamma(to, (((p.x - rect.left()) + (p.y - rect.top())) / span).clamp(0.0, 1.0));
     let mut mesh = egui::Mesh::default();
     mesh.colored_vertex(rect.center(), shade(rect.center()));
     // The corners clockwise from the top right, each a quarter turn from where its arc starts.
@@ -586,10 +724,13 @@ fn bar_item(ui: &mut egui::Ui, icon: &str, label: &str, width: f32, size: f32, h
     job.halign = egui::Align::Center;
     let galley = ui.painter().layout_job(job);
     // The icon and the label are centred together.
-    let block = 22.0 + 4.0 + galley.size().y;
+    let block = 28.0 + 3.0 + galley.size().y;
     let top = body.center().y - block / 2.0;
-    icons::paint(ui, Rect::from_center_size(pos2(body.center().x, top + 11.0), vec2(24.0, 24.0)), icon, 22.0, hue);
-    ui.painter().galley(pos2(body.center().x, top + 26.0), galley, text_color);
+    let chip = Rect::from_center_size(pos2(body.center().x, top + 14.0), vec2(44.0, 28.0));
+    let wash = if t.dark() { hue.gamma_multiply(0.30) } else { hue.gamma_multiply(0.14) };
+    ui.painter().rect_filled(chip, CornerRadius::same(14), wash);
+    icons::paint_bold(ui, chip, icon, 19.0, if t.dark() { hue.lerp_to_gamma(Color32::WHITE, 0.15) } else { hue });
+    ui.painter().galley(pos2(body.center().x, top + 31.0), galley, text_color);
     theme::hand(resp)
 }
 
@@ -606,16 +747,16 @@ pub(crate) fn sheet_row(ui: &mut egui::Ui, icon: &str, label: &str, enabled: boo
         press.wash(ui, rect, 10, false);
     }
     let body = rect.translate(press.offset());
-    let color = if enabled { t.icon } else { t.text_faint };
-    icons::paint(ui, Rect::from_center_size(body.left_center() + vec2(26.0, 0.0), vec2(22.0, 22.0)), icon, 20.0, color);
+    let chip = Rect::from_center_size(body.left_center() + vec2(28.0, 0.0), vec2(36.0, 36.0));
+    icon_chip(ui, chip, icon, 19.0, if enabled { icon_hue(icon) } else { t.text_faint }, t);
     let reserve = if checked.is_some() { 44.0 } else { 12.0 };
     widgets::paint_left(
         ui,
-        body.left_center() + vec2(56.0, 0.0),
+        body.left_center() + vec2(60.0, 0.0),
         label,
         theme::regular(15.5),
         if enabled { t.text } else { t.text_faint },
-        (rect.width() - 56.0 - reserve).max(0.0),
+        (rect.width() - 60.0 - reserve).max(0.0),
     );
     if checked == Some(true) {
         icons::paint(ui, Rect::from_center_size(body.right_center() - vec2(24.0, 0.0), vec2(20.0, 20.0)), "check", 20.0, t.accent_text);
@@ -1186,8 +1327,8 @@ pub(crate) fn tool_tile(ui: &mut egui::Ui, g: &catalog::ToolGroup, width: f32, t
     press.wash(ui, rect.shrink(3.0), 12, false);
     let body = rect.translate(press.offset());
     let disc = Rect::from_center_size(body.center_top() + vec2(0.0, 28.0), Vec2::splat(46.0));
-    vivid_tile(ui.painter(), disc, 15.0, tool_color(g.id));
-    icons::paint(ui, disc, g.icon, 24.0, Color32::WHITE);
+    glowing_tile(ui.painter(), disc, 15.0, tool_color(g.id), t);
+    tile_glyph(ui, disc, g.icon, 24.0);
     let mut job = egui::text::LayoutJob::simple(label.to_owned(), theme::regular(11.5), t.text, width - 8.0);
     job.wrap.max_rows = 2;
     job.halign = egui::Align::Center;

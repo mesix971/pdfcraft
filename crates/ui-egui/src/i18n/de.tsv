@@ -2450,3 +2450,12 @@ decimal separator	.	,
 	Dark pages	Dunkle Seiten
 	Light text on a dark page, for reading at night.	Heller Text auf dunkler Seite, zum Lesen bei Nacht.
 	Night	Nacht
+	Downloads	Downloads
+	Choose a file	Datei wählen
+	Choose files	Dateien wählen
+	Choose a folder	Ordner wählen
+	Tap to unlock	Zum Entsperren tippen
+	Browse folders	Ordner durchsuchen
+	Combined from top to bottom. Use the arrows to change the order.	Von oben nach unten kombiniert. Mit den Pfeilen änderst du die Reihenfolge.
+	PDFs and pictures, combined into one PDF in the order you choose.	PDFs und Bilder, in der von dir gewählten Reihenfolge zu einer PDF kombiniert.
+@plural	{n} byte|{n} bytes	{n} Byte|{n} Byte

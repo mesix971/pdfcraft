@@ -124,9 +124,15 @@ Android 8.0 (API 26) or later, 64-bit ARM by default.
   paragraph in its own font, size and colour, rewrapped in its box, as one step that Undo (in
   the ⋮ menu) takes back. It is the only reason the app has the INTERNET permission: nothing is
   sent until a key is entered and a question asked.
+- **Files.** Choosing a file is a screen of its own: a pick of PDFs starts on every PDF
+  found on the device, newest first, each with its first page, and one tap opens it. Recent
+  files and the places (Downloads, Documents, the storage, PdfCraft's folder) are chips across
+  the top; search narrows the list; several files can be picked from different folders.
+- **Combine files** is a list of cards in the order they will be combined, each with its first
+  page: arrows move a file, a cross takes it out, a tap shows it large, Combine is at the bottom.
 - **Dark mode.** Profile ▸ Appearance chooses Automatic (the phone's theme), Light or Dark; until
   it is chosen, PdfCraft follows the phone. **Dark pages** shows documents as light grey text on
-  dark grey pages (pictures keep their colours, and the file isn't changed), from the same place or
+  black pages (pictures keep their colours, and the file isn't changed), from the same place or
   the reader's ⋮ menu, which also switches the dark mode. Android's status and navigation bars take
   the colours of the screen's top and bottom, with icons that read on them.
 

@@ -1738,6 +1738,15 @@ mod tests {
 
     /// French translates every registered command and every All tools group, section and item.
     #[test]
+    fn a_small_file_is_counted_in_the_languages_bytes() {
+        let fr = Lang::from_code("fr").expect("fr registered");
+        assert_eq!(trn(fr, 442, "{n} byte", "{n} bytes"), "442 octets");
+        assert_eq!(trn(fr, 1, "{n} byte", "{n} bytes"), "1 octet");
+        let de = Lang::from_code("de").expect("de registered");
+        assert_eq!(trn(de, 2, "{n} byte", "{n} bytes"), "2 Byte");
+    }
+
+    #[test]
     fn french_covers_commands_and_catalogue() {
         let fr = Lang::from_code("fr").expect("fr registered");
         for command in pdfcraft_engine::commands::COMMANDS {
