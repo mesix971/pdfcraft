@@ -2458,3 +2458,6 @@ file state	Open	Відкрито
 	This picture is too large.	Це зображення завелике.
 	Couldn't use this picture: {e}	Не вдалося використати це зображення: {e}
 	Couldn't use this picture.	Не вдалося використати це зображення.
+	{n} MB	{n} МБ
+	{n} KB	{n} КБ
+decimal separator	.	,

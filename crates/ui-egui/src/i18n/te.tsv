@@ -2348,3 +2348,6 @@ file state	Open	తెరిచి ఉంది
 	This picture is too large.	ఈ చిత్రం చాలా పెద్దది.
 	Couldn't use this picture: {e}	ఈ చిత్రాన్ని ఉపయోగించడం సాధ్యం కాలేదు: {e}
 	Couldn't use this picture.	ఈ చిత్రాన్ని ఉపయోగించడం సాధ్యం కాలేదు.
+	{n} MB	{n} MB
+	{n} KB	{n} KB
+decimal separator	.	.

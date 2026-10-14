@@ -2349,3 +2349,6 @@ file state	Open	Открыт
 	This picture is too large.	Это изображение слишком велико.
 	Couldn't use this picture: {e}	Не удалось использовать это изображение: {e}
 	Couldn't use this picture.	Не удалось использовать это изображение.
+	{n} MB	{n} МБ
+	{n} KB	{n} КБ
+decimal separator	.	,

@@ -2433,3 +2433,6 @@ file state	Open	Ашық
 	This picture is too large.	Бұл сурет тым үлкен.
 	Couldn't use this picture: {e}	Бұл суретті пайдалану мүмкін болмады: {e}
 	Couldn't use this picture.	Бұл суретті пайдалану мүмкін болмады.
+	{n} MB	{n} МБ
+	{n} KB	{n} КБ
+decimal separator	.	,

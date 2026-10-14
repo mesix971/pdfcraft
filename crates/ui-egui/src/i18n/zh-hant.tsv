@@ -2311,3 +2311,6 @@ file state	Open	已開啟
 	This picture is too large.	此圖片太大。
 	Couldn't use this picture: {e}	無法使用此圖片：{e}
 	Couldn't use this picture.	無法使用此圖片。
+	{n} MB	{n} MB
+	{n} KB	{n} KB
+decimal separator	.	.

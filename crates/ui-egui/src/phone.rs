@@ -482,6 +482,54 @@ pub(crate) fn tool_hue(t: &Tokens, id: &str) -> Color32 {
     if t.dark() { hue.lerp_to_gamma(Color32::WHITE, 0.25) } else { hue.lerp_to_gamma(Color32::BLACK, 0.15) }
 }
 
+/// A tool group's colour at full strength, for a tile filled with it (its icon white on top).
+pub(crate) fn tool_color(id: &str) -> Color32 {
+    let rgb = match id {
+        "draw" => [0x3A, 0x6F, 0xE8],
+        id => catalog::group(id).map_or([0x12, 0xA5, 0x8A], |g| g.hue),
+    };
+    Color32::from_rgb(rgb[0], rgb[1], rgb[2])
+}
+
+/// A tile filled with `color`: lit at the top left, deeper at the bottom right, its edge smooth.
+pub(crate) fn vivid_tile(painter: &egui::Painter, rect: Rect, radius: f32, color: Color32) {
+    let (from, to) = (color.lerp_to_gamma(Color32::WHITE, 0.14), color.lerp_to_gamma(Color32::BLACK, 0.26));
+    // The plain shape under it gives the edge egui's smoothing; the gradient covers the rest.
+    painter.rect_filled(rect, CornerRadius::same(radius.clamp(0.0, 255.0) as u8), from.lerp_to_gamma(to, 0.5));
+    gradient_rect(painter, rect.shrink(0.6), (radius - 0.6).max(0.0), from, to);
+}
+
+/// A rounded rectangle shaded from `from` (top left) to `to` (bottom right).
+pub(crate) fn gradient_rect(painter: &egui::Painter, rect: Rect, radius: f32, from: Color32, to: Color32) {
+    use std::f32::consts::{FRAC_PI_2, PI};
+    const ARC: u32 = 8;
+    let r = radius.clamp(0.0, rect.width().min(rect.height()).max(0.0) / 2.0);
+    let span = (rect.width() + rect.height()).max(1.0);
+    let shade = |p: egui::Pos2| from.lerp_to_gamma(to, (((p.x - rect.left()) + (p.y - rect.top())) / span).clamp(0.0, 1.0));
+    let mut mesh = egui::Mesh::default();
+    mesh.colored_vertex(rect.center(), shade(rect.center()));
+    // The corners clockwise from the top right, each a quarter turn from where its arc starts.
+    let corners = [
+        (pos2(rect.right() - r, rect.top() + r), -FRAC_PI_2),
+        (pos2(rect.right() - r, rect.bottom() - r), 0.0),
+        (pos2(rect.left() + r, rect.bottom() - r), FRAC_PI_2),
+        (pos2(rect.left() + r, rect.top() + r), PI),
+    ];
+    for (centre, start) in corners {
+        for k in 0..=ARC {
+            let a = start + k as f32 / ARC as f32 * FRAC_PI_2;
+            let p = centre + r * vec2(a.cos(), a.sin());
+            mesh.colored_vertex(p, shade(p));
+        }
+    }
+    // A fan from the centre: the shape is convex.
+    let rim = 4 * (ARC + 1);
+    for i in 1..=rim {
+        mesh.add_triangle(0, i, if i == rim { 1 } else { i + 1 });
+    }
+    painter.add(egui::Shape::mesh(mesh));
+}
+
 /// A bottom-bar item: an icon above its label (`size` points, up to two lines), a finger wide.
 /// The icon is drawn in `hue`.
 fn bar_item(ui: &mut egui::Ui, icon: &str, label: &str, width: f32, size: f32, hue: Color32, t: &Tokens) -> egui::Response {
@@ -1089,15 +1137,14 @@ pub(crate) fn tool_tile(ui: &mut egui::Ui, g: &catalog::ToolGroup, width: f32, t
     let press = theme::Press::track(ui, &resp);
     press.wash(ui, rect.shrink(3.0), 12, false);
     let body = rect.translate(press.offset());
-    let hue = Color32::from_rgb(g.hue[0], g.hue[1], g.hue[2]);
-    let disc = Rect::from_center_size(body.center_top() + vec2(0.0, 28.0), Vec2::splat(42.0));
-    ui.painter().rect_filled(disc, CornerRadius::same(14), hue.gamma_multiply(if t.dark() { 0.28 } else { 0.14 }));
-    icons::paint(ui, disc, g.icon, 22.0, hue);
+    let disc = Rect::from_center_size(body.center_top() + vec2(0.0, 28.0), Vec2::splat(46.0));
+    vivid_tile(ui.painter(), disc, 15.0, tool_color(g.id));
+    icons::paint(ui, disc, g.icon, 24.0, Color32::WHITE);
     let mut job = egui::text::LayoutJob::simple(label.to_owned(), theme::regular(11.5), t.text, width - 8.0);
     job.wrap.max_rows = 2;
     job.halign = egui::Align::Center;
     let galley = ui.painter().layout_job(job);
-    ui.painter().galley(pos2(body.center().x, body.top() + 56.0), galley, t.text);
+    ui.painter().galley(pos2(body.center().x, body.top() + 58.0), galley, t.text);
     theme::hand(resp)
 }
 

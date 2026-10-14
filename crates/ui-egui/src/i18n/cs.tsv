@@ -2509,3 +2509,6 @@ file state	Open	Otevřeno
 	This picture is too large.	Tento obrázek je příliš velký.
 	Couldn't use this picture: {e}	Tento obrázek nelze použít: {e}
 	Couldn't use this picture.	Tento obrázek nelze použít.
+	{n} MB	{n} MB
+	{n} KB	{n} kB
+decimal separator	.	,

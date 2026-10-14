@@ -2435,3 +2435,6 @@ file state	Open	Ouvert
 	This picture is too large.	Cette image est trop volumineuse.
 	Couldn't use this picture: {e}	Impossible d'utiliser cette image : {e}
 	Couldn't use this picture.	Impossible d'utiliser cette image.
+	{n} MB	{n} Mo
+	{n} KB	{n} Ko
+decimal separator	.	,

@@ -645,7 +645,8 @@ fn home_greets_by_name_and_the_profile_sets_it() {
     h.run_steps(2);
     back(&mut h);
     back(&mut h);
-    assert!(shows(&h, "Hello, Ana Diaz"));
+    // By first name; the whole name signs comments.
+    assert!(shows(&h, "Hello, Ana") && !shows(&h, "Hello, Ana Diaz"));
     assert!(!shows(&h, "Make PdfCraft yours"), "the tip has done its job");
     assert_eq!(h.state().comment_prefs.author, "Ana Diaz", "the same name signs comments");
 }
@@ -902,4 +903,39 @@ fn a_wrong_home_tab_leaves_the_document_shown() {
     let mut h = harness(true);
     assert!(h.state_mut().set_option("home_tab", "nowhere").is_err());
     assert_eq!(h.state().active, Some(0));
+}
+
+/// A swipe up that starts on the quick actions moves the page (the row only scrolls sideways,
+/// and egui gives a drag to the innermost scroll area); a swipe sideways moves the row.
+#[test]
+fn a_swipe_on_a_row_moves_the_page_or_the_row() {
+    let dir = folder("swipe");
+    for i in 0..30 {
+        std::fs::write(dir.join(format!("file{i:02}.pdf")), FIXTURE).unwrap();
+    }
+    let folders = vec![dir.clone()];
+    let mut h = harness_with(None, move |app| app.device_folders = folders);
+    click(&mut h, "On this device");
+    wait(&mut h, |app| app.home_device_files().len() == 30);
+    // A touch screen: egui scrolls by dragging only where it has seen one.
+    for phase in [egui::TouchPhase::Start, egui::TouchPhase::End] {
+        h.event(Event::Touch { device_id: egui::TouchDeviceId(0), id: egui::TouchId(0), phase, pos: pos2(4.0, 4.0), force: None });
+    }
+    h.run_steps(2);
+    let page = |h: &Harness<'static, PdfCraftApp>| h.get_by_label("Recent").rect().top();
+    let row = |h: &Harness<'static, PdfCraftApp>| h.get_by_label("Comments").rect().left();
+    let (page_before, row_before) = (page(&h), row(&h));
+    let tile = h.get_by_label("Comments").rect().center();
+    finger_drag(&mut h, tile, tile - vec2(0.0, 240.0));
+    h.run_steps(10);
+    assert!(page_before - page(&h) > 150.0, "the page moved up: {} → {}", page_before, page(&h));
+    assert!((row(&h) - row_before).abs() < 2.0, "the row stayed put");
+    // Sideways, the row moves and the page doesn't.
+    let (page_now, row_now) = (page(&h), row(&h));
+    let tile = h.get_by_label("Comments").rect().center();
+    finger_drag(&mut h, tile, tile - vec2(150.0, 0.0));
+    h.run_steps(10);
+    assert!(row_now - row(&h) > 100.0, "the row moved left: {} → {}", row_now, row(&h));
+    assert!((page(&h) - page_now).abs() < 2.0, "the page stayed put");
+    let _ = std::fs::remove_dir_all(&dir);
 }

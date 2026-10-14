@@ -2431,3 +2431,6 @@ file state	Open	Açık
 	This picture is too large.	Bu görsel çok büyük.
 	Couldn't use this picture: {e}	Bu görsel kullanılamadı: {e}
 	Couldn't use this picture.	Bu görsel kullanılamadı.
+	{n} MB	{n} MB
+	{n} KB	{n} KB
+decimal separator	.	,

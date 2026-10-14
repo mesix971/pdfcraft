@@ -1359,6 +1359,8 @@ mod tests {
             "ΔLOC",
             "+Bin",
             "−Bin",
+            // The unit's symbol is the same in Czech (only kB differs).
+            "{n} MB",
         ];
         let (entries, errors) = parse_entries(cs.0.source, cs.0.plural_forms());
         assert!(errors.is_empty(), "{errors:?}");
@@ -1471,6 +1473,9 @@ mod tests {
             "−Bin",
             "Model",
             "Home / End",
+            // The units' symbols are the same in Turkish.
+            "{n} MB",
+            "{n} KB",
         ];
         let (entries, errors) = parse_entries(tr_lang.0.source, tr_lang.0.plural_forms());
         assert!(errors.is_empty(), "Turkish catalog errors: {errors:?}");

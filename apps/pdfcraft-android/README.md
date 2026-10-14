@@ -110,8 +110,10 @@ Android 8.0 (API 26) or later, 64-bit ARM by default.
     two-column settings put each label above its controls
     (`tests/phone.rs::every_dialog_keeps_its_controls_on_a_phone_screen` checks every dialog).
   - Back closes one thing at a time and never leaves Home.
-  - Colour: the accent is the icon's green, Home has a header in it, each tool keeps its
-    group's colour in the bottom bar, and a tool mode's bar takes a wash of it. The strip under
+  - Colour: the accent is the icon's green. Home sits on a deeper ground under a glow that goes
+    from that green to the ArtCraft mark's blue, with its header over it rather than on a bar;
+    each tool keeps its group's colour (Home's tiles, the bottom bar), and a tool mode's bar takes
+    a wash of it. Sizes are written the UI language's way ("30,5 Ko" in French). The strip under
     Android's status bar is PdfCraft's to paint (a `NativeActivity` window takes the whole
     screen), in the same green.
 - **The AI assistant** (`crates/ai`): summarize the document, ask about it, translate a page,

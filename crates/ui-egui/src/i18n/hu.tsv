@@ -2434,3 +2434,6 @@ file state	Open	Megnyitva
 	This picture is too large.	Ez a kép túl nagy.
 	Couldn't use this picture: {e}	Ezt a képet nem sikerült használni: {e}
 	Couldn't use this picture.	Ezt a képet nem sikerült használni.
+	{n} MB	{n} MB
+	{n} KB	{n} KB
+decimal separator	.	,

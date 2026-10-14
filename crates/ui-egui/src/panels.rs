@@ -1326,10 +1326,19 @@ fn fields(
 
 pub fn human_size(n: usize) -> String {
     match n {
-        n if n >= 1 << 20 => format!("{:.1} MB", n as f64 / (1u64 << 20) as f64),
-        n if n >= 1 << 10 => format!("{:.1} KB", n as f64 / (1u64 << 10) as f64),
+        // From the size that would round to "1024.0 KB".
+        n if n >= (1 << 20) - 51 => crate::i18n::fmt(tl!("{n} MB"), &[("n", &one_decimal(n as f64 / (1u64 << 20) as f64))]),
+        n if n >= 1 << 10 => crate::i18n::fmt(tl!("{n} KB"), &[("n", &one_decimal(n as f64 / (1u64 << 10) as f64))]),
         n => byte_count(n),
     }
+}
+
+/// `x` with one decimal, written the UI language's way ("3.5", "3,5"): each catalog says which
+/// mark separates the decimals.
+fn one_decimal(x: f64) -> String {
+    let written = format!("{x:.1}");
+    let mark = tl_ctx!("decimal separator", ".");
+    if mark == "." { written } else { written.replacen('.', mark, 1) }
 }
 
 /// An exact size in bytes, with the count's own plural form.
@@ -1438,5 +1447,26 @@ mod bookmark_filter {
         // A child match keeps its parent: [0] and [0, 0].
         assert_eq!(outline_matches(&outline, &fold("KIŞ")).len(), 2);
         assert!(outline_matches(&outline, &fold("izmir")).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod sizes {
+    use super::human_size;
+    use crate::i18n::{self, Lang};
+
+    /// Units and the decimal mark follow the language, and a size that would round to
+    /// "1024.0 KB" is written in megabytes.
+    #[test]
+    fn sizes_are_written_the_languages_way() {
+        // The language is per thread: this test's alone.
+        i18n::set_current(Lang::EN);
+        assert_eq!(human_size((1 << 20) - 52), "1023.9 KB");
+        assert_eq!(human_size((1 << 20) - 51), "1.0 MB");
+        assert_eq!(human_size(3 << 19), "1.5 MB");
+        i18n::set_current(Lang::from_code("fr").expect("French ships"));
+        assert_eq!(human_size(31_232), "30,5 Ko");
+        assert_eq!(human_size(3 << 19), "1,5 Mo");
+        i18n::set_current(Lang::EN);
     }
 }

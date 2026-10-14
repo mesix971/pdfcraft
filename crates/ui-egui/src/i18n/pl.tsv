@@ -2416,3 +2416,6 @@ file state	Open	Otwarty
 	This picture is too large.	Ten obraz jest za duży.
 	Couldn't use this picture: {e}	Nie można użyć tego obrazu: {e}
 	Couldn't use this picture.	Nie można użyć tego obrazu.
+	{n} MB	{n} MB
+	{n} KB	{n} KB
+decimal separator	.	,

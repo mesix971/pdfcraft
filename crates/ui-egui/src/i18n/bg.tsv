@@ -2398,3 +2398,6 @@ file state	Open	Отворен
 	This picture is too large.	Това изображение е твърде голямо.
 	Couldn't use this picture: {e}	Това изображение не можа да бъде използвано: {e}
 	Couldn't use this picture.	Това изображение не можа да бъде използвано.
+	{n} MB	{n} МБ
+	{n} KB	{n} КБ
+decimal separator	.	,

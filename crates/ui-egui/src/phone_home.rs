@@ -18,13 +18,31 @@ use crate::{PdfCraftApp, icons, widgets};
 
 /// Home's header: the app's mark and name, search, and the profile.
 const HEADER: f32 = 64.0;
+/// The ArtCraft mark's blue, which the glow behind Home's top fades into from the icon's green.
+const MARK_BLUE: Color32 = Color32::from_rgb(0x4E, 0x7B, 0xFB);
 /// The tab bar along the bottom.
 const NAV: f32 = 64.0;
 /// The floating "+".
-const FAB: f32 = 56.0;
+const FAB: f32 = 60.0;
 /// A file's row, and its thumbnail.
-const ROW: f32 = 76.0;
+const ROW: f32 = 78.0;
 const THUMB: Vec2 = vec2(46.0, 60.0);
+
+/// Home's own surfaces: a deeper ground than the rest of the app (its glow shows on it), cards
+/// a step up from it, and their edges.
+struct Look {
+    ground: Color32,
+    surface: Color32,
+    edge: Color32,
+}
+
+fn look(t: &Tokens) -> Look {
+    if t.dark() {
+        Look { ground: Color32::from_rgb(0x0D, 0x11, 0x10), surface: Color32::from_rgb(0x17, 0x1D, 0x1B), edge: Color32::from_rgb(0x28, 0x31, 0x2E) }
+    } else {
+        Look { ground: Color32::from_rgb(0xF5, 0xF8, 0xF7), surface: Color32::WHITE, edge: Color32::from_rgb(0xE0, 0xE6, 0xE4) }
+    }
+}
 
 /// The tabs along the bottom of Home.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -260,8 +278,15 @@ pub(crate) fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui, screen: Rect, t: &T
     }
     #[cfg(not(target_arch = "wasm32"))]
     app.phone.home.thumbs.begin_frame();
+    // egui fades a scrolled area's edges in its frame's colour, which isn't Home's ground and
+    // glow: a band would show under the header.
+    ui.spacing_mut().scroll.fade.strength = 0.0;
     let nav = Rect::from_min_max(pos2(screen.left(), screen.bottom() - NAV), screen.max);
     let body = Rect::from_min_max(screen.min, pos2(screen.right(), nav.top()));
+    ui.painter().rect_filled(body, CornerRadius::ZERO, look(t).ground);
+    if app.phone.home.tab == HomeTab::Home {
+        glow(ui.painter(), body, t);
+    }
     match app.phone.home.tab {
         HomeTab::Home => home_tab(app, ui, body, t),
         HomeTab::Files => files_tab(app, ui, body, t),
@@ -286,15 +311,16 @@ fn home_tab(app: &mut PdfCraftApp, ui: &mut egui::Ui, body: Rect, t: &Tokens) {
         egui::ScrollArea::vertical().id_salt("phone-home").auto_shrink([false, false]).show(ui, |ui| {
             ui.spacing_mut().item_spacing.y = 0.0;
             if app.phone.home.search.is_none() {
-                ui.add_space(18.0);
+                ui.add_space(14.0);
+                // By first name, as a person greets.
                 let greeting = match app.profile_name() {
-                    Some(name) => crate::i18n::fmt(tl!("Hello, {name}"), &[("name", name)]),
+                    Some(name) => crate::i18n::fmt(tl!("Hello, {name}"), &[("name", first_name(name))]),
                     None => tl!("Welcome to PdfCraft").to_owned(),
                 };
                 indented(ui, |ui| {
-                    ui.add(egui::Label::new(egui::RichText::new(greeting).font(theme::semibold(26.0)).color(t.text)).wrap());
+                    ui.add(egui::Label::new(egui::RichText::new(greeting).font(theme::semibold(30.0)).color(t.text)).wrap());
                 });
-                ui.add_space(14.0);
+                ui.add_space(20.0);
                 tips(app, ui, t);
                 section_title(ui, tl!("What would you like to do?"), t);
                 quick_actions(app, ui, t);
@@ -309,7 +335,7 @@ fn home_tab(app: &mut PdfCraftApp, ui: &mut egui::Ui, body: Rect, t: &Tokens) {
 }
 
 fn files_tab(app: &mut PdfCraftApp, ui: &mut egui::Ui, body: Rect, t: &Tokens) {
-    let top = Rect::from_min_size(body.min, vec2(body.width(), TOP_BAR));
+    let top = Rect::from_min_size(body.min, vec2(body.width(), HEADER));
     title_bar(ui, "phone-files-bar", top, tl!("Files"), t);
     let rest = Rect::from_min_max(pos2(body.left(), top.bottom()), body.max);
     let places = places(app);
@@ -352,7 +378,7 @@ fn browse(app: &mut PdfCraftApp, dir: &std::path::Path) {
 }
 
 fn create_tab(app: &mut PdfCraftApp, ui: &mut egui::Ui, body: Rect, t: &Tokens) {
-    let top = Rect::from_min_size(body.min, vec2(body.width(), TOP_BAR));
+    let top = Rect::from_min_size(body.min, vec2(body.width(), HEADER));
     title_bar(ui, "phone-create-bar", top, tl!("Create"), t);
     let rest = Rect::from_min_max(pos2(body.left(), top.bottom()), body.max);
     // (command, icon, the tool group whose colour it takes, what it makes)
@@ -369,7 +395,7 @@ fn create_tab(app: &mut PdfCraftApp, ui: &mut egui::Ui, body: Rect, t: &Tokens) 
             ui.add_space(8.0);
             for (command, icon, hue, detail) in rows {
                 let title = phone::command_label(app, command);
-                if action_row(ui, icon, phone::tool_hue(t, hue), &title, detail, t).clicked() {
+                if action_row(ui, icon, phone::tool_color(hue), &title, detail, t).clicked() {
                     run = Some(command);
                 }
             }
@@ -381,7 +407,7 @@ fn create_tab(app: &mut PdfCraftApp, ui: &mut egui::Ui, body: Rect, t: &Tokens) 
 }
 
 fn tools_tab(app: &mut PdfCraftApp, ui: &mut egui::Ui, body: Rect, t: &Tokens) {
-    let top = Rect::from_min_size(body.min, vec2(body.width(), TOP_BAR));
+    let top = Rect::from_min_size(body.min, vec2(body.width(), HEADER));
     title_bar(ui, "phone-tools-bar", top, tl!("Tools"), t);
     let rest = Rect::from_min_max(pos2(body.left(), top.bottom()), body.max);
     let mut pick = None;
@@ -417,7 +443,8 @@ fn tools_tab(app: &mut PdfCraftApp, ui: &mut egui::Ui, body: Rect, t: &Tokens) {
 // ---------------------------------------------------------------------------------------------
 // Home's parts
 
-/// The header in the icon's green: the ArtCraft mark and the app's name, search, and the profile.
+/// The header, over the glow rather than on a bar of its own: the ArtCraft mark and the app's
+/// name, search, and the profile.
 fn header(app: &mut PdfCraftApp, ui: &mut egui::Ui, rect: Rect, t: &Tokens) {
     let mut search = false;
     let mut profile = false;
@@ -425,35 +452,46 @@ fn header(app: &mut PdfCraftApp, ui: &mut egui::Ui, rect: Rect, t: &Tokens) {
     let photo = photo_texture(app, ui.ctx());
     let initials = initials(app.profile_name());
     let searching = app.phone.home.search.is_some();
-    phone::bar_filled(ui, "phone-home-bar", rect, t.brand, None, true, |ui| {
-        if let Some(query) = app.phone.home.search.as_mut() {
-            close_search = header_button(ui, "chevron-left", tl!("Back"), t).clicked();
-            let edit = egui::TextEdit::singleline(query)
-                .id(egui::Id::new("phone-home-search"))
-                .hint_text(tl!("Search files"))
-                .font(theme::regular(16.0))
-                .desired_width(ui.available_width() - 12.0)
-                .char_limit(200);
-            // The field's name for screen readers (its hint isn't one).
-            let name = ui.allocate_response(Vec2::ZERO, Sense::hover());
-            name.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, tl!("Search files")));
-            let r = ui.add(edit).labelled_by(name.id);
-            // On the frame it shows: focus asked for earlier would name a widget not there yet.
-            if std::mem::take(&mut app.phone.home.focus_search) {
-                r.request_focus();
+    egui::Area::new(egui::Id::new("phone-home-bar")).order(egui::Order::Middle).fixed_pos(rect.min).constrain(false).show(ui.ctx(), |ui| {
+        let (r, _) = ui.allocate_exact_size(rect.size(), Sense::hover());
+        let inner = r.shrink2(vec2(8.0, 0.0));
+        ui.scope_builder(egui::UiBuilder::new().max_rect(inner).layout(egui::Layout::left_to_right(egui::Align::Center)), |ui| {
+            ui.spacing_mut().item_spacing.x = 0.0;
+            if let Some(query) = app.phone.home.search.as_mut() {
+                close_search = header_button(ui, "chevron-left", tl!("Back"), t).clicked();
+                ui.add_space(4.0);
+                let edit = egui::TextEdit::singleline(query)
+                    .id(egui::Id::new("phone-home-search"))
+                    .hint_text(tl!("Search files"))
+                    .font(theme::regular(16.0))
+                    .margin(egui::Margin::symmetric(14, 10))
+                    .background_color(look(t).surface)
+                    .desired_width(ui.available_width() - 8.0)
+                    .char_limit(200);
+                // The field's name for screen readers (its hint isn't one).
+                let name = ui.allocate_response(Vec2::ZERO, Sense::hover());
+                name.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, tl!("Search files")));
+                let r = ui.add(edit).labelled_by(name.id);
+                // On the frame it shows: focus asked for earlier would name a widget not there yet.
+                if std::mem::take(&mut app.phone.home.focus_search) {
+                    r.request_focus();
+                }
+                return;
             }
-            return;
-        }
-        let (r, _) = ui.allocate_exact_size(vec2(ui.available_width() - 2.0 * TARGET, HEADER), Sense::hover());
-        let disc = Rect::from_center_size(r.left_center() + vec2(26.0, 0.0), Vec2::splat(36.0));
-        ui.painter().circle_filled(disc.center(), 18.0, Color32::WHITE);
-        egui::Image::from_bytes("bytes://artcraft-mark.svg", include_bytes!("../../../docs/brand/artcraft-mark.svg")).paint_at(ui, disc.shrink(6.0));
-        ui.painter().text(disc.right_center() + vec2(10.0, 0.0), Align2::LEFT_CENTER, "PdfCraft", theme::semibold(22.0), t.on_brand);
-        search = header_button(ui, "search", tl!("Search"), t).clicked();
-        let (b, resp) = ui.allocate_exact_size(Vec2::splat(TARGET), Sense::click());
-        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!("Profile")));
-        avatar(ui, Rect::from_center_size(b.center(), Vec2::splat(36.0)), photo.as_ref(), &initials, t, true);
-        profile = theme::hand(resp).clicked();
+            ui.add_space(8.0);
+            let (mark, _) = ui.allocate_exact_size(Vec2::splat(32.0), Sense::hover());
+            egui::Image::from_bytes("bytes://artcraft-mark.svg", include_bytes!("../../../docs/brand/artcraft-mark.svg")).paint_at(ui, mark);
+            let (r, _) = ui.allocate_exact_size(vec2(ui.available_width() - 2.0 * TARGET, HEADER), Sense::hover());
+            ui.painter().text(r.left_center() + vec2(10.0, 0.0), Align2::LEFT_CENTER, "PdfCraft", theme::semibold(21.0), t.text);
+            search = header_button(ui, "search", tl!("Search"), t).clicked();
+            let (b, resp) = ui.allocate_exact_size(Vec2::splat(TARGET), Sense::click());
+            resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!("Profile")));
+            let press = theme::Press::track(ui, &resp);
+            let face = Rect::from_center_size(b.center() + press.offset(), Vec2::splat(34.0));
+            avatar(ui, face, photo.as_ref(), &initials, t);
+            gradient_ring(ui.painter(), face.center(), 19.0, 21.5, t.brand, MARK_BLUE);
+            profile = theme::hand(resp).clicked();
+        });
     });
     if search && !searching {
         app.phone.home.search = Some(String::new());
@@ -467,47 +505,110 @@ fn header(app: &mut PdfCraftApp, ui: &mut egui::Ui, rect: Rect, t: &Tokens) {
     }
 }
 
-/// A white icon button on the header's green.
+/// An icon button in the header, in the text's colour.
 fn header_button(ui: &mut egui::Ui, icon: &str, label: &str, t: &Tokens) -> egui::Response {
     let (b, resp) = ui.allocate_exact_size(Vec2::splat(TARGET), Sense::click());
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label));
     let press = theme::Press::track(ui, &resp);
-    let wash = Color32::from_white_alpha(0).lerp_to_gamma(Color32::from_white_alpha(46), ((press.hover + press.down) * 6.0).min(1.0));
-    ui.painter().rect_filled(b.shrink(4.0), CornerRadius::same(20), wash);
-    icons::paint(ui, b.translate(press.offset()), icon, 22.0, t.on_brand);
+    press.wash(ui, b.shrink(4.0), 20, false);
+    icons::paint(ui, b.translate(press.offset()), icon, 22.0, t.text);
     theme::hand(resp)
 }
 
-/// A title bar for the Files, Create and Tools tabs.
+/// The Files, Create and Tools tabs' title: large, on Home's ground as Home's header is.
 fn title_bar(ui: &mut egui::Ui, id: &str, rect: Rect, title: &str, t: &Tokens) {
-    phone::bar(ui, id, rect, t, true, |ui| {
-        let width = ui.available_width();
-        let (r, _) = ui.allocate_exact_size(vec2(width, TOP_BAR), Sense::hover());
-        ui.painter().text(r.left_center() + vec2(12.0, 0.0), Align2::LEFT_CENTER, title, theme::semibold(20.0), t.text);
+    ui.scope_builder(egui::UiBuilder::new().max_rect(rect).id_salt(id), |ui| {
+        let (r, _) = ui.allocate_exact_size(rect.size(), Sense::hover());
+        let width = (r.width() - 32.0).max(0.0);
+        widgets::row_text(ui, pos2(r.left() + 16.0, r.center().y + 2.0), title, theme::semibold(26.0), t.text, width);
     });
 }
 
-/// The photo, or the name's initials on the accent, or a person: `rect`'s circle. `ring` draws a
-/// white ring (on the header's green).
-fn avatar(ui: &egui::Ui, rect: Rect, photo: Option<&TextureHandle>, initials: &str, t: &Tokens, ring: bool) {
+/// The photo, or the name's initials on the accent, or a person: `rect`'s circle.
+fn avatar(ui: &egui::Ui, rect: Rect, photo: Option<&TextureHandle>, initials: &str, t: &Tokens) {
     let radius = rect.width().min(rect.height()) / 2.0;
     match photo {
         Some(tex) => {
             egui::Image::new((tex.id(), rect.size())).corner_radius(CornerRadius::same(radius.min(255.0) as u8)).paint_at(ui, rect);
         }
         None => {
-            ui.painter().circle_filled(rect.center(), radius, if ring { t.accent } else { t.accent_soft });
-            let color = if ring { Color32::WHITE } else { t.accent_text };
+            // From the accent, deeper: white initials read on all of it.
+            gradient_disc(ui.painter(), rect.center(), radius, t.accent, t.accent.lerp_to_gamma(Color32::BLACK, 0.25));
             if initials.is_empty() {
-                icons::paint(ui, rect, "user-round", radius, color);
+                icons::paint(ui, rect, "user-round", radius, Color32::WHITE);
             } else {
-                ui.painter().text(rect.center(), Align2::CENTER_CENTER, initials, theme::semibold(radius * 0.8), color);
+                ui.painter().text(rect.center(), Align2::CENTER_CENTER, initials, theme::semibold(radius * 0.8), Color32::WHITE);
             }
         }
     }
-    if ring {
-        ui.painter().circle_stroke(rect.center(), radius, Stroke::new(2.0, Color32::WHITE));
+}
+
+/// The glow at the top of Home: the icon's green at the left and the mark's blue at the right,
+/// fading out downwards (eased, so it has no edge).
+fn glow(painter: &egui::Painter, body: Rect, t: &Tokens) {
+    const BANDS: u32 = 16;
+    let strength = if t.dark() { 0.62 } else { 0.30 };
+    let height = body.height().min(320.0);
+    let mut mesh = egui::Mesh::default();
+    for i in 0..=BANDS {
+        let f = i as f32 / BANDS as f32;
+        let fade = (1.0 - f) * (1.0 - f) * strength;
+        let y = body.top() + height * f;
+        mesh.colored_vertex(pos2(body.left(), y), t.brand.gamma_multiply(fade));
+        mesh.colored_vertex(pos2(body.right(), y), MARK_BLUE.gamma_multiply(fade * 0.85));
     }
+    for i in 0..BANDS {
+        let a = i * 2;
+        mesh.add_triangle(a, a + 1, a + 2);
+        mesh.add_triangle(a + 1, a + 3, a + 2);
+    }
+    painter.add(egui::Shape::mesh(mesh));
+}
+
+/// A disc shaded from `from` (top left) to `to` (bottom right).
+fn gradient_disc(painter: &egui::Painter, center: egui::Pos2, radius: f32, from: Color32, to: Color32) {
+    const STEPS: u32 = 48;
+    let mut mesh = egui::Mesh::default();
+    let shade = |p: egui::Pos2| {
+        // Along the diagonal: 0 at the top left of the disc, 1 at the bottom right.
+        let d = ((p.x - center.x) + (p.y - center.y)) / (2.0 * radius.max(0.5) * std::f32::consts::SQRT_2) + 0.5;
+        from.lerp_to_gamma(to, d.clamp(0.0, 1.0))
+    };
+    mesh.colored_vertex(center, shade(center));
+    for i in 0..=STEPS {
+        let a = i as f32 / STEPS as f32 * std::f32::consts::TAU;
+        let p = center + radius * vec2(a.cos(), a.sin());
+        mesh.colored_vertex(p, shade(p));
+        if i > 0 {
+            mesh.add_triangle(0, i, i + 1);
+        }
+    }
+    painter.add(egui::Shape::mesh(mesh));
+}
+
+/// A ring between `inner` and `outer`, shaded from `from` (top left) to `to` (bottom right).
+fn gradient_ring(painter: &egui::Painter, center: egui::Pos2, inner: f32, outer: f32, from: Color32, to: Color32) {
+    const STEPS: u32 = 64;
+    let mut mesh = egui::Mesh::default();
+    for i in 0..=STEPS {
+        let a = i as f32 / STEPS as f32 * std::f32::consts::TAU;
+        let dir = vec2(a.cos(), a.sin());
+        // Green at the top left, blue at the bottom right.
+        let c = from.lerp_to_gamma(to, ((dir.x + dir.y) / std::f32::consts::SQRT_2 * 0.5 + 0.5).clamp(0.0, 1.0));
+        mesh.colored_vertex(center + inner * dir, c);
+        mesh.colored_vertex(center + outer * dir, c);
+        if i > 0 {
+            let k = i * 2;
+            mesh.add_triangle(k - 2, k - 1, k);
+            mesh.add_triangle(k - 1, k + 1, k);
+        }
+    }
+    painter.add(egui::Shape::mesh(mesh));
+}
+
+/// The first word of a name ("Ana Diaz" → "Ana").
+fn first_name(name: &str) -> &str {
+    name.split_whitespace().next().unwrap_or(name)
 }
 
 /// The first letters of the name's first two words ("Ana Diaz" → "AD").
@@ -538,8 +639,8 @@ fn indented<R>(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
 }
 
 fn section_title(ui: &mut egui::Ui, title: &str, t: &Tokens) {
-    egui::Frame::NONE.inner_margin(egui::Margin { left: 16, right: 16, top: 10, bottom: 8 }).show(ui, |ui| {
-        ui.add(egui::Label::new(egui::RichText::new(title).font(theme::semibold(16.0)).color(t.text)).wrap());
+    egui::Frame::NONE.inner_margin(egui::Margin { left: 16, right: 16, top: 12, bottom: 10 }).show(ui, |ui| {
+        ui.add(egui::Label::new(egui::RichText::new(title).font(theme::semibold(18.0)).color(t.text)).wrap());
     });
 }
 
@@ -553,7 +654,7 @@ fn tips(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
         cards.push((
             "ai",
             "sparkles",
-            phone::tool_hue(t, "ai"),
+            phone::tool_color("ai"),
             tl!("Your AI assistant"),
             tl!("Summarize, question and correct your PDFs with Claude, with your own key."),
             tl!("Set up"),
@@ -563,7 +664,7 @@ fn tips(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
         cards.push((
             "profile",
             "user-round",
-            t.accent,
+            t.brand,
             tl!("Make PdfCraft yours"),
             tl!("Add your name and a photo. Your name also signs your comments."),
             tl!("Add my name"),
@@ -574,7 +675,7 @@ fn tips(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
         cards.push((
             "access",
             "folder-open",
-            phone::tool_hue(t, "export"),
+            phone::tool_color("export"),
             tl!("See your PDFs"),
             tl!("Allow access to your files and PdfCraft lists the PDFs on this device."),
             tl!("Allow access"),
@@ -586,49 +687,59 @@ fn tips(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
     }
     let mut act = None;
     let mut dismiss = None;
+    let look = look(t);
     // The next card shows at the edge, so the row reads as one that scrolls.
-    let width = (ui.available_width() - 56.0).min(340.0);
-    egui::ScrollArea::horizontal().id_salt("phone-tips").auto_shrink([false, true]).show(ui, |ui| {
-        ui.horizontal(|ui| {
+    let width = (ui.available_width() - 48.0).min(360.0);
+    // The tinted panel at each card's left, with the tip's icon.
+    const PANEL: f32 = 84.0;
+    swipe_row(ui, "phone-tips", |ui| {
+        ui.horizontal_top(|ui| {
             ui.add_space(16.0);
             ui.spacing_mut().item_spacing.x = 12.0;
             for (id, icon, hue, title, text, action) in &cards {
-                egui::Frame::NONE
-                    .fill(t.card)
-                    .stroke(Stroke::new(1.0, t.border))
-                    .corner_radius(CornerRadius::same(16))
-                    .inner_margin(egui::Margin::same(14))
+                let card = egui::Frame::NONE
+                    .fill(look.surface)
+                    .stroke(Stroke::new(1.0, look.edge))
+                    .corner_radius(CornerRadius::same(18))
+                    // The panel (84) and a gap (14) at the left.
+                    .inner_margin(egui::Margin { left: 98, right: 4, top: 12, bottom: 10 })
                     .show(ui, |ui| {
-                        ui.set_width(width - 28.0);
+                        ui.set_width(width - PANEL - 18.0);
+                        ui.set_min_height(104.0);
                         ui.horizontal_top(|ui| {
-                            let (disc, _) = ui.allocate_exact_size(Vec2::splat(44.0), Sense::hover());
-                            ui.painter().rect_filled(disc, CornerRadius::same(14), hue.gamma_multiply(if t.dark() { 0.28 } else { 0.14 }));
-                            icons::paint(ui, disc, icon, 22.0, *hue);
-                            ui.add_space(10.0);
                             ui.vertical(|ui| {
-                                // Room for the 40-point ✕ and the gap before it.
-                                ui.set_width(ui.available_width() - 52.0);
-                                ui.label(egui::RichText::new(*title).font(theme::semibold(15.5)).color(t.text));
+                                ui.spacing_mut().item_spacing.y = 3.0;
+                                // Room for the ✕.
+                                ui.set_width(ui.available_width() - TARGET);
+                                ui.add_space(2.0);
+                                ui.add(egui::Label::new(egui::RichText::new(*title).font(theme::semibold(16.0)).color(t.text)).wrap());
                                 ui.add(egui::Label::new(egui::RichText::new(*text).font(theme::regular(13.5)).color(t.text_muted)).wrap());
-                                ui.add_space(6.0);
+                                ui.add_space(4.0);
                                 let r = ui.add(
-                                    egui::Button::new(egui::RichText::new(*action).font(theme::semibold(14.5)).color(t.accent_text)).frame(false),
+                                    egui::Button::new(egui::RichText::new(*action).font(theme::semibold(15.0)).color(t.accent_text))
+                                        .frame(false)
+                                        .min_size(vec2(0.0, TARGET)),
                                 );
                                 if r.clicked() {
                                     act = Some(*id);
                                 }
                             });
                             // Each its own name: "Dismiss" three times says nothing to a screen reader.
-                            if icons::button(ui, "x", 40.0, false, &format!("{} · {title}", tl!("Dismiss"))).clicked() {
+                            if icons::button(ui, "x", TARGET, false, &format!("{} · {title}", tl!("Dismiss"))).clicked() {
                                 dismiss = Some(*id);
                             }
                         });
                     });
+                // The tip's colour as a block at the card's left, as tall as the card came out.
+                let r = card.response.rect.shrink(8.0);
+                let panel = Rect::from_min_size(r.min, vec2(PANEL - 14.0, r.height()));
+                phone::vivid_tile(ui.painter(), panel, 13.0, *hue);
+                icons::paint(ui, panel, icon, 32.0, Color32::WHITE);
             }
             ui.add_space(4.0);
         });
     });
-    ui.add_space(14.0);
+    ui.add_space(8.0);
     if let Some(id) = dismiss {
         app.home_tips_dismissed.push(id.to_owned());
     }
@@ -638,6 +749,89 @@ fn tips(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
         Some("access") => ask_files_access(app),
         _ => {}
     }
+}
+
+/// A row that scrolls sideways (the tips, the quick actions) in Home's page, which scrolls up and
+/// down. egui gives a drag to the innermost scroll area, so a swipe up or down that starts on a
+/// row would move nothing: here a finger's swipe goes one way or the other, as its first few
+/// points say, and keeps going for a moment after it lifts, as a scroll area's does.
+fn swipe_row<R>(ui: &mut egui::Ui, id: &str, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
+    let source = egui::scroll_area::ScrollSource { drag: egui::scroll_area::DragScroll::Never, ..Default::default() };
+    egui::ScrollArea::horizontal()
+        .id_salt(id)
+        .auto_shrink([false, true])
+        .scroll_source(source)
+        .show(ui, |ui| {
+            // Under the row's contents: their taps are theirs, the drags are the swipe's.
+            if ui.input(|i| i.has_touch_screen()) {
+                // The row's own: inside a scroll area `ui.id()` is the same for every row.
+                let key = egui::Id::new(("phone-swipe", id));
+                let drag = ui.interact(ui.clip_rect(), key, Sense::DRAG);
+                swipe(ui, &drag, key);
+            }
+            add(ui)
+        })
+        .inner
+}
+
+/// A swipe in progress, or a fling after one.
+#[derive(Clone, Copy, Default)]
+struct Swipe {
+    /// 0: sideways, 1: up and down; `None` until the finger has moved enough to tell.
+    axis: Option<usize>,
+    /// How far the finger has moved since it went down.
+    moved: Vec2,
+    /// After it lifts: the speed along `fling`'s axis, slowing down.
+    speed: f32,
+    fling: usize,
+}
+
+/// Turn `drag` into scrolling: the row's sideways, the page's up and down (the row's scroll area
+/// takes the sideways part of a delta, its parent the rest).
+fn swipe(ui: &egui::Ui, drag: &egui::Response, key: egui::Id) {
+    // How far a finger moves before its direction counts, and the fling's slowing (a scroll
+    // area's own figures).
+    const DECIDE: f32 = 6.0;
+    const FRICTION: f32 = 1000.0;
+    const STOP: f32 = 20.0;
+    let mut s: Swipe = ui.data(|d| d.get_temp(key)).unwrap_or_default();
+    let along = |axis: usize, amount: f32| {
+        let mut delta = Vec2::ZERO;
+        delta[axis] = amount;
+        ui.scroll_with_delta_animation(delta, egui::style::ScrollAnimation::none());
+    };
+    if drag.drag_started() {
+        s = Swipe::default();
+    }
+    if drag.dragged() {
+        let delta = ui.input(|i| i.pointer.delta());
+        s.moved += delta;
+        match s.axis {
+            Some(axis) => along(axis, delta[axis]),
+            None if s.moved.length() > DECIDE => {
+                let axis = if s.moved.x.abs() > s.moved.y.abs() { 0 } else { 1 };
+                s.axis = Some(axis);
+                // What moved before the direction was known goes that way too.
+                along(axis, s.moved[axis]);
+            }
+            None => {}
+        }
+    } else if drag.drag_stopped() {
+        if let Some(axis) = s.axis.take() {
+            s.speed = ui.input(|i| i.pointer.velocity()[axis]);
+            s.fling = axis;
+        }
+    } else if s.speed != 0.0 {
+        let dt = ui.input(|i| i.stable_dt).min(0.1);
+        if !s.speed.is_finite() || s.speed.abs() < STOP || FRICTION * dt > s.speed.abs() {
+            s.speed = 0.0;
+        } else {
+            s.speed -= FRICTION * dt * s.speed.signum();
+            along(s.fling, s.speed * dt);
+            ui.ctx().request_repaint();
+        }
+    }
+    ui.data_mut(|d| d.insert_temp(key, s));
 }
 
 /// The row of quick actions: a coloured tile each, its name under it.
@@ -650,7 +844,7 @@ fn quick_actions(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
     }
     actions.extend([("combine", Then::Read), ("create", Then::Read), ("organize", Then::Tool("organize")), ("compress", Then::Tool("compress"))]);
     let mut chosen = None;
-    egui::ScrollArea::horizontal().id_salt("phone-quick").auto_shrink([false, true]).show(ui, |ui| {
+    swipe_row(ui, "phone-quick", |ui| {
         ui.horizontal(|ui| {
             ui.add_space(10.0);
             ui.spacing_mut().item_spacing.x = 4.0;
@@ -664,7 +858,7 @@ fn quick_actions(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
                     _ => tl!(g.label),
                 };
                 let icon = if id == "ai" { "sparkles" } else { g.icon };
-                if quick_tile(ui, icon, phone::tool_hue(t, id), label, t).clicked() {
+                if quick_tile(ui, icon, phone::tool_color(id), label, t).clicked() {
                     chosen = Some((id, then));
                 }
             }
@@ -681,15 +875,17 @@ fn quick_actions(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
     }
 }
 
-/// One quick action: a 64-point tile in its colour, its name in two lines under it.
+/// One quick action: a 68-point tile in its colour, its name in two lines under it.
 fn quick_tile(ui: &mut egui::Ui, icon: &str, hue: Color32, label: &str, t: &Tokens) -> egui::Response {
-    let (rect, resp) = ui.allocate_exact_size(vec2(84.0, 112.0), Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(vec2(86.0, 118.0), Sense::click());
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label));
     let press = theme::Press::track(ui, &resp);
-    let tile = Rect::from_center_size(rect.center_top() + vec2(0.0, 36.0), Vec2::splat(64.0)).translate(press.offset());
-    let fill = hue.gamma_multiply(if t.dark() { 0.30 } else { 0.14 });
-    ui.painter().rect_filled(tile, CornerRadius::same(18), press.fill(fill, fill.gamma_multiply(1.3), fill.gamma_multiply(1.6)));
-    icons::paint(ui, tile, icon, 30.0, hue);
+    let tile = Rect::from_center_size(rect.center_top() + vec2(0.0, 38.0), Vec2::splat(68.0)).translate(press.offset());
+    // The tool's colour at full strength, glowing a little on the ground; deeper while pressed.
+    let glow = egui::Shadow { offset: [0, 5], blur: 14, spread: 0, color: hue.gamma_multiply(if t.dark() { 0.45 } else { 0.35 }) };
+    ui.painter().add(glow.as_shape(tile, CornerRadius::same(20)));
+    phone::vivid_tile(ui.painter(), tile, 20.0, press.fill(hue, hue.lerp_to_gamma(Color32::BLACK, 0.08), hue.lerp_to_gamma(Color32::BLACK, 0.18)));
+    icons::paint(ui, tile, icon, 32.0, Color32::WHITE);
     // Smaller type, rather than a word cut in two ("Commentaires").
     let widest = label
         .split_whitespace()
@@ -700,28 +896,34 @@ fn quick_tile(ui: &mut egui::Ui, icon: &str, hue: Color32, label: &str, t: &Toke
     job.wrap.max_rows = 2;
     job.halign = egui::Align::Center;
     let galley = ui.painter().layout_job(job);
-    ui.painter().galley(pos2(rect.center().x, tile.bottom() + 6.0), galley, t.text);
+    ui.painter().galley(pos2(rect.center().x, tile.bottom() + 8.0), galley, t.text);
     theme::hand(resp)
 }
 
 /// Recent · Starred · On this device, the chosen one underlined.
 fn list_tabs(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
     let lists = [(FileList::Recent, tl!("Recent")), (FileList::Starred, tl!("Starred")), (FileList::Device, tl!("On this device"))];
-    let (row, _) = ui.allocate_exact_size(vec2(ui.available_width(), 48.0), Sense::hover());
-    ui.painter().hline(row.x_range(), row.bottom() - 0.5, Stroke::new(1.0, t.divider));
+    let (row, _) = ui.allocate_exact_size(vec2(ui.available_width(), 50.0), Sense::hover());
+    ui.painter().hline(row.x_range(), row.bottom() - 0.5, Stroke::new(1.0, look(t).edge));
+    const SIZE: f32 = 15.5;
+    const GAP: f32 = 28.0;
+    let widths: Vec<f32> =
+        lists.iter().map(|(_, l)| ui.fonts_mut(|f| f.layout_no_wrap((*l).to_owned(), theme::semibold(SIZE), Color32::WHITE).size().x)).collect();
+    let room = (row.width() - 32.0 - GAP * (lists.len() as f32 - 1.0)).max(1.0);
+    let scale = (room / widths.iter().sum::<f32>().max(1.0)).clamp(0.75, 1.0);
+    let font = theme::semibold(SIZE * scale);
     let mut x = row.left() + 16.0;
-    for (list, label) in lists {
-        let font = theme::semibold(15.0);
-        let w = ui.fonts_mut(|f| f.layout_no_wrap(label.to_owned(), font.clone(), Color32::WHITE).size().x);
+    for ((list, label), w) in lists.into_iter().zip(widths) {
+        let w = w * scale;
         let hit = Rect::from_min_max(pos2(x - 8.0, row.top()), pos2(x + w + 8.0, row.bottom()));
         let resp = ui.interact(hit, egui::Id::new(("phone-list-tab", label)), Sense::click());
         let selected = app.phone.home.list == list;
         resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Button, true, selected, label));
-        let color = if selected { t.accent_text } else { t.text_muted };
-        ui.painter().text(pos2(x, row.center().y), Align2::LEFT_CENTER, label, font, color);
+        let color = if selected { t.text } else { t.text_muted };
+        ui.painter().text(pos2(x, row.center().y), Align2::LEFT_CENTER, label, font.clone(), color);
         if selected {
             let bar = Rect::from_min_max(pos2(x, row.bottom() - 3.0), pos2(x + w, row.bottom()));
-            ui.painter().rect_filled(bar, CornerRadius::same(2), t.accent);
+            ui.painter().rect_filled(bar, CornerRadius { nw: 2, ne: 2, sw: 0, se: 0 }, t.brand);
         }
         if theme::hand(resp).clicked() {
             app.phone.home.list = list;
@@ -882,7 +1084,7 @@ fn file_row(ui: &mut egui::Ui, f: &Listed, thumb: Option<&TextureHandle>, t: &To
     let text_left = card.right() + 14.0;
     let width = (more_rect.left() - text_left - 4.0).max(0.0);
     let title = if f.open.is_some() { format!("{} ", crate::bidi::visual(&f.name)) } else { crate::bidi::visual(&f.name).into_owned() };
-    widgets::row_text(ui, pos2(text_left, body.center().y - 11.0), title, theme::medium(15.5), t.text, width);
+    widgets::row_text(ui, pos2(text_left, body.center().y - 11.0), title, theme::medium(16.0), t.text, width);
     let mut detail_x = text_left;
     if f.open.is_some() {
         // "Open", as a small chip before the detail.
@@ -901,7 +1103,7 @@ fn file_row(ui: &mut egui::Ui, f: &Listed, thumb: Option<&TextureHandle>, t: &To
             Rect::from_center_size(pos2(detail_x + 7.0, body.center().y + 13.0), Vec2::splat(14.0)),
             "star",
             13.0,
-            phone::tool_hue(t, "comment"),
+            phone::tool_color("comment"),
         );
         detail_x += 18.0;
     }
@@ -916,7 +1118,7 @@ fn file_row(ui: &mut egui::Ui, f: &Listed, thumb: Option<&TextureHandle>, t: &To
     let more_press = theme::Press::track(ui, &more);
     more_press.wash(ui, more_rect.shrink(6.0), 18, false);
     icons::paint(ui, more_rect.translate(more_press.offset()), "ellipsis-vertical", 20.0, t.icon);
-    ui.painter().hline(pos2(text_left, 0.0).x..=rect.right() - 12.0, rect.bottom() - 0.5, Stroke::new(1.0, t.divider));
+    ui.painter().hline(pos2(text_left, 0.0).x..=rect.right() - 16.0, rect.bottom() - 0.5, Stroke::new(1.0, look(t).edge));
     (theme::hand(row), theme::hand(more))
 }
 
@@ -935,11 +1137,12 @@ fn thumbnail(ui: &egui::Ui, card: Rect, thumb: Option<&TextureHandle>, t: &Token
         ui.painter().rect_stroke(page, CornerRadius::same(3), Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
         return;
     }
+    let look = look(t);
     ui.painter().add(shadow.as_shape(card, CornerRadius::same(6)));
-    ui.painter().rect(card, CornerRadius::same(6), t.card, Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
+    ui.painter().rect(card, CornerRadius::same(6), look.surface, Stroke::new(1.0, look.edge), egui::StrokeKind::Inside);
     let mark = Rect::from_center_size(card.center() - vec2(0.0, 8.0), Vec2::splat(card.width() * 0.56));
     egui::Image::from_bytes("bytes://artcraft-mark.svg", include_bytes!("../../../docs/brand/artcraft-mark.svg")).paint_at(ui, mark);
-    ui.painter().text(pos2(card.center().x, card.bottom() - 10.0), Align2::CENTER_CENTER, "PDF", theme::semibold(10.5), t.text_muted);
+    ui.painter().text(pos2(card.center().x, card.bottom() - 10.0), Align2::CENTER_CENTER, "PDF", theme::semibold(10.5), t.accent_text);
 }
 
 /// What an empty list says, with a way forward. `None`: a search found nothing.
@@ -989,7 +1192,8 @@ fn pill(ui: &mut egui::Ui, icon: &str, label: &str, t: &Tokens) -> egui::Respons
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label));
     let press = theme::Press::track(ui, &resp);
     let body = r.translate(press.offset());
-    ui.painter().rect_filled(body, CornerRadius::same(24), press.fill(t.accent, t.accent.gamma_multiply(0.92), t.accent.gamma_multiply(0.82)));
+    let deeper = |k: f32| t.accent.lerp_to_gamma(Color32::BLACK, k);
+    ui.painter().rect_filled(body, CornerRadius::same(24), press.fill(t.accent, deeper(0.08), deeper(0.18)));
     icons::paint(ui, Rect::from_center_size(body.left_center() + vec2(26.0, 0.0), vec2(18.0, 18.0)), icon, 18.0, Color32::WHITE);
     ui.painter().text(body.left_center() + vec2(42.0, 0.0), Align2::LEFT_CENTER, label, font, Color32::WHITE);
     theme::hand(resp)
@@ -1011,9 +1215,9 @@ fn action_row(ui: &mut egui::Ui, icon: &str, hue: Color32, title: &str, detail: 
     let press = theme::Press::track(ui, &resp);
     press.wash(ui, rect.shrink2(vec2(4.0, 2.0)), 12, false);
     let body = rect.translate(press.offset());
-    let disc = Rect::from_center_size(body.left_center() + vec2(36.0, 0.0), Vec2::splat(42.0));
-    ui.painter().rect_filled(disc, CornerRadius::same(13), hue.gamma_multiply(if t.dark() { 0.28 } else { 0.14 }));
-    icons::paint(ui, disc, icon, 22.0, hue);
+    let disc = Rect::from_center_size(body.left_center() + vec2(36.0, 0.0), Vec2::splat(44.0));
+    phone::vivid_tile(ui.painter(), disc, 14.0, hue);
+    icons::paint(ui, disc, icon, 22.0, Color32::WHITE);
     let top = body.center().y - (detail.size().y + 22.0) / 2.0;
     widgets::row_text(ui, pos2(body.left() + left, top + 10.0), title, theme::medium(15.5), t.text, width);
     ui.painter().galley(pos2(body.left() + left, top + 22.0), detail, t.text_muted);
@@ -1029,7 +1233,8 @@ fn tab_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui, rect: Rect, t: &Tokens) {
         (HomeTab::Tools, "layout-grid", tl!("Tools")),
     ];
     let mut picked = None;
-    phone::bar(ui, "phone-home-tabs", rect, t, false, |ui| {
+    let look = look(t);
+    phone::bar_filled(ui, "phone-home-tabs", rect, look.surface, Some(look.edge), false, |ui| {
         let w = (ui.available_width() / tabs.len() as f32).floor();
         for (tab, icon, label) in tabs {
             let selected = app.phone.home.tab == tab;
@@ -1040,11 +1245,11 @@ fn tab_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui, rect: Rect, t: &Tokens) {
             // Material's indicator: a pill behind the chosen tab's icon.
             let pill = Rect::from_center_size(body.center_top() + vec2(0.0, 20.0), vec2(56.0, 30.0));
             if selected {
-                ui.painter().rect_filled(pill, CornerRadius::same(15), t.accent_soft);
+                phone::vivid_tile(ui.painter(), pill, 15.0, t.accent);
             } else {
                 press.wash(ui, pill, 15, false);
             }
-            let color = if selected { t.accent_text } else { t.icon };
+            let color = if selected { Color32::WHITE } else { t.icon };
             icons::paint(ui, pill, icon, 22.0, color);
             let text = if selected { t.accent_text } else { t.text_muted };
             ui.painter().text(pos2(body.center().x, pill.bottom() + 11.0), Align2::CENTER_CENTER, label, theme::medium(12.0), text);
@@ -1061,17 +1266,21 @@ fn tab_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui, rect: Rect, t: &Tokens) {
 
 /// The floating "+" over the bottom right of `body`.
 fn fab(app: &mut PdfCraftApp, ui: &mut egui::Ui, body: Rect, t: &Tokens) {
-    let fab = Rect::from_min_size(body.right_bottom() - vec2(FAB + 20.0, FAB + 18.0), Vec2::splat(FAB));
+    let fab = Rect::from_min_size(body.right_bottom() - vec2(FAB + 18.0, FAB + 18.0), Vec2::splat(FAB));
     let label = phone::command_label(app, "file.open");
     let mut tapped = false;
     egui::Area::new(egui::Id::new("phone-fab")).order(egui::Order::Middle).fixed_pos(fab.min).constrain(false).show(ui.ctx(), |ui| {
         let (r, resp) = ui.allocate_exact_size(fab.size(), Sense::click());
         resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &label));
         let press = theme::Press::track(ui, &resp);
-        let shadow = egui::Shadow { offset: [0, 4], blur: 14, spread: 0, color: Color32::from_black_alpha(if t.dark() { 120 } else { 50 }) };
-        ui.painter().add(shadow.as_shape(r, CornerRadius::same(18)));
-        ui.painter().rect_filled(r, CornerRadius::same(18), press.fill(t.accent, t.accent.gamma_multiply(0.92), t.accent.gamma_multiply(0.82)));
-        icons::paint(ui, r.translate(press.offset()), "plus", 26.0, Color32::WHITE);
+        let radius = FAB / 2.0;
+        let shadow = egui::Shadow { offset: [0, 6], blur: 18, spread: 0, color: Color32::from_black_alpha(if t.dark() { 140 } else { 60 }) };
+        ui.painter().add(shadow.as_shape(r, CornerRadius::same(radius as u8)));
+        // The icon's green into the accent; darker while pressed.
+        let deeper = |k: f32| t.brand.lerp_to_gamma(Color32::BLACK, k);
+        let (from, to) = (press.fill(t.brand, deeper(0.08), deeper(0.18)), t.accent);
+        gradient_disc(ui.painter(), r.center() + press.offset(), radius, from, to);
+        icons::paint(ui, r.translate(press.offset()), "plus", 28.0, Color32::WHITE);
         tapped = theme::hand(resp).clicked();
     });
     if tapped {
@@ -1101,23 +1310,23 @@ fn new_sheet(app: &mut PdfCraftApp, ctx: &egui::Context, screen: Rect, t: &Token
     let mut pick = None;
     let combine = phone::command_label(app, "page.combine");
     let open = phone::sheet(ctx, "new", screen, None, |ui| {
-        if action_row(ui, "folder-open", t.accent, tl!("Open file"), tl!("A PDF on this device."), t).clicked() {
+        if action_row(ui, "folder-open", t.brand, tl!("Open file"), tl!("A PDF on this device."), t).clicked() {
             pick = Some(Pick::Command("file.open"));
         }
-        if action_row(ui, "file-plus", phone::tool_hue(t, "create"), tl!("Create a PDF"), tl!("From photos, scans or other files."), t).clicked() {
+        if action_row(ui, "file-plus", phone::tool_color("create"), tl!("Create a PDF"), tl!("From photos, scans or other files."), t).clicked() {
             pick = Some(Pick::Create);
         }
-        if action_row(ui, "files", phone::tool_hue(t, "combine"), &combine, tl!("Several PDFs and pictures in one document."), t).clicked() {
+        if action_row(ui, "files", phone::tool_color("combine"), &combine, tl!("Several PDFs and pictures in one document."), t).clicked() {
             pick = Some(Pick::Command("page.combine"));
         }
         #[cfg(not(target_arch = "wasm32"))]
-        if action_row(ui, "sparkles", phone::tool_hue(t, "ai"), tl!("AI assistant"), tl!("Summarize, ask and translate."), t).clicked() {
+        if action_row(ui, "sparkles", phone::tool_color("ai"), tl!("AI assistant"), tl!("Summarize, ask and translate."), t).clicked() {
             pick = Some(Pick::Then(Then::Assistant));
         }
-        if action_row(ui, "file-pen-line", phone::tool_hue(t, "edit"), tl!("Edit a PDF"), tl!("Change its text and pictures."), t).clicked() {
+        if action_row(ui, "file-pen-line", phone::tool_color("edit"), tl!("Edit a PDF"), tl!("Change its text and pictures."), t).clicked() {
             pick = Some(Pick::Then(Then::Tool("edit")));
         }
-        if action_row(ui, "signature", phone::tool_hue(t, "fill_sign"), tl!("Fill & Sign"), tl!("Fill in a form and sign it."), t).clicked() {
+        if action_row(ui, "signature", phone::tool_color("fill_sign"), tl!("Fill & Sign"), tl!("Fill in a form and sign it."), t).clicked() {
             pick = Some(Pick::Then(Then::Tool("fill_sign")));
         }
     });
@@ -1293,7 +1502,7 @@ fn profile(app: &mut PdfCraftApp, ui: &mut egui::Ui, screen: Rect, t: &Tokens) {
                     if can_choose {
                         resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, !making, tl!("Choose a photo")));
                     }
-                    avatar(ui, r, photo.as_ref(), &initials, t, false);
+                    avatar(ui, r, photo.as_ref(), &initials, t);
                     if making {
                         // The picture is being made small.
                         ui.painter().circle_filled(r.center(), r.width() / 2.0, Color32::from_black_alpha(110));

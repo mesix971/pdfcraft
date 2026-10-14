@@ -18,6 +18,10 @@ fn main() -> Result<(), String> {
     let (mut file, mut opts) = (None, Vec::new());
     let (mut size, mut scale) = (egui::vec2(1440.0, 900.0), 2.0f32);
     let mut width: Option<u32> = None;
+    // Extra time for work no render waits on (Home's previews, a device scan).
+    let mut settle = Duration::ZERO;
+    // The system's bars over the window, in points (Android's status bar: `--inset_top 33`).
+    let mut inset_top = 0.0f32;
     while let Some(a) = args.next() {
         match a.strip_prefix("--") {
             Some("size") => {
@@ -27,6 +31,8 @@ fn main() -> Result<(), String> {
             }
             Some("scale") => scale = args.next().and_then(|v| v.parse().ok()).ok_or("bad --scale")?,
             Some("width") => width = Some(args.next().and_then(|v| v.parse().ok()).ok_or("bad --width")?),
+            Some("inset_top") => inset_top = args.next().and_then(|v| v.parse().ok()).ok_or("bad --inset_top (points)")?,
+            Some("settle") => settle = Duration::from_millis(args.next().and_then(|v| v.parse().ok()).ok_or("bad --settle (milliseconds)")?),
             Some(k) => opts.push((k.to_string(), args.next().unwrap_or_default())),
             None => file = Some(a),
         }
@@ -47,6 +53,9 @@ fn main() -> Result<(), String> {
         }
         app
     });
+    if inset_top > 0.0 {
+        harness.input_mut().safe_area_insets = Some(egui::SafeAreaInsets(egui::epaint::MarginF32 { top: inset_top, ..Default::default() }));
+    }
     // Let fonts install, layout settle and background renders arrive.
     let start = Instant::now();
     harness.run_steps(4);
@@ -60,6 +69,12 @@ fn main() -> Result<(), String> {
         }
         std::thread::sleep(Duration::from_millis(30));
     }
+    let settled = Instant::now();
+    while settled.elapsed() < settle {
+        harness.run_steps(1);
+        std::thread::sleep(Duration::from_millis(30));
+    }
+    harness.run_steps(2);
     let mut image = harness.render()?;
     if let Some(w) = width.filter(|w| *w < image.width()) {
         let h = (image.height() as f64 * w as f64 / image.width() as f64).round() as u32;

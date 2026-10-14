@@ -2435,3 +2435,6 @@ file state	Open	開いています
 	This picture is too large.	この画像は大きすぎます。
 	Couldn't use this picture: {e}	この画像を使用できませんでした: {e}
 	Couldn't use this picture.	この画像を使用できませんでした。
+	{n} MB	{n} MB
+	{n} KB	{n} KB
+decimal separator	.	.

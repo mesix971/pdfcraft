@@ -2440,3 +2440,6 @@ file state	Open	Odprto
 	This picture is too large.	Ta slika je prevelika.
 	Couldn't use this picture: {e}	Te slike ni bilo mogoče uporabiti: {e}
 	Couldn't use this picture.	Te slike ni bilo mogoče uporabiti.
+	{n} MB	{n} MB
+	{n} KB	{n} KB
+decimal separator	.	,

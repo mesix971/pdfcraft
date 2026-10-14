@@ -2445,3 +2445,6 @@ file state	Open	Ανοιχτό
 	This picture is too large.	Αυτή η εικόνα είναι πολύ μεγάλη.
 	Couldn't use this picture: {e}	Δεν ήταν δυνατή η χρήση αυτής της εικόνας: {e}
 	Couldn't use this picture.	Δεν ήταν δυνατή η χρήση αυτής της εικόνας.
+	{n} MB	{n} MB
+	{n} KB	{n} KB
+decimal separator	.	,

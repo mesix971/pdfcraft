@@ -2436,3 +2436,6 @@ file state	Open	Geöffnet
 	This picture is too large.	Dieses Bild ist zu groß.
 	Couldn't use this picture: {e}	Dieses Bild konnte nicht verwendet werden: {e}
 	Couldn't use this picture.	Dieses Bild konnte nicht verwendet werden.
+	{n} MB	{n} MB
+	{n} KB	{n} KB
+decimal separator	.	,

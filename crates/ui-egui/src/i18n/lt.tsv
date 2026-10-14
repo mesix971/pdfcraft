@@ -2679,3 +2679,6 @@ file state	Open	Atvertas
 	This picture is too large.	Šis paveikslėlis per didelis.
 	Couldn't use this picture: {e}	Nepavyko panaudoti šio paveikslėlio: {e}
 	Couldn't use this picture.	Nepavyko panaudoti šio paveikslėlio.
+	{n} MB	{n} MB
+	{n} KB	{n} KB
+decimal separator	.	,
