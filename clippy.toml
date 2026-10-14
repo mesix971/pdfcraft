@@ -12,4 +12,5 @@ disallowed-methods = [
     { path = "egui::Ui::radio", reason = "use radio from crates/ui-egui/src/widgets.rs, which is outlined and filled" },
     { path = "egui::Ui::radio_value", reason = "use radio_value from crates/ui-egui/src/widgets.rs, which is outlined and filled" },
     { path = "egui::RadioButton::new", reason = "use radio from crates/ui-egui/src/widgets.rs, which is outlined and filled" },
+    { path = "egui::ComboBox::from_id_salt", reason = "use combo from crates/ui-egui/src/widgets.rs, whose rows are a finger tall on a phone" },
 ]

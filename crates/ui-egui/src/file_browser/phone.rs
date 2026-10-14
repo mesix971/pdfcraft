@@ -691,7 +691,8 @@ fn bottom_height(b: &Browser) -> f32 {
         Kind::File => 0.0,
         Kind::Files => 76.0,
         Kind::Folder => 76.0 + message,
-        Kind::Save => 132.0 + message,
+        // The name and Save, then New folder.
+        Kind::Save => 188.0 + message,
     }
 }
 
@@ -751,45 +752,23 @@ fn bottom(ui: &mut egui::Ui, b: &mut Browser, rect: Rect, t: &Tokens, look: &Loo
                         b.phone.trail.push(here);
                     }
                 }
+                // A folder to save into, made here.
+                ui.add_space(4.0);
+                ui.horizontal_centered(|ui| {
+                    if b.new_folder.is_some() {
+                        new_folder_field(ui, b, t, look);
+                    } else {
+                        new_folder_button(ui, b, t);
+                    }
+                });
                 message(ui, b, t);
             }
             Kind::Folder => {
-                ui.horizontal_centered(|ui| match b.new_folder.as_mut() {
-                    Some(name) => {
-                        let mut create = false;
-                        let pill_w = widgets::text_width(ui, tl!("Create"), &theme::semibold(15.0)) + 40.0;
-                        let field = egui::TextEdit::singleline(name)
-                            .id(egui::Id::new("phone-browser-new-folder"))
-                            .font(theme::regular(16.0))
-                            .margin(egui::Margin::symmetric(12, 12))
-                            .background_color(look.ground)
-                            .desired_width((ui.available_width() - pill_w - 10.0).max(60.0))
-                            .char_limit(MAX_NAME_CHARS);
-                        let r = ui.add(field);
-                        if r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
-                            create = true;
-                        }
-                        let can = save_name(name, &[]).is_some();
-                        if phone::action_pill(ui, None, tl!("Create"), can, t).clicked() {
-                            create = true;
-                        }
-                        if std::mem::take(&mut b.phone.focus_name) {
-                            r.request_focus();
-                        }
-                        if create {
-                            let here = b.dir.clone();
-                            b.create_folder();
-                            if b.dir != here {
-                                b.phone.trail.push(here);
-                            }
-                        }
-                    }
-                    None => {
-                        if phone::soft_pill(ui, "folder-plus", tl!("New folder"), t).clicked() {
-                            b.new_folder = Some(tl!("New folder").to_owned());
-                            b.phone.focus_name = true;
-                            b.error = None;
-                        }
+                ui.horizontal_centered(|ui| {
+                    if b.new_folder.is_some() {
+                        new_folder_field(ui, b, t, look);
+                    } else {
+                        new_folder_button(ui, b, t);
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if phone::action_pill(ui, Some("check"), tl!("Choose this folder"), b.listing.is_ok(), t).clicked() {
                                 answer = b.confirm();
@@ -802,6 +781,48 @@ fn bottom(ui: &mut egui::Ui, b: &mut Browser, rect: Rect, t: &Tokens, look: &Loo
         }
     });
     answer
+}
+
+/// New folder: opens the field for its name.
+fn new_folder_button(ui: &mut egui::Ui, b: &mut Browser, t: &Tokens) {
+    if phone::soft_pill(ui, "folder-plus", tl!("New folder"), t).clicked() {
+        b.new_folder = Some(tl!("New folder").to_owned());
+        b.phone.focus_name = true;
+        b.error = None;
+    }
+}
+
+/// The new folder's name and Create: the folder is made in the one shown, and opens (Back
+/// comes back).
+fn new_folder_field(ui: &mut egui::Ui, b: &mut Browser, t: &Tokens, look: &Look) {
+    let Some(name) = b.new_folder.as_mut() else { return };
+    let mut create = false;
+    let pill_w = widgets::text_width(ui, tl!("Create"), &theme::semibold(15.0)) + 40.0;
+    let field = egui::TextEdit::singleline(name)
+        .id(egui::Id::new("phone-browser-new-folder"))
+        .font(theme::regular(16.0))
+        .margin(egui::Margin::symmetric(12, 12))
+        .background_color(look.ground)
+        .desired_width((ui.available_width() - pill_w - 10.0).max(60.0))
+        .char_limit(MAX_NAME_CHARS);
+    let r = ui.add(field);
+    if r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+        create = true;
+    }
+    let can = save_name(name, &[]).is_some();
+    if phone::action_pill(ui, None, tl!("Create"), can, t).clicked() {
+        create = true;
+    }
+    if std::mem::take(&mut b.phone.focus_name) {
+        r.request_focus();
+    }
+    if create {
+        let here = b.dir.clone();
+        b.create_folder();
+        if b.dir != here {
+            b.phone.trail.push(here);
+        }
+    }
 }
 
 /// A Save waiting to replace a file, or what went wrong.
@@ -1022,6 +1043,23 @@ trailer << /Root 1 0 R >>
         h.get_by_role_and_label(Role::Button, "Replace").click();
         h.run_steps(4);
         assert_eq!(got.lock().unwrap().clone(), Some(vec![root.join("Download/Lease.pdf")]));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn save_makes_a_new_folder_and_saves_into_it() {
+        let root = device("save-folder");
+        let mut h = harness(&root, "en", false);
+        let got = ask(&mut h, Kind::Save, pdf().set_file_name("Notes").set_directory(root.join("Documents")));
+        h.get_by_role_and_label(Role::Button, "New folder").click();
+        h.run_steps(3);
+        // (Home, under the browser, has a Create tab: the browser's button comes last.)
+        h.query_all_by_role_and_label(Role::Button, "Create").last().unwrap().click();
+        h.run_steps(3);
+        assert!(root.join("Documents/New folder").is_dir(), "made where the browser stands");
+        h.get_by_role_and_label(Role::Button, "Save").click();
+        h.run_steps(4);
+        assert_eq!(got.lock().unwrap().clone(), Some(vec![root.join("Documents/New folder/Notes.pdf")]), "and saved into it");
         let _ = std::fs::remove_dir_all(&root);
     }
 

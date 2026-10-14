@@ -266,7 +266,7 @@ pub(crate) fn preferences_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tok
     widgets::setting_row(ui, tl!("Interface language"), |ui, _| {
         let selected = crate::i18n::Lang::from_code(&app.language).map_or(tl!("Auto"), crate::i18n::Lang::name);
         let before = app.language.clone();
-        egui::ComboBox::from_id_salt("interface-language").selected_text(selected).show_ui(ui, |ui| {
+        crate::widgets::combo("interface-language").selected_text(selected).show_ui(ui, |ui| {
             if ui.selectable_value(&mut app.language, crate::i18n::AUTO.to_string(), tl!("Auto")).clicked() {
                 ui.close();
             }
@@ -288,7 +288,7 @@ pub(crate) fn preferences_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tok
         let auto_percent = ui_scale::percent(ui_scale::drawn(None, app.auto_text_scale(), native));
         let auto = crate::i18n::fmt(tl!("Auto ({percent}%)"), &[("percent", &auto_percent.to_string())]);
         let selected = app.ui_scale.map_or_else(|| auto.clone(), |f| format!("{}%", ui_scale::percent(f)));
-        egui::ComboBox::from_id_salt("interface-size").selected_text(selected).show_ui(ui, |ui| {
+        crate::widgets::combo("interface-size").selected_text(selected).show_ui(ui, |ui| {
             if ui.selectable_value(&mut app.ui_scale, None, auto).clicked() {
                 ui.close();
             }
@@ -401,7 +401,7 @@ pub(crate) fn preferences_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tok
     ui.label(egui::RichText::new(tl!("Reading colours")).font(theme::semibold(13.0)));
     widgets::setting_row(ui, tl!("Replace document colours"), |ui, _| {
         let mode = app.reading_colors.mode_name();
-        egui::ComboBox::from_id_salt("reading-colors").selected_text(tl!(reading_mode_label(mode))).show_ui(ui, |ui| {
+        crate::widgets::combo("reading-colors").selected_text(tl!(reading_mode_label(mode))).show_ui(ui, |ui| {
             for (m, label) in [
                 ("off", "Off"),
                 ("black-on-white", "Black on white"),
@@ -496,7 +496,7 @@ fn date_format(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) {
     widgets::setting_row(ui, tl!("Fill & Sign dates"), |ui, label| {
         let current = app.session.date_format().to_string();
         let selected = if DATE_FORMATS.contains(&current.as_str()) { sample(app, &current) } else { tl!("Custom").to_string() };
-        egui::ComboBox::from_id_salt("date-format")
+        crate::widgets::combo("date-format")
             .selected_text(selected)
             .width(240.0)
             .show_ui(ui, |ui| {
@@ -546,7 +546,7 @@ fn date_format(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) {
         let follow = crate::i18n::fmt(tl!("Same as interface ({language})"), &[("language", interface)]);
         let current = app.session.date_language().map(str::to_string);
         let selected = DATE_LANGUAGES.iter().find(|l| current.as_deref() == Some(l.code)).map_or(follow.clone(), |l| l.name.to_string());
-        egui::ComboBox::from_id_salt("date-language")
+        crate::widgets::combo("date-language")
             .selected_text(selected)
             .width(240.0)
             .show_ui(ui, |ui| {

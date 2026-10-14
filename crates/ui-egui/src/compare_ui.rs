@@ -52,7 +52,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
         let shown =
             others.iter().find(|(id, _)| Some(*id) == app.compare_old).map_or(tl!("Open the older version first").to_string(), |(_, n)| n.clone());
         let width = widgets::combo_width(ui, 320.0);
-        egui::ComboBox::from_id_salt("compare-old").selected_text(shown).width(width).show_ui(ui, |ui| {
+        crate::widgets::combo("compare-old").selected_text(shown).width(width).show_ui(ui, |ui| {
             for (id, n) in &others {
                 ui.selectable_value(&mut app.compare_old, Some(*id), n);
             }

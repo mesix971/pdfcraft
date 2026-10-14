@@ -53,13 +53,14 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: E
         widgets::row(ui, |ui| {
             ui.label(tl!("Resolution"));
             widgets::line_break(ui);
-            egui::ComboBox::from_id_salt("export-dpi")
-                .selected_text(crate::i18n::fmt(tl!("{dpi} pixels/inch"), &[("dpi", &d.dpi.to_string())]))
-                .show_ui(ui, |ui| {
+            crate::widgets::combo("export-dpi").selected_text(crate::i18n::fmt(tl!("{dpi} pixels/inch"), &[("dpi", &d.dpi.to_string())])).show_ui(
+                ui,
+                |ui| {
                     for dpi in [72.0, 96.0, 150.0, 300.0, 600.0] {
                         ui.selectable_value(&mut d.dpi, dpi, crate::i18n::fmt(tl!("{dpi} pixels/inch"), &[("dpi", &dpi.to_string())]));
                     }
-                });
+                },
+            );
         });
         widgets::row(ui, |ui| {
             ui.label(tl!("Format"));
@@ -68,7 +69,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: E
                 ImageFormat::Jpeg { quality } => quality,
                 _ => 85,
             };
-            egui::ComboBox::from_id_salt("export-format").selected_text(d.format.label()).show_ui(ui, |ui| {
+            crate::widgets::combo("export-format").selected_text(d.format.label()).show_ui(ui, |ui| {
                 for f in [ImageFormat::Png, ImageFormat::Jpeg { quality }, ImageFormat::Tiff] {
                     let on = std::mem::discriminant(&d.format) == std::mem::discriminant(&f);
                     if ui.selectable_label(on, f.label()).clicked() {
@@ -96,7 +97,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: E
             let label = move |n: u32| {
                 if n == 0 { tl!("No limit").to_string() } else { crate::i18n::trn(crate::i18n::current(), u64::from(n), "{n} pixel", "{n} pixels") }
             };
-            egui::ComboBox::from_id_salt("export-min").selected_text(label(d.min_side)).show_ui(ui, |ui| {
+            crate::widgets::combo("export-min").selected_text(label(d.min_side)).show_ui(ui, |ui| {
                 for n in [0, 16, 32, 64, 128, 256] {
                     ui.selectable_value(&mut d.min_side, n, label(n));
                 }

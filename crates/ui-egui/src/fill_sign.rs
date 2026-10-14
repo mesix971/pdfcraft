@@ -552,6 +552,64 @@ pub(crate) fn signature_entries(ui: &mut egui::Ui, app: &mut crate::PdfCraftApp,
     command
 }
 
+/// Sign yourself on a phone: a sheet with the saved signature and initials, each shown as it is,
+/// to place (a tap on it), change or remove; or the way to make one. The commands are the ones
+/// the desktop's Fill & Sign panel runs.
+pub(crate) fn phone_sign_sheet(app: &mut crate::PdfCraftApp, ctx: &egui::Context, screen: egui::Rect, t: &Tokens) {
+    let look = crate::phone_home::look(t);
+    let mut command = None;
+    let open = crate::phone::sheet(ctx, "sign", screen, Some(tl!("Sign yourself")), |ui| {
+        for (i, title, what, use_id, change_id, remove_id) in [
+            (0, tl!("Signature"), "signature", "sign.fill.signature", "sign.fill.signature.change", "sign.fill.signature.remove"),
+            (1, tl!("Initials"), "initials", "sign.fill.initials", "sign.fill.initials.change", "sign.fill.initials.remove"),
+        ] {
+            let label = |template: &str| crate::i18n::fmt(tl!(template), &[("what", tl!(what))]);
+            egui::Frame::NONE.inner_margin(egui::Margin { left: 14, right: 14, top: 10, bottom: 4 }).show(ui, |ui| {
+                ui.label(egui::RichText::new(title).font(crate::theme::semibold(14.0)).color(t.text_muted));
+            });
+            let saved = if i == 0 { app.signature.clone() } else { app.initials.clone() };
+            let Some(saved) = saved else {
+                if crate::phone::sheet_row(ui, "plus", &label("Add {what}"), true, None, t).clicked() {
+                    command = Some(use_id);
+                }
+                continue;
+            };
+            ui.horizontal(|ui| {
+                ui.add_space(8.0);
+                // The signature itself, a finger tall: a tap places it.
+                // (The space before it and between the three is part of the row's width.)
+                let width = (ui.available_width() - 2.0 * crate::phone::TARGET - 24.0).max(120.0);
+                let (rect, resp) = ui.allocate_exact_size(vec2(width, 72.0), Sense::click());
+                let use_label = label("Use {what}");
+                resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &use_label));
+                let press = crate::theme::Press::track(ui, &resp);
+                let card = rect.translate(press.offset());
+                ui.painter().rect(card, CornerRadius::same(12), Color32::WHITE, Stroke::new(1.0, look.edge), egui::StrokeKind::Inside);
+                if let Some(cache) = app.saved_signature_previews.get_mut(i) {
+                    paint_saved(ui, card.shrink(10.0), &saved, cache, &format!("saved-{what}"));
+                }
+                if crate::theme::hand(resp).clicked() {
+                    command = Some(use_id);
+                }
+                if crate::icons::button(ui, "pencil", crate::phone::TARGET, false, &label("Change {what}")).clicked() {
+                    command = Some(change_id);
+                }
+                if crate::icons::button(ui, "trash-2", crate::phone::TARGET, false, &label("Remove saved {what}")).clicked() {
+                    command = Some(remove_id);
+                }
+            });
+            ui.add_space(4.0);
+        }
+        ui.add_space(8.0);
+    });
+    if !open || command.is_some() {
+        app.phone.sheet = None;
+    }
+    if let Some(id) = command {
+        app.execute(id);
+    }
+}
+
 /// Draw a saved signature as large as fits in `rect`, centred: typed text and images through
 /// `cache` (a texture named `key`), strokes as lines.
 pub(crate) fn paint_saved(ui: &egui::Ui, rect: egui::Rect, saved: &SavedSig, cache: &mut Option<(SavedSig, egui::TextureHandle)>, key: &str) {

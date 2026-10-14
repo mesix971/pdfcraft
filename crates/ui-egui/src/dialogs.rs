@@ -160,7 +160,7 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
                             ui.label(tl!("Navigation tab"));
                             widgets::grid_break(ui);
                             ui.add_enabled_ui(editable, |ui| {
-                                egui::ComboBox::from_id_salt("iv-nav")
+                                crate::widgets::combo("iv-nav")
                                     .selected_text(tl!(format!("{:?}", v.navigation)
                                         .replace("PageOnly", "Page Only")
                                         .replace("Pages", "Pages Panel and Page")
@@ -191,7 +191,7 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
                                     (L::TwoUpContinuousCoverPage, tl!("Two-Up Continuous (Cover Page)")),
                                 ];
                                 let shown = names.iter().find(|(l, _)| *l == v.layout).map_or(tl!("Default"), |(_, n)| n);
-                                egui::ComboBox::from_id_salt("iv-layout").selected_text(shown).show_ui(ui, |ui| {
+                                crate::widgets::combo("iv-layout").selected_text(shown).show_ui(ui, |ui| {
                                     for (l, n) in names {
                                         ui.selectable_value(&mut v.layout, l, n);
                                     }
@@ -214,7 +214,7 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
                                         M::Percent(p) => format!("{p:.0}%"),
                                         m => names.iter().find(|(x, _)| *x == m).map_or(tl!("Default").to_string(), |(_, n)| n.to_string()),
                                     };
-                                    egui::ComboBox::from_id_salt("iv-mag").selected_text(shown).show_ui(ui, |ui| {
+                                    crate::widgets::combo("iv-mag").selected_text(shown).show_ui(ui, |ui| {
                                         for (m, n) in names {
                                             ui.selectable_value(&mut v.magnification, m, n);
                                         }
@@ -620,7 +620,7 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
                 egui::Grid::new("rotate-pages").num_columns(2).spacing([12.0, 8.0]).show(ui, |ui| {
                     ui.label(tl!("Direction:"));
                     widgets::grid_break(ui);
-                    egui::ComboBox::from_id_salt("rotate-dir")
+                    crate::widgets::combo("rotate-dir")
                         .selected_text(match d.degrees {
                             270 => tl!("Counterclockwise 90 degrees"),
                             180 => tl!("180 degrees"),
@@ -648,7 +648,7 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
                     ui.end_row();
                     ui.label(tl!("Rotate:"));
                     widgets::grid_break(ui);
-                    egui::ComboBox::from_id_salt("rotate-parity")
+                    crate::widgets::combo("rotate-parity")
                         .selected_text(match d.parity {
                             P::Both => tl!("Even and Odd Pages"),
                             P::Even => tl!("Even Pages Only"),
@@ -663,7 +663,7 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
                     if !widgets::phone_dialogs(ui.ctx()) {
                         ui.label("");
                     }
-                    egui::ComboBox::from_id_salt("rotate-orient")
+                    crate::widgets::combo("rotate-orient")
                         .selected_text(match d.orientation {
                             O::Both => tl!("Landscape and Portrait Pages"),
                             O::Landscape => tl!("Landscape Pages"),
@@ -768,9 +768,11 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
                 ui.label(tl!("Choose a layout:"));
                 let _ = ui.add(widgets::radio(true, tl!("Comments only")));
                 ui.add_space(6.0);
-                ui.horizontal(|ui| {
+                // (On a phone the list goes under its label when they don't fit side by side.)
+                widgets::row(ui, |ui| {
                     ui.label(tl!("Sort comments by:"));
-                    egui::ComboBox::from_id_salt("summary-sort").selected_text(tl!(app.summary_sort.name())).show_ui(ui, |ui| {
+                    let width = widgets::combo_width(ui, 140.0);
+                    crate::widgets::combo("summary-sort").selected_text(tl!(app.summary_sort.name())).width(width).show_ui(ui, |ui| {
                         for s in pdfcraft_engine::SummarySort::ALL {
                             ui.selectable_value(&mut app.summary_sort, s, tl!(s.name()));
                         }
@@ -1004,7 +1006,7 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
                         (L::None, tl!("None (prefix only)")),
                     ];
                     let current = styles.iter().find(|(s, _)| *s == d.style).map_or("1, 2, 3", |(_, l)| *l);
-                    egui::ComboBox::from_id_salt("label_style").selected_text(current).show_ui(ui, |ui| {
+                    crate::widgets::combo("label_style").selected_text(current).show_ui(ui, |ui| {
                         for (s, l) in styles {
                             ui.selectable_value(&mut d.style, s, l);
                         }

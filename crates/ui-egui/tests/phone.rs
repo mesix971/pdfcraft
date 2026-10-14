@@ -1443,3 +1443,115 @@ fn a_long_press_over_a_sheet_leaves_the_page_alone() {
     long_press_drag(&mut h, from, from + vec2(60.0, 80.0));
     assert_eq!(h.state().session.get(id).unwrap().edit_generation(), generation, "nothing moved under the sheet");
 }
+
+/// Fill & Sign keeps the saved signature and initials within reach: a sheet to place, change or
+/// remove them, or to make them.
+#[test]
+fn fill_and_sign_has_the_saved_signature_to_use_change_or_remove() {
+    let mut h = harness_with(Some(FIXTURE), |app| app.signature = Some(pdfcraft_ui_egui::fill_sign::SavedSig::Typed("Jean D.".into())));
+    click(&mut h, "Fill & Sign");
+    click(&mut h, "Sign yourself");
+    assert_eq!(h.state().phone_sheet(), Some(Sheet::Sign));
+    assert!(h.query_by_label("Use signature").is_some(), "the saved signature, to place");
+    assert!(h.query_by_label("Add initials").is_some(), "no initials yet: the way to make them");
+    click(&mut h, "Use signature");
+    assert_eq!(h.state().quick_tool, QuickTool::Fill(pdfcraft_ui_egui::fill_sign::FillTool::Signature), "ready to place");
+    assert_eq!(h.state().phone_sheet(), None);
+    click(&mut h, "Sign yourself");
+    click(&mut h, "Remove saved signature");
+    assert!(h.state().signature.is_none(), "removed");
+    click(&mut h, "Sign yourself");
+    click(&mut h, "Add signature");
+    assert_eq!(h.state().dialog, Some(pdfcraft_ui_egui::Dialog::Signature), "making one opens its dialog");
+}
+
+/// A picture picked in Edit has handles at its corners, added text at its sides: a finger on one
+/// resizes it at once, and the pages hold still.
+#[test]
+fn a_finger_on_a_handle_resizes_what_is_picked() {
+    let mut png = Vec::new();
+    image::RgbImage::from_pixel(80, 40, image::Rgb([200, 40, 40])).write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
+    let mut h = harness_with(None, move |app| {
+        app.open_bytes("picture.png", None, png.clone()).expect("a picture opens as a page");
+    });
+    let id = h.state().views[0].id;
+    let width = |h: &Harness<'static, PdfCraftApp>| {
+        let r = h.state().session.get(id).unwrap().page_images(0)[0].rect;
+        (r[2] - r[0]).abs()
+    };
+    let before = width(&h);
+    click(&mut h, "Edit");
+    let r = h.state().views[0].page_screen_rect(0).unwrap();
+    tap(&mut h, r.center());
+    assert!(h.state().views[0].image_selection.is_some());
+    let top = r.top();
+    // The bottom-right handle, in towards the middle.
+    finger_drag(&mut h, r.right_bottom(), r.right_bottom() - vec2(r.width() / 2.0, r.height() / 2.0));
+    h.run_steps(4);
+    assert!(width(&h) < before * 0.75, "smaller: {before} → {}", width(&h));
+    assert_eq!(h.state().views[0].page_screen_rect(0).unwrap().top(), top, "the pages held still");
+
+    // Added text: its box wider from its right edge.
+    let mut h = harness(true);
+    click(&mut h, "Edit");
+    click(&mut h, "Add text");
+    let p = at(&h, 0, 40.0, 60.0);
+    tap(&mut h, p);
+    h.event(Event::Text("Wide".to_owned()));
+    h.run_steps(3);
+    click(&mut h, "Done");
+    h.run_steps(4);
+    let id = h.state().views[0].id;
+    let rect = |h: &Harness<'static, PdfCraftApp>| match h.state().session.get(id).unwrap().added.first().map(|a| a.content.clone()) {
+        Some(pdfcraft_engine::AddedContent::Text(t)) => t.rect,
+        other => panic!("the text: {other:?}"),
+    };
+    let before = rect(&h);
+    let page = h.state().views[0].page_screen_rect(0).unwrap();
+    let k = page.width() / 300.0;
+    // Its top-left corner on screen is where the page was tapped: its right side's handle is its
+    // width on, halfway down.
+    let side = pos2(p.x + (before[2] - before[0]) as f32 * k, p.y + (before[3] - before[1]) as f32 * k / 2.0);
+    finger_drag(&mut h, side, side - vec2(40.0, 0.0));
+    h.run_steps(4);
+    let after = rect(&h);
+    assert!(after[2] < before[2] - 10.0, "narrower from its right edge: {before:?} → {after:?}");
+}
+
+/// On a phone a dialog's buttons and choices are a finger tall; the desktop keeps its own.
+#[test]
+fn a_dialogs_controls_are_finger_sized_on_a_phone() {
+    let mut h = harness(true);
+    h.state_mut().set_option("dialog", "background").unwrap();
+    h.run_steps(6);
+    let height = |h: &Harness<'static, PdfCraftApp>, label: &str| h.query_all_by_label(label).last().map(|n| n.rect().height()).unwrap_or(0.0);
+    assert!(height(&h, "OK") >= 40.0, "OK: {}", height(&h, "OK"));
+    assert!(height(&h, "All pages") >= 36.0, "a radio button: {}", height(&h, "All pages"));
+    h.state_mut().set_option("shell", "auto").unwrap();
+    h.run_steps(6);
+    assert!(height(&h, "OK") < 32.0, "the desktop's: {}", height(&h, "OK"));
+}
+
+/// A dialog's drop-down list opens on rows a finger tall on a phone; the desktop keeps its own.
+#[test]
+fn a_dialogs_lists_open_on_finger_sized_rows() {
+    let mut h = harness(true);
+    h.state_mut().set_option("dialog", "background").unwrap();
+    h.run_steps(6);
+    let row = |h: &mut Harness<'static, PdfCraftApp>| {
+        // (A list is named by its choice, its value.)
+        h.query_all_by(|n| n.value().as_deref() == Some("All pages in range")).last().expect("the subset list").click();
+        h.run_steps(4);
+        let height = h.query_all_by_label("Odd pages only").last().map(|n| n.rect().height()).unwrap_or(0.0);
+        h.key_press(Key::Escape);
+        h.run_steps(3);
+        height
+    };
+    let phone = row(&mut h);
+    assert!(phone >= 36.0, "a phone's row: {phone}");
+    h.state_mut().set_option("shell", "auto").unwrap();
+    h.state_mut().set_option("dialog", "background").unwrap();
+    h.run_steps(6);
+    let desktop = row(&mut h);
+    assert!(desktop > 0.0 && desktop < 30.0, "the desktop's row: {desktop}");
+}

@@ -153,7 +153,7 @@ pub(crate) fn extras_panel(ui: &mut egui::Ui, e: &mut Extras) -> bool {
         }
         let zero = tl!("Line spacing").to_string();
         let label = |v: f64| if v == 0.0 { zero.clone() } else { format!("{v:.2}×") };
-        egui::ComboBox::from_id_salt("line-spacing").selected_text(label(e.line_spacing)).width(110.0).show_ui(ui, |ui| {
+        crate::widgets::combo("line-spacing").selected_text(label(e.line_spacing)).width(110.0).show_ui(ui, |ui| {
             for v in [1.0, 1.15, 1.5, 2.0] {
                 ui.selectable_value(&mut e.line_spacing, v, label(v));
             }
@@ -366,6 +366,12 @@ impl ImageSelection {
     /// Picture `index` of `page`, picked up by a long press at `start` (the phone's Edit).
     pub(crate) fn carried(page: usize, index: usize, start: Pos2) -> Self {
         ImageSelection { page, index, drag: Some((start, None)) }
+    }
+
+    /// Picture `index` of `page`, resized by a finger on the corner at `start`, the `opposite`
+    /// one staying put (the phone's Edit).
+    pub(crate) fn resizing(page: usize, index: usize, start: Pos2, opposite: Pos2) -> Self {
+        ImageSelection { page, index, drag: Some((start, Some(opposite))) }
     }
 
     /// It is being moved or resized.

@@ -547,7 +547,7 @@ impl Browser {
         let all = self.dialog.filters.len();
         let label = |i: usize| self.dialog.filters.get(i).map_or_else(|| tl!("All files").to_owned(), |f| f.name.clone());
         let mut filter = self.filter;
-        egui::ComboBox::from_id_salt("file_browser_filter").selected_text(label(filter)).width(ui.available_width().min(320.0)).show_ui(ui, |ui| {
+        crate::widgets::combo("file_browser_filter").selected_text(label(filter)).width(ui.available_width().min(320.0)).show_ui(ui, |ui| {
             for i in 0..=all {
                 ui.selectable_value(&mut filter, i, label(i));
             }

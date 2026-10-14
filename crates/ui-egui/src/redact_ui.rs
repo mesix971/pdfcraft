@@ -307,7 +307,7 @@ pub(crate) fn search_body(ui: &mut egui::Ui, d: &mut SearchDraft, t: &Tokens) ->
     ui.add_space(6.0);
     widgets::radio_value(ui, &mut d.mode, SearchMode::Patterns, tl!("Patterns"));
     ui.add_enabled_ui(d.mode == SearchMode::Patterns, |ui| {
-        egui::ComboBox::from_id_salt("redact-pattern").selected_text(tl!(d.pattern.label())).width(240.0).show_ui(ui, |ui| {
+        crate::widgets::combo("redact-pattern").selected_text(tl!(d.pattern.label())).width(240.0).show_ui(ui, |ui| {
             for p in REDACT_PATTERNS {
                 ui.selectable_value(&mut d.pattern, p, tl!(p.label()));
             }
@@ -372,7 +372,7 @@ pub(crate) fn props_body(ui: &mut egui::Ui, d: &mut RedactPrefs, _t: &Tokens) ->
         widgets::grid_break(ui);
         let codes_on = on && d.use_code;
         ui.add_enabled_ui(codes_on, |ui| {
-            egui::ComboBox::from_id_salt("redaction-code-set").selected_text(d.code_set.name).show_ui(ui, |ui| {
+            crate::widgets::combo("redaction-code-set").selected_text(d.code_set.name).show_ui(ui, |ui| {
                 for set in REDACTION_CODE_SETS {
                     if ui.selectable_label(d.code_set == set, set.name).clicked() && d.code_set != set {
                         d.code_set = set;
@@ -382,7 +382,8 @@ pub(crate) fn props_body(ui: &mut egui::Ui, d: &mut RedactPrefs, _t: &Tokens) ->
             });
         });
         ui.end_row();
-        for row in d.code_set.codes.chunks(4) {
+        // Four to a row; three on a phone, whose check boxes are a finger tall.
+        for row in d.code_set.codes.chunks(if phone { 3 } else { 4 }) {
             if !phone {
                 ui.label("");
             }
@@ -390,7 +391,12 @@ pub(crate) fn props_body(ui: &mut egui::Ui, d: &mut RedactPrefs, _t: &Tokens) ->
                 ui.horizontal(|ui| {
                     for &code in row {
                         let mut picked = d.codes.contains(&code);
-                        if ui.add_sized([62.0, 18.0], widgets::checkbox(&mut picked, code)).changed() {
+                        let changed = if phone {
+                            ui.add(widgets::checkbox(&mut picked, code)).changed()
+                        } else {
+                            ui.add_sized([62.0, 18.0], widgets::checkbox(&mut picked, code)).changed()
+                        };
+                        if changed {
                             d.codes.retain(|c| *c != code);
                             if picked {
                                 d.codes.push(code);
@@ -405,7 +411,7 @@ pub(crate) fn props_body(ui: &mut egui::Ui, d: &mut RedactPrefs, _t: &Tokens) ->
         ui.label(tl!("Font:"));
         widgets::grid_break(ui);
         ui.add_enabled_ui(on, |ui| {
-            egui::ComboBox::from_id_salt("overlay-font").selected_text(look.font.name()).show_ui(ui, |ui| {
+            crate::widgets::combo("overlay-font").selected_text(look.font.name()).show_ui(ui, |ui| {
                 for f in pdfcraft_engine::OverlayFont::ALL {
                     ui.selectable_value(&mut look.font, f, f.name());
                 }
@@ -417,6 +423,10 @@ pub(crate) fn props_body(ui: &mut egui::Ui, d: &mut RedactPrefs, _t: &Tokens) ->
         ui.add_enabled_ui(on, |ui| {
             widgets::row_or_stack(ui, |ui| {
                 let mut auto = look.size <= 0.0;
+                // A long label wraps on a phone rather than run off it.
+                if widgets::phone_dialogs(ui.ctx()) {
+                    ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+                }
                 if ui.add(widgets::checkbox(&mut auto, tl!("Auto-size text to fit redaction region"))).changed() {
                     look.size = if auto { 0.0 } else { 10.0 };
                 }

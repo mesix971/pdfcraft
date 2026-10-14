@@ -119,7 +119,7 @@ fn image_row(ui: &mut egui::Ui, id: &str, title: &str, s: &mut ImageSettings) {
             Compression::Flate => tl!("ZIP"),
             Compression::Retain => tl!("Retain existing"),
         };
-        egui::ComboBox::from_id_salt((id, "compression")).selected_text(label).show_ui(ui, |ui| {
+        crate::widgets::combo((id, "compression")).selected_text(label).show_ui(ui, |ui| {
             let q = match s.compression {
                 Compression::Jpeg(q) => q,
                 _ => 60,
@@ -132,7 +132,7 @@ fn image_row(ui: &mut egui::Ui, id: &str, title: &str, s: &mut ImageSettings) {
             widgets::line_break(ui);
             ui.label(tl!("Quality"));
             let name = QUALITIES.iter().min_by_key(|(_, v)| (*v as i32 - *q as i32).abs()).map_or(tl!("Medium"), |(n, _)| tl!(n));
-            egui::ComboBox::from_id_salt((id, "quality")).selected_text(name).show_ui(ui, |ui| {
+            crate::widgets::combo((id, "quality")).selected_text(name).show_ui(ui, |ui| {
                 for (n, v) in QUALITIES {
                     ui.selectable_value(q, v, tl!(n));
                 }

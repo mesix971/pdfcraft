@@ -107,7 +107,7 @@ pub(crate) fn options_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens)
         widgets::row(ui, |ui| {
             ui.label(tl!("Category:"));
             let width = widgets::combo_width(ui, 260.0);
-            egui::ComboBox::from_id_salt("a11y-category").selected_text(tl!(o.category.label())).width(width).show_ui(ui, |ui| {
+            crate::widgets::combo("a11y-category").selected_text(tl!(o.category.label())).width(width).show_ui(ui, |ui| {
                 for c in Category::ALL {
                     ui.selectable_value(&mut o.category, c, tl!(c.label()));
                 }

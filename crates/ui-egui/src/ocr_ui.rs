@@ -101,7 +101,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
             ui.label(tl!("Document language"));
             widgets::grid_break(ui);
             let name = LANGUAGES.iter().find(|l| l.0 == d.language).map_or("English", |l| l.1);
-            egui::ComboBox::from_id_salt("ocr-language").selected_text(tl!(name)).width(220.0).wrap_mode(widgets::combo_text(ui)).show_ui(ui, |ui| {
+            crate::widgets::combo("ocr-language").selected_text(tl!(name)).width(220.0).wrap_mode(widgets::combo_text(ui)).show_ui(ui, |ui| {
                 for (code, name) in LANGUAGES {
                     ui.selectable_value(&mut d.language, (*code).to_string(), tl!(*name));
                 }
@@ -109,7 +109,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
             ui.end_row();
             ui.label(tl!("Output"));
             widgets::grid_break(ui);
-            egui::ComboBox::from_id_salt("ocr-output")
+            crate::widgets::combo("ocr-output")
                 .selected_text(tl!("Searchable Image (Exact)"))
                 .width(220.0)
                 .wrap_mode(widgets::combo_text(ui))
@@ -121,7 +121,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
             ui.end_row();
             ui.label(tl!("Downsample to"));
             widgets::grid_break(ui);
-            egui::ComboBox::from_id_salt("ocr-dpi").selected_text(format!("{} dpi", d.dpi)).width(220.0).wrap_mode(widgets::combo_text(ui)).show_ui(
+            crate::widgets::combo("ocr-dpi").selected_text(format!("{} dpi", d.dpi)).width(220.0).wrap_mode(widgets::combo_text(ui)).show_ui(
                 ui,
                 |ui| {
                     for v in [600, 300, 150, 72] {

@@ -68,6 +68,8 @@ pub enum Sheet {
     Pick,
     /// The rest of the Edit mode's tools.
     EditMore,
+    /// Fill & Sign's saved signature and initials: use, change or remove them, or make them.
+    Sign,
 }
 
 impl Sheet {
@@ -1131,8 +1133,10 @@ fn tool_bottom_bar(app: &mut PdfCraftApp, mode: ToolMode, ui: &mut egui::Ui, rec
         _ => None,
     };
     let signature_label = command_label(app, FillTool::Signature.command());
+    let mut sign = false;
     bar(ui, "phone-tool-bottom-bar", rect, t, false, |ui| {
-        let swatch = if colour.is_some() { TARGET + 8.0 } else { 0.0 };
+        // At the right: a comment tool's colour, or Fill & Sign's saved signatures.
+        let swatch = if colour.is_some() || mode == ToolMode::FillSign { TARGET + 8.0 } else { 0.0 };
         let room = ui.available_width() - swatch;
         ui.scope_builder(egui::UiBuilder::new().max_rect(Rect::from_min_size(ui.cursor().min, vec2(room, BOTTOM_BAR))), |ui| {
             egui::ScrollArea::horizontal().id_salt("phone-tools").auto_shrink([false, true]).show(ui, |ui| {
@@ -1165,6 +1169,15 @@ fn tool_bottom_bar(app: &mut PdfCraftApp, mode: ToolMode, ui: &mut egui::Ui, rec
             ui.painter().circle_filled(r.center(), 13.0, c);
             ui.painter().circle_stroke(r.center(), 13.0, Stroke::new(1.5, t.border));
             style = theme::hand(resp).clicked();
+        } else if mode == ToolMode::FillSign {
+            ui.add_space(ui.available_width() - TARGET - 4.0);
+            let (r, resp) = ui.allocate_exact_size(Vec2::splat(TARGET), Sense::click());
+            resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!("Sign yourself")));
+            let press = theme::Press::track(ui, &resp);
+            let chip = Rect::from_center_size(r.center() + press.offset(), Vec2::splat(40.0));
+            glowing_tile(ui.painter(), chip, 12.0, tool_color("fill_sign"), t);
+            icons::paint_bold(ui, chip, "user-round", 20.0, Color32::WHITE);
+            sign = theme::hand(resp).clicked();
         }
     });
     if let Some(id) = run {
@@ -1172,6 +1185,9 @@ fn tool_bottom_bar(app: &mut PdfCraftApp, mode: ToolMode, ui: &mut egui::Ui, rec
     }
     if style {
         app.phone.sheet = Some(Sheet::Style);
+    }
+    if sign {
+        app.phone.sheet = Some(Sheet::Sign);
     }
 }
 
@@ -1288,6 +1304,7 @@ fn sheets(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, screen: Rect, 
         Some(Sheet::GoTo) => go_to_sheet(app, index, &ctx, screen, t),
         Some(Sheet::Style) => style_sheet(app, &ctx, screen, t),
         Some(Sheet::EditMore) => crate::phone_edit::more_sheet(app, &ctx, screen, t),
+        Some(Sheet::Sign) => crate::fill_sign::phone_sign_sheet(app, &ctx, screen, t),
         Some(Sheet::New | Sheet::Item | Sheet::Pick) | None => {}
     }
 }

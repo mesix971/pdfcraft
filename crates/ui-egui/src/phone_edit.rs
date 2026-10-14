@@ -295,6 +295,72 @@ fn divider(ui: &mut egui::Ui, l: &phone_home::Look) {
 /// How long a finger stays down, without moving (as far as a tap may), to pick up what is under
 /// it.
 const HOLD: f64 = 0.45;
+/// A corner handle of what is picked: its dot's radius, and the finger-sized room around it.
+const HANDLE_DOT: f32 = 9.0;
+const HANDLE_TARGET: f32 = 44.0;
+
+/// A corner handle on the page (the phone's Edit): what a finger on it resizes.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum Handle {
+    /// A picture of the page, by its index, from the corner opposite (which stays put).
+    Picture { index: usize, opposite: egui::Pos2 },
+    /// An item PdfCraft added, by its place among the page's items, from its corner (`left`,
+    /// `top` say which).
+    Added { index: usize, left: bool, top: bool },
+}
+
+/// Draw the handles at the corners of what is picked on `page` (a picture, or an item PdfCraft
+/// added), finger-sized, and remember them for the next frame: a finger that goes down on one
+/// resizes it from that frame on (so the pages don't scroll under it: see `canvas.rs`).
+pub(crate) fn handles(
+    ui: &egui::Ui,
+    xf: &crate::canvas::PageXform,
+    page: usize,
+    info: &pdfcraft_render::DocInfo,
+    added: &[pdfcraft_engine::Added],
+    generation: u64,
+    view: &mut crate::canvas::DocView,
+) {
+    if view.carrying() {
+        return;
+    }
+    let t = Tokens::get(ui.ctx());
+    let corners = |r: Rect| [r.left_top(), r.right_top(), r.left_bottom(), r.right_bottom()];
+    let mut found: Vec<(Rect, Handle)> = Vec::new();
+    if let Some(s) = view.image_selection.as_ref().filter(|s| s.page == page)
+        && let Some(r) = view
+            .edit_images
+            .get(&page)
+            .filter(|(g, _)| *g == generation)
+            .and_then(|(_, images)| images.get(s.index))
+            .and_then(|im| im.visible_rect)
+            .map(|r| xf.user_rect(info, page, r.map(|v| v as f32)))
+            .filter(|r| r.is_positive())
+    {
+        // A small picture's handles shrink with it, so its middle stays its own (a long press there
+        // moves it).
+        let target = (r.width().min(r.height()) / 2.0).clamp(16.0, HANDLE_TARGET);
+        let c = corners(r);
+        for (k, at) in c.iter().enumerate() {
+            let opposite = c.get(3 - k).copied().unwrap_or(*at);
+            found.push((Rect::from_center_size(*at, Vec2::splat(target)), Handle::Picture { index: s.index, opposite }));
+        }
+    } else if let Some((p, index)) = view.content.selected.filter(|(p, _)| *p == page)
+        && let Some(r) = crate::content_ui::item_screen_rect(xf, info, p, added, index).filter(|r| r.is_positive())
+    {
+        // Added text (or a picture) is resized by its sides: its text rewraps to the width, and a
+        // line of text is too short for handles at its top and bottom.
+        for (at, left) in [(r.left_center(), true), (r.right_center(), false)] {
+            found.push((Rect::from_center_size(at, Vec2::splat(HANDLE_TARGET)), Handle::Added { index, left, top: true }));
+        }
+    }
+    for (r, _) in &found {
+        let c = r.center();
+        ui.painter().circle_filled(c, HANDLE_DOT + 2.0, Color32::from_black_alpha(40));
+        ui.painter().circle(c, HANDLE_DOT, Color32::WHITE, Stroke::new(2.5, t.accent));
+    }
+    view.phone_handles_next.extend(found.into_iter().map(|(r, h)| (page, r, h)));
+}
 
 /// A long press on `page` in the Edit mode picks up what is under the finger: text PdfCraft added,
 /// else a paragraph, else a picture. It then follows the finger, and lands where the finger lifts
@@ -327,6 +393,19 @@ pub(crate) fn long_press(
     let still = ui.ctx().options(|o| o.input_options.max_click_dist);
     let (origin, latest, since, now) = ui.input(|i| (i.pointer.press_origin(), i.pointer.latest_pos(), i.pointer.press_start_time(), i.time));
     let (Some(origin), Some(since)) = (origin, since) else { return };
+    // A finger on a handle of what is picked resizes it at once, no long press needed.
+    if view.carried_press != Some(since)
+        && let Some(handle) = handle_at(&view.phone_handles, page, origin)
+    {
+        view.carried_press = Some(since);
+        match handle {
+            Handle::Picture { index, opposite } => {
+                view.image_selection = Some(crate::edit_text_ui::ImageSelection::resizing(page, index, origin, opposite));
+            }
+            Handle::Added { index, left, top } => crate::content_ui::grab_corner(view, page, index, left, top, origin),
+        }
+        return;
+    }
     // A finger that moved further than a tap may is scrolling.
     if !xf.rect.contains(origin) || latest.is_some_and(|p| p.distance(origin) > still) {
         return;
@@ -369,6 +448,15 @@ pub(crate) fn long_press(
         view.content.selected = None;
         view.image_selection = Some(crate::edit_text_ui::ImageSelection::carried(page, index, origin));
     }
+}
+
+/// The handle on `page` under a finger at `p`: the nearest, where a small item's handles overlap.
+fn handle_at(handles: &[(usize, Rect, Handle)], page: usize, p: egui::Pos2) -> Option<Handle> {
+    handles
+        .iter()
+        .filter(|(at, r, _)| *at == page && r.contains(p))
+        .min_by(|(_, a, _), (_, b, _)| a.center().distance_sq(p).total_cmp(&b.center().distance_sq(p)))
+        .map(|(_, _, h)| *h)
 }
 
 /// What the Edit mode's bottom bar asks for.
@@ -525,5 +613,30 @@ pub(crate) fn more_sheet(app: &mut PdfCraftApp, ctx: &egui::Context, screen: Rec
             app.execute(command);
         }
         None => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_finger_takes_the_nearest_of_overlapping_handles() {
+        // A 20-point picture: its corners' handles overlap over all of it.
+        let corners = [pos2(100.0, 100.0), pos2(120.0, 100.0), pos2(100.0, 120.0), pos2(120.0, 120.0)];
+        let handles: Vec<(usize, Rect, Handle)> = corners
+            .iter()
+            .enumerate()
+            .map(|(k, c)| (0, Rect::from_center_size(*c, Vec2::splat(44.0)), Handle::Added { index: k, left: k % 2 == 0, top: k < 2 }))
+            .collect();
+        let index = |p| match handle_at(&handles, 0, p) {
+            Some(Handle::Added { index, .. }) => Some(index),
+            _ => None,
+        };
+        assert_eq!(index(pos2(118.0, 119.0)), Some(3), "the bottom right, not the first in the list");
+        assert_eq!(index(pos2(101.0, 102.0)), Some(0));
+        assert_eq!(index(pos2(119.0, 101.0)), Some(1));
+        assert_eq!(index(pos2(300.0, 300.0)), None, "nowhere near");
+        assert_eq!(handle_at(&handles, 1, pos2(118.0, 119.0)).map(|_| ()), None, "another page's");
     }
 }

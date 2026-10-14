@@ -132,8 +132,11 @@ Android 8.0 (API 26) or later, 64-bit ARM by default.
   opens it large on a screen of its own (size, bold, italic, underline, alignment, colours; Done
   or ✕), Add text puts new text where the page is tapped, and a tapped picture gets a bar to
   turn, flip, replace, save or delete it. A long press picks a paragraph, added text or a
-  picture up to move it: it follows the finger and lands where it lifts. More has headers and
-  footers, a watermark, the background, Bates numbers and the pages.
+  picture up to move it: it follows the finger and lands where it lifts; a picked picture has
+  handles at its corners to resize it, added text at its sides. More has headers and footers, a
+  watermark, the background, Bates numbers and the pages. Dialogs have finger-sized controls.
+- **Fill & Sign** has a sheet with the saved signature and initials: tap one to place it, or
+  change or remove it.
 - **Combine files** is a list of cards in the order they will be combined, each with its first
   page: arrows move a file, a cross takes it out, a tap shows it large, Combine is at the bottom.
 - **Dark mode.** Profile ▸ Appearance chooses Automatic (the phone's theme), Light or Dark; until

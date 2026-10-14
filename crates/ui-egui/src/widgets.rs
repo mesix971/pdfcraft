@@ -9,6 +9,10 @@ use crate::{PdfCraftApp, icons};
 const FIELD_MARGIN: egui::Margin = egui::Margin::symmetric(10, 6);
 /// Outer height of a single-line field, including its inset.
 const FIELD_MIN_HEIGHT: f32 = 30.0;
+/// On a phone: the height of a dialog's controls and buttons (a finger's), and its text sizes.
+const PHONE_CONTROL: f32 = 40.0;
+const PHONE_TEXT: f32 = 14.5;
+const PHONE_SMALL: f32 = 13.0;
 /// Padding inside every modal.
 const DIALOG_PAD_X: i8 = 20;
 const DIALOG_PAD_Y: i8 = 16;
@@ -38,6 +42,37 @@ fn dialog_max_width_id() -> egui::Id {
 /// no wider than the phone.
 pub fn set_phone_dialogs(ctx: &egui::Context, on: bool) {
     ctx.data_mut(|d| d.insert_temp(phone_dialogs_id(), on));
+    PHONE_LISTS.with(|p| p.set(on));
+}
+
+thread_local! {
+    /// The phone layout, for the drop-down lists' rows: a list's popup style is given only the
+    /// style, not the context (set with [`set_phone_dialogs`], every frame, on the UI's thread).
+    static PHONE_LISTS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// A drop-down list. Every one goes through here (clippy.toml disallows
+/// `egui::ComboBox::from_id_salt`): on a phone its rows are a finger tall, as the dialogs' other
+/// controls are.
+pub fn combo(id_salt: impl egui::AsIdSalt) -> egui::ComboBox {
+    #[expect(clippy::disallowed_methods, reason = "the one place that makes drop-down lists")]
+    let list = egui::ComboBox::from_id_salt(id_salt);
+    list.popup_style(egui::style::StyleModifier::new(phone_list_rows))
+}
+
+/// On a phone: a drop-down list's rows a finger tall, their text a size up.
+fn phone_list_rows(style: &mut egui::Style) {
+    if !PHONE_LISTS.with(std::cell::Cell::get) {
+        return;
+    }
+    style.spacing.interact_size.y = PHONE_CONTROL;
+    style.spacing.button_padding = vec2(14.0, 10.0);
+    style.spacing.item_spacing.y = 2.0;
+    for (text, font) in style.text_styles.iter_mut() {
+        if matches!(text, egui::TextStyle::Body | egui::TextStyle::Button | egui::TextStyle::Monospace) {
+            font.size = font.size.max(PHONE_TEXT);
+        }
+    }
 }
 
 /// Whether dialogs are phone screens (the phone layout).
@@ -192,6 +227,24 @@ pub fn begin_dialog(ui: &mut egui::Ui) {
     }
     ui.visuals_mut().selection.stroke = Stroke::new(1.5, t.accent);
     ui.spacing_mut().interact_size.y = FIELD_MIN_HEIGHT;
+    // A phone: radio buttons, check boxes, lists and values a finger tall, room between them,
+    // and text a size up (every dialog starts here).
+    if phone_dialogs(ui.ctx()) {
+        let s = ui.spacing_mut();
+        s.interact_size.y = PHONE_CONTROL;
+        s.icon_width = 20.0;
+        s.icon_width_inner = 11.0;
+        s.icon_spacing = 7.0;
+        s.item_spacing = vec2(8.0, 10.0);
+        s.button_padding = vec2(12.0, 8.0);
+        for (style, font) in ui.style_mut().text_styles.iter_mut() {
+            match style {
+                egui::TextStyle::Body | egui::TextStyle::Button | egui::TextStyle::Monospace => font.size = font.size.max(PHONE_TEXT),
+                egui::TextStyle::Small => font.size = font.size.max(PHONE_SMALL),
+                _ => {}
+            }
+        }
+    }
 }
 
 /// A single-line field tall enough to read and to click.
@@ -265,9 +318,11 @@ pub fn mode_tab(ui: &mut egui::Ui, label: &str, active: bool) -> Response {
 /// Rounded pill button; `primary` fills with the accent.
 pub fn pill_button(ui: &mut egui::Ui, label: &str, primary: bool) -> Response {
     let t = Tokens::get(ui.ctx());
-    let font = theme::medium(12.5);
+    // A phone's dialogs: a finger tall, the label a size up.
+    let phone = phone_dialogs(ui.ctx());
+    let font = theme::medium(if phone { PHONE_TEXT } else { 12.5 });
     let w = ui.fonts_mut(|f| f.layout_no_wrap(label.to_owned(), font.clone(), t.text).size().x);
-    let (rect, resp) = ui.allocate_exact_size(vec2(w + 26.0, 28.0), Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(if phone { vec2(w + 32.0, PHONE_CONTROL) } else { vec2(w + 26.0, 28.0) }, Sense::click());
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), label));
     let press = theme::Press::track(ui, &resp);
     let (fill, stroke, text) = if primary {
@@ -275,7 +330,7 @@ pub fn pill_button(ui: &mut egui::Ui, label: &str, primary: bool) -> Response {
     } else {
         (press.fill(t.card, t.hover, t.pressed), Stroke::new(1.0, t.border), t.text)
     };
-    ui.painter().rect(rect, CornerRadius::same(14), fill, stroke, egui::StrokeKind::Inside);
+    ui.painter().rect(rect, CornerRadius::same(if phone { 20 } else { 14 }), fill, stroke, egui::StrokeKind::Inside);
     ui.painter().text(rect.translate(press.offset()).center(), Align2::CENTER_CENTER, label, font, text);
     theme::hand(resp)
 }
@@ -709,9 +764,12 @@ pub fn split_pill(ui: &mut egui::Ui, icon: &str, label: &str, more: &str) -> (Re
 /// A pill button with an icon (primary = filled accent).
 pub fn icon_pill(ui: &mut egui::Ui, icon: &str, label: &str, primary: bool) -> Response {
     let t = Tokens::get(ui.ctx());
-    let font = theme::medium(12.5);
+    // A phone's dialogs: a finger tall, the label a size up.
+    let phone = phone_dialogs(ui.ctx());
+    let font = theme::medium(if phone { PHONE_TEXT } else { 12.5 });
     let w = ui.fonts_mut(|f| f.layout_no_wrap(label.to_owned(), font.clone(), t.text).size().x);
-    let (rect, resp) = ui.allocate_exact_size(vec2(w + 46.0, 30.0), Sense::click());
+    let height = if phone { PHONE_CONTROL } else { 30.0 };
+    let (rect, resp) = ui.allocate_exact_size(vec2(w + 46.0, height), Sense::click());
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), label));
     let press = theme::Press::track(ui, &resp);
     let (fill, stroke, text) = if primary {
@@ -719,9 +777,9 @@ pub fn icon_pill(ui: &mut egui::Ui, icon: &str, label: &str, primary: bool) -> R
     } else {
         (press.fill(t.card, t.hover, t.pressed), Stroke::new(1.0, t.border), t.text)
     };
-    ui.painter().rect(rect, CornerRadius::same(15), fill, stroke, egui::StrokeKind::Inside);
+    ui.painter().rect(rect, CornerRadius::same((height / 2.0) as u8), fill, stroke, egui::StrokeKind::Inside);
     let body = rect.translate(press.offset());
-    crate::icons::paint(ui, Rect::from_min_size(body.min + vec2(12.0, 7.0), vec2(16.0, 16.0)), icon, 15.0, text);
+    crate::icons::paint(ui, Rect::from_min_size(body.min + vec2(12.0, (height - 16.0) / 2.0), vec2(16.0, 16.0)), icon, 15.0, text);
     ui.painter().text(body.left_center() + vec2(34.0, 0.0), Align2::LEFT_CENTER, label, font, text);
     theme::hand(resp)
 }

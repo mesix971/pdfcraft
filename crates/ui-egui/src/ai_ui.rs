@@ -626,7 +626,7 @@ fn chat(app: &mut PdfCraftApp, doc: DocId, ui: &mut egui::Ui, t: &Tokens) {
                             ask = Some((Task::Translate { page, language: app.ai.translate_to.clone() }, shown));
                         }
                     });
-                    egui::ComboBox::from_id_salt("ai-translate-to").selected_text(app.ai.translate_to.clone()).show_ui(ui, |ui| {
+                    crate::widgets::combo("ai-translate-to").selected_text(app.ai.translate_to.clone()).show_ui(ui, |ui| {
                         for lang in crate::i18n::Lang::all() {
                             let name = lang.name().to_owned();
                             if ui.selectable_label(app.ai.translate_to == name, &name).clicked() {

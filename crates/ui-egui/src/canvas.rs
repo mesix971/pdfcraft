@@ -398,6 +398,10 @@ pub struct DocView {
     /// The phone's Edit: the press (when it began, as egui counts it) that already picked
     /// something up, or found nothing to, so it doesn't again.
     pub(crate) carried_press: Option<f64>,
+    /// The phone's Edit: the corner handles drawn last frame (page, screen rect, what it resizes).
+    pub(crate) phone_handles: Vec<(usize, Rect, crate::phone_edit::Handle)>,
+    /// This frame's, kept apart until every page has looked at last frame's.
+    pub(crate) phone_handles_next: Vec<(usize, Rect, crate::phone_edit::Handle)>,
     pub(crate) text_background: crate::edit_text_ui::TextBackground,
     /// Edit text & images: the images per page (by document generation), and the selected one.
     pub(crate) edit_images: HashMap<usize, (u64, Vec<pdfcraft_engine::PageImage>)>,
@@ -652,6 +656,8 @@ impl DocView {
             edit_lines: HashMap::new(),
             line_editor: None,
             carried_press: None,
+            phone_handles: Vec::new(),
+            phone_handles_next: Vec::new(),
             text_background: Default::default(),
             edit_images: HashMap::new(),
             objects: Default::default(),
@@ -2823,6 +2829,9 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                     crate::edit_text_ui::image_input(ui, &resp, &xf, i, info, &images, view, &mut image_action, image_owns_pointer || !text_used);
                 text_used || image_used
             };
+            if tap_edit && tool == QuickTool::EditText && can_modify {
+                crate::phone_edit::handles(ui, &xf, i, info, &added, doc.edit_generation(), view);
+            }
             let on_link = tool == QuickTool::Link && can_modify && crate::link_ui::page_input(ui, &resp, &xf, i, info, &doc_links, view);
             if tool == QuickTool::Select
                 && resp.secondary_clicked()
@@ -3105,6 +3114,8 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         }
         // (What a long press carried lands on the release, in its own branch, before anything
         // else sees the release as a tap.)
+        // The handles drawn this frame are the ones a finger finds next frame.
+        view.phone_handles = std::mem::take(&mut view.phone_handles_next);
         // The page navigated to stays current while no page shows more of itself, so the next
         // page step starts from it rather than from a page further down the screen (#188).
         // It also stays current while it is wholly on screen: a short page (a cheque) gone to

@@ -425,6 +425,18 @@ pub(crate) fn item_at(xf: &PageXform, info: &DocInfo, page: usize, added: &[Adde
     on_page(added, page).into_iter().rev().find(|(_, a)| screen_rect(xf, info, page, a.content.rect()).expand(2.0).contains(p)).map(|(i, _)| i)
 }
 
+/// Added item `i` of `page` on screen.
+pub(crate) fn item_screen_rect(xf: &PageXform, info: &DocInfo, page: usize, added: &[Added], i: usize) -> Option<Rect> {
+    on_page(added, page).into_iter().find(|(k, _)| *k == i).map(|(_, a)| screen_rect(xf, info, page, a.content.rect()))
+}
+
+/// Resize added item `i` of `page` by its corner (`left`, `top` say which) under a finger at `at`
+/// (a phone's handle), as a mouse drag on its handle does.
+pub(crate) fn grab_corner(view: &mut DocView, page: usize, i: usize, left: bool, top: bool, at: Pos2) {
+    view.content.selected = Some((page, i));
+    view.content.grab = Some((page, Grab::Corner(left, top), at));
+}
+
 /// Pick up added item `i` of `page` with a finger at `at` (a long press on a phone): it moves
 /// with the finger and lands where it is let go, as a mouse drag does.
 pub(crate) fn carry(view: &mut DocView, page: usize, i: usize, at: Pos2) {
@@ -488,13 +500,13 @@ pub(crate) fn format_panel(ui: &mut egui::Ui, t: &Tokens, style: &AddedText) -> 
     let mut s = style.clone();
     widgets::section_title(ui, tl!("Format text"));
     ui.horizontal(|ui| {
-        egui::ComboBox::from_id_salt("font-family").selected_text(s.family.label()).width(110.0).show_ui(ui, |ui| {
+        crate::widgets::combo("font-family").selected_text(s.family.label()).width(110.0).show_ui(ui, |ui| {
             for f in [FontFamily::Helvetica, FontFamily::Times, FontFamily::Courier] {
                 ui.selectable_value(&mut s.family, f, f.label());
             }
         });
         // A list rather than a drag value: every change is an undo step.
-        egui::ComboBox::from_id_salt("font-size").selected_text(format!("{} pt", s.size)).width(70.0).show_ui(ui, |ui| {
+        crate::widgets::combo("font-size").selected_text(format!("{} pt", s.size)).width(70.0).show_ui(ui, |ui| {
             for size in [8.0, 9.0, 10.0, 11.0, 12.0, 14.0, 16.0, 18.0, 20.0, 24.0, 28.0, 36.0, 48.0, 72.0] {
                 ui.selectable_value(&mut s.size, size, format!("{size} pt"));
             }

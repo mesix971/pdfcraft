@@ -62,12 +62,16 @@ impl PageRange {
                 ui.end_row();
             }
             ui.label(tl!("Subset"));
+            if widgets::phone_dialogs(ui.ctx()) {
+                // A long choice ("All pages in range"): the list has the line to itself.
+                ui.end_row();
+            }
             let label = match self.subset {
                 Subset::All => tl!("All pages in range"),
                 Subset::Even => tl!("Even pages only"),
                 Subset::Odd => tl!("Odd pages only"),
             };
-            egui::ComboBox::from_id_salt("mark-subset").selected_text(label).show_ui(ui, |ui| {
+            crate::widgets::combo("mark-subset").selected_text(label).show_ui(ui, |ui| {
                 ui.selectable_value(&mut self.subset, Subset::All, tl!("All pages in range"));
                 ui.selectable_value(&mut self.subset, Subset::Even, tl!("Even pages only"));
                 ui.selectable_value(&mut self.subset, Subset::Odd, tl!("Odd pages only"));
@@ -212,27 +216,21 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
                 });
             }
             widgets::row(ui, |ui| {
-                egui::ComboBox::from_id_salt("hf-page-format").selected_text(PAGE_FORMATS[d.page_format].trim_matches(['<', '>'])).show_ui(
-                    ui,
-                    |ui| {
-                        for (k, f) in PAGE_FORMATS.iter().enumerate() {
-                            ui.selectable_value(&mut d.page_format, k, f.trim_matches(['<', '>']));
-                        }
-                    },
-                );
+                crate::widgets::combo("hf-page-format").selected_text(PAGE_FORMATS[d.page_format].trim_matches(['<', '>'])).show_ui(ui, |ui| {
+                    for (k, f) in PAGE_FORMATS.iter().enumerate() {
+                        ui.selectable_value(&mut d.page_format, k, f.trim_matches(['<', '>']));
+                    }
+                });
                 if ui.button(tl!("Insert Page Number")).clicked() {
                     d.hf.text[d.focused_box].push_str(PAGE_FORMATS[d.page_format]);
                 }
                 ui.add_space(12.0);
                 widgets::line_break(ui);
-                egui::ComboBox::from_id_salt("hf-date-format").selected_text(DATE_FORMATS[d.date_format].trim_matches(['<', '>'])).show_ui(
-                    ui,
-                    |ui| {
-                        for (k, f) in DATE_FORMATS.iter().enumerate() {
-                            ui.selectable_value(&mut d.date_format, k, f.trim_matches(['<', '>']));
-                        }
-                    },
-                );
+                crate::widgets::combo("hf-date-format").selected_text(DATE_FORMATS[d.date_format].trim_matches(['<', '>'])).show_ui(ui, |ui| {
+                    for (k, f) in DATE_FORMATS.iter().enumerate() {
+                        ui.selectable_value(&mut d.date_format, k, f.trim_matches(['<', '>']));
+                    }
+                });
                 if ui.button(tl!("Insert Date")).clicked() {
                     d.hf.text[d.focused_box].push_str(DATE_FORMATS[d.date_format]);
                 }

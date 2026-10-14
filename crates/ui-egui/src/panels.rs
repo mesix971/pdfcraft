@@ -420,7 +420,7 @@ fn format_section(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
         let mut ed = ed;
         let mut changed = false;
         let font_choices = app.session.get(app.views[i].id).map(|d| d.text_editor_fonts(ed.page)).unwrap_or_default();
-        egui::ComboBox::from_id_salt("document-font-resource")
+        crate::widgets::combo("document-font-resource")
             .selected_text(
                 ed.font_resource
                     .as_ref()
@@ -437,7 +437,7 @@ fn format_section(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
             app.pick_files(crate::files::FilePurpose::TextFont { page: ed.page }, false);
         }
         #[cfg(not(target_arch = "wasm32"))]
-        egui::ComboBox::from_id_salt("installed-document-font").selected_text(tl!("Installed fonts…")).show_ui(ui, |ui| {
+        crate::widgets::combo("installed-document-font").selected_text(tl!("Installed fonts…")).show_ui(ui, |ui| {
             if let Some(fonts) = crate::files::installed_font_files(ui.ctx()) {
                 if fonts.is_empty() {
                     ui.label(tl!("No openly licensed document fonts found. Load a font file."));
