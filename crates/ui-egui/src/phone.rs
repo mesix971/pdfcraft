@@ -439,7 +439,9 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
     // looks the same either way. Above the panel that fills the window (it would cover the strip),
     // and outside the content, so it covers nothing of it.
     let whole = ctx.input(|i| i.viewport_rect());
-    let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("phone-system-strips")));
+    let mut painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("phone-system-strips")));
+    // A layer's painter keeps to the content rect, which is just what the strips are outside of.
+    painter.set_clip_rect(whole);
     if screen.top() > whole.top() {
         painter.rect_filled(Rect::from_min_max(whole.min, pos2(whole.right(), screen.top())), CornerRadius::ZERO, top);
     }

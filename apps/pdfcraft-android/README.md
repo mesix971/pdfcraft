@@ -117,9 +117,7 @@ Android 8.0 (API 26) or later, 64-bit ARM by default.
   - Colour: the accent is the icon's green. Home sits on a deeper ground under a glow that goes
     from that green to the ArtCraft mark's blue, with its header over it rather than on a bar;
     each tool keeps its group's colour (Home's tiles, the bottom bar), and a tool mode's bar takes
-    a wash of it. Sizes are written the UI language's way ("30,5 Ko" in French). The strip under
-    Android's status bar is PdfCraft's to paint (a `NativeActivity` window takes the whole
-    screen), in the same green.
+    a wash of it. Sizes are written the UI language's way ("30,5 Ko" in French). The strips under Android's status and navigation bars are PdfCraft's to paint (a `NativeActivity` window takes the whole screen), in the colours of the screen's top and bottom.
 - **The AI assistant** (`crates/ai`): summarize the document, ask about it, translate a page,
   with the user's own Anthropic API key. Asked to correct, reword or translate the document
   itself, it proposes the changes (each passage and its replacement); **Apply** rewrites each
