@@ -189,8 +189,10 @@ impl RecoveryStore {
 
 /// Autosaves written off the UI thread: a large document takes a while to write and sync, and
 /// the periodic autosave would freeze the window meanwhile. One writer, so writes land in order;
-/// an entry forgotten meanwhile (its document saved, discarded or closed) is never written again:
-/// the writer checks the forgotten keys under the lock removing an entry takes.
+/// an entry forgotten meanwhile (its document saved, discarded or closed) is never left behind: the
+/// writer checks the forgotten keys before it writes, and again after, removing what was forgotten
+/// during the write. It doesn't hold their lock while it writes: saving or closing a document takes
+/// it, and would wait for a large write.
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) struct Autosaver {
     jobs: std::sync::mpsc::Sender<Job>,
@@ -223,11 +225,17 @@ impl Autosaver {
             for job in rx {
                 match job {
                     Job::Write(store, meta, bytes) => {
-                        let gone = forgotten_keys(&gone);
-                        if !gone.contains(&meta.key)
-                            && let Err(e) = store.write(&meta, &bytes)
-                        {
+                        if forgotten_keys(&gone).contains(&meta.key) {
+                            continue;
+                        }
+                        #[cfg(test)]
+                        tests::before_write(&store);
+                        if let Err(e) = store.write(&meta, &bytes) {
                             log::warn!("autosave failed: {e}");
+                        }
+                        // Forgotten while it was written: its removal may have come first.
+                        if forgotten_keys(&gone).contains(&meta.key) {
+                            store.remove(&meta.key);
                         }
                     }
                     Job::Flush(done) => {
@@ -423,6 +431,49 @@ impl PdfCraftApp {
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use super::*;
+
+    /// A writer about to write into this folder says so, and waits to be told to go on.
+    type Pause = (std::path::PathBuf, std::sync::mpsc::Sender<()>, std::sync::mpsc::Receiver<()>);
+    static BEFORE_WRITE: std::sync::Mutex<Option<Pause>> = std::sync::Mutex::new(None);
+
+    /// The writer's pause point between its first check and the write (only for the folder a test
+    /// asked it for: other tests' writers run alongside).
+    pub(super) fn before_write(store: &RecoveryStore) {
+        let pause = {
+            let mut held = BEFORE_WRITE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            if held.as_ref().is_some_and(|(dir, ..)| dir == store.dir()) { held.take() } else { None }
+        };
+        if let Some((_, reached, go_on)) = pause {
+            let _ = reached.send(());
+            let _ = go_on.recv();
+        }
+    }
+
+    /// A document forgotten while its autosave is being written leaves no entry: the write lands
+    /// after the removal, and the writer takes it back out.
+    #[test]
+    fn an_autosave_forgotten_while_written_is_taken_back() {
+        let dir = std::env::temp_dir().join(format!("pdfcraft-autosave-during-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let store = RecoveryStore::new(&dir);
+        let mut app = PdfCraftApp::new();
+        app.enable_recovery(store.clone());
+        let pdf = b"%PDF-1.7\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n2 0 obj << /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >> endobj\n3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >> endobj\n4 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF";
+        app.open_bytes("a.pdf", None, pdf.to_vec()).unwrap();
+        assert!(app.apply_edit(pdfcraft_engine::Edit::DeletePages { pages: vec![0] }));
+        let (reached_tx, reached) = std::sync::mpsc::channel();
+        let (go_on, go_on_rx) = std::sync::mpsc::channel();
+        *BEFORE_WRITE.lock().unwrap() = Some((store.dir().to_path_buf(), reached_tx, go_on_rx));
+        app.autosave_tick(AUTOSAVE_SECS + 1.0);
+        // The writer has checked the entry and is about to write it: now it is forgotten.
+        reached.recv_timeout(std::time::Duration::from_secs(20)).unwrap();
+        let Some((_, id)) = app.active_ids() else { panic!("a document") };
+        app.forget_recovery(id);
+        go_on.send(()).unwrap();
+        app.autosave_now();
+        assert!(store.list().is_empty(), "{:?}", store.list());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     /// The periodic autosave writes off the UI thread, and a document saved or closed while its
     /// snapshot waits to be written leaves no entry behind.

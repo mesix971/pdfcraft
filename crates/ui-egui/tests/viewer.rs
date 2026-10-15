@@ -1068,3 +1068,24 @@ fn each_page_on_screen_is_read_by_its_number_and_text() {
     let second = read(&h, "Page 2 of 2");
     assert!(second.iter().any(|d| d.contains("Page 2 pages PAGE")), "{second:?}");
 }
+
+/// A search through a long document finishes: it counts the pages it has searched, not the text
+/// layers still cached (they keep to a budget, so they stopped short of the page count).
+#[test]
+fn a_search_through_a_long_document_finishes() {
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_cc| {
+        let mut app = PdfCraftApp::new();
+        app.set_option("language", "en").unwrap();
+        app.open_bytes("long.pdf", None, fixture(60)).unwrap();
+        app.set_option("find", "zebra").unwrap();
+        app
+    });
+    for _ in 0..3000 {
+        h.run_steps(2);
+        if !h.state().render_pending() && h.query_by_label("No matches").is_some() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    assert!(h.query_by_label("No matches").is_some(), "{:?}", h.query_by_label_contains("Searching").map(|n| n.accesskit_node().value()));
+}

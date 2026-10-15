@@ -646,6 +646,12 @@ pub fn toast(app: &mut PdfCraftApp, ctx: &egui::Context) {
     ctx.request_repaint_after(std::time::Duration::from_millis(100));
 }
 
+/// A notice's text, said by screen readers when it shows (a live region, polite: after what they
+/// are saying).
+fn spoken(ui: &egui::Ui, text: &Response) {
+    ui.ctx().accesskit_node_builder(text.id, |node| node.set_live(egui::accesskit::Live::Polite));
+}
+
 /// One notice's card, its bottom centre at `bottom`, with Undo when `undo` (a finger tall on a
 /// phone). Returns where it is and whether Undo was clicked.
 fn toast_card(ctx: &egui::Context, id: egui::Id, bottom: egui::Pos2, msg: &str, undo: bool, phone: bool) -> (Rect, bool) {
@@ -668,7 +674,8 @@ fn toast_card(ctx: &egui::Context, id: egui::Id, bottom: egui::Pos2, msg: &str, 
                 ui.set_max_width((screen.width() - 64.0).clamp(1.0, 560.0));
                 let message = egui::Label::new(egui::RichText::new(msg).color(ink)).wrap();
                 if !undo {
-                    ui.add(message);
+                    let said = ui.add(message);
+                    spoken(ui, &said);
                     return;
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -677,7 +684,8 @@ fn toast_card(ctx: &egui::Context, id: egui::Id, bottom: egui::Pos2, msg: &str, 
                         .min_size(vec2(0.0, if phone { PHONE_CONTROL } else { 0.0 }));
                     clicked = theme::hand(ui.add(button)).clicked();
                     ui.add_space(12.0);
-                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| ui.add(message));
+                    let said = ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| ui.add(message)).inner;
+                    spoken(ui, &said);
                 });
             });
     });
@@ -990,6 +998,9 @@ mod tests {
         assert_eq!(earlier, ["Saved"]);
         app.notify("Copied");
         assert_eq!(app.toast_earlier.len(), 2, "an outcome stacks like any notice");
+        // An error that no longer holds goes, with every notice before it.
+        app.clear_notices();
+        assert!(app.toast.is_none() && app.toast_earlier.is_empty());
     }
 
     #[test]

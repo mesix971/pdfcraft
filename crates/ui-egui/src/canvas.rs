@@ -2567,7 +2567,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         // Reading on a phone the pages take taps only, so a drag reaches the scroll area under them.
         let sense = if touch_view || tap_edit { Sense::click() } else { Sense::click_and_drag() };
         let (resp_rect, resp) = ui.allocate_exact_size(vec2(content_w, content_h), sense);
-        // Named for screen readers; each page on screen is a node inside it ([`page_node`]).
+        // Named for screen readers; each page on screen is a node of its own beside it ([`page_node`]).
         resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Other, true, tl!("Pages")));
         // The Hand tool pans: the content widget takes every drag, so scroll by its delta.
         if hand {
@@ -3947,7 +3947,8 @@ fn page_node(ui: &egui::Ui, text: Option<&PageText>, page: usize, pages: usize, 
     ui.ctx().accesskit_node_builder(node.id, |b| {
         b.set_role(egui::accesskit::Role::Group);
         if let Some(text) = text {
-            let mut words = text.plain_text();
+            // Only the glyphs that can be given: a page of tiny print isn't put together whole.
+            let mut words = text.text_of(0..text.glyphs.len().min(PAGE_NODE_TEXT));
             if let Some((cut, _)) = words.char_indices().nth(PAGE_NODE_TEXT) {
                 words.truncate(cut);
             }

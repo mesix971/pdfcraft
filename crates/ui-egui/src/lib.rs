@@ -1677,6 +1677,15 @@ impl PdfCraftApp {
         self.toast = Some((msg, 0.0));
     }
 
+    /// Take every notice off the screen: what they said no longer holds (the import an error was
+    /// about has now worked).
+    pub(crate) fn clear_notices(&mut self) {
+        self.toast = None;
+        self.toast_earlier.clear();
+        self.toast_undo = None;
+        self.toast_progress = false;
+    }
+
     /// Say how far a job has got: the next notice, its next step or its outcome, takes this one's
     /// place rather than stacking under it.
     pub(crate) fn notify_progress(&mut self, msg: impl Into<String>) {

@@ -897,7 +897,7 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
                         crate::fill_sign::FillTool::Signature
                     };
                     app.quick_tool = crate::QuickTool::Fill(tool);
-                    app.toast = None;
+                    app.clear_notices();
                 }
                 close = apply || cancel;
                 return;

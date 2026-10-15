@@ -1224,7 +1224,7 @@ impl crate::PdfCraftApp {
         match cleaned {
             Ok(image) => {
                 self.signature_draft.image = Some(image);
-                self.toast = None;
+                self.clear_notices();
             }
             Err(e) => self.notify_fmt("Couldn't import the signature image: {e}", &[("e", &e)]),
         }
@@ -1267,7 +1267,7 @@ impl crate::PdfCraftApp {
             Ok(mut scan) => {
                 scan.rescan_in_background(&mut self.signature_draft.image, true, self.ctx.as_ref());
                 self.signature_draft.scan = Some(scan);
-                self.toast = None;
+                self.clear_notices();
             }
             Err(e) => self.notify_fmt("Couldn't use the photo: {e}", &[("e", &e)]),
         }

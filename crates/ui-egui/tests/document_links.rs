@@ -2,7 +2,7 @@
 //! user's permission, and anything but a web or email address is refused (#90, #91).
 
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use pdfcraft_ui_egui::{LinkOrigin, PdfCraftApp, PendingLink};
 
 /// See `tests/view.rs`: WARP's shader JIT crashes when two devices compile at once on ARM64.
@@ -412,6 +412,8 @@ fn removed_links_come_back_with_the_notices_undo() {
     assert_eq!(links(&h), 0);
     let removed = format!("Removed {before} links");
     assert!(h.query_by_label(&removed).is_some() && h.query_by_label("An earlier notice").is_some(), "both notices show");
+    // Said by screen readers as it shows.
+    assert_eq!(h.get_by_label(&removed).accesskit_node().live(), egui::accesskit::Live::Polite);
     h.get_by_label("Undo").click();
     h.run_steps(2);
     assert_eq!(links(&h), before, "undone");
