@@ -202,6 +202,9 @@ enum Job {
     Write(RecoveryStore, RecoveryMeta, std::sync::Arc<Vec<u8>>),
     /// Answered once every job sent before it is done.
     Flush(std::sync::mpsc::Sender<()>),
+    /// Tests: the writer waits here until told to go on, so what comes meanwhile is decided first.
+    #[cfg(test)]
+    Hold(std::sync::mpsc::Receiver<()>),
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -229,6 +232,10 @@ impl Autosaver {
                     }
                     Job::Flush(done) => {
                         let _ = done.send(());
+                    }
+                    #[cfg(test)]
+                    Job::Hold(go_on) => {
+                        let _ = go_on.recv();
                     }
                 }
             }
@@ -429,11 +436,15 @@ mod tests {
         let pdf = b"%PDF-1.7\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n2 0 obj << /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >> endobj\n3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >> endobj\n4 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF";
         app.open_bytes("a.pdf", None, pdf.to_vec()).unwrap();
         assert!(app.apply_edit(pdfcraft_engine::Edit::DeletePages { pages: vec![0] }));
+        // The writer is held while the snapshot waits behind it and the document is forgotten.
+        app.autosaver = Autosaver::start();
+        let (go_on, held) = std::sync::mpsc::channel();
+        let Some(writer) = &app.autosaver else { panic!("a writer") };
+        writer.jobs.send(Job::Hold(held)).unwrap();
         app.autosave_tick(AUTOSAVE_SECS + 1.0);
-        assert!(app.autosaver.is_some(), "written by the writer thread");
-        // Gone before the writer may have reached it.
         let Some((_, id)) = app.active_ids() else { panic!("a document") };
         app.forget_recovery(id);
+        go_on.send(()).unwrap();
         app.autosave_now();
         assert!(store.list().is_empty(), "{:?}", store.list());
         // And one still open is there once written.
