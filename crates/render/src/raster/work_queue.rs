@@ -142,6 +142,7 @@ impl WorkQueue {
     }
 
     /// Tell the consumer a result is ready (outside every lock: the waker may take its own).
+    #[cfg(any(test, not(target_arch = "wasm32")))]
     fn wake_consumer(&self) {
         let waker = lock(&self.waker).clone();
         if let Some(wake) = waker {

@@ -99,21 +99,14 @@ pub struct Da {
 }
 
 pub fn parse_da(da: &str) -> Da {
-    let toks: Vec<&str> = da.split_whitespace().collect();
-    let mut out = Da { font: "Helv".into(), size: 0.0, color: "0 g".into() };
-    for (i, t) in toks.iter().enumerate() {
-        match *t {
-            "Tf" if i >= 2 => {
-                out.font = toks[i - 2].trim_start_matches('/').to_string();
-                out.size = toks[i - 1].parse::<f64>().ok().filter(|s| s.is_finite() && *s >= 0.0).unwrap_or(0.0).min(300.0);
-            }
-            "g" if i >= 1 && toks[i - 1].parse::<f64>().is_ok() => out.color = format!("{} g", toks[i - 1]),
-            "rg" if i >= 3 && toks[i - 3..i].iter().all(|x| x.parse::<f64>().is_ok()) => out.color = format!("{} rg", toks[i - 3..i].join(" ")),
-            "k" if i >= 4 && toks[i - 4..i].iter().all(|x| x.parse::<f64>().is_ok()) => out.color = format!("{} k", toks[i - 4..i].join(" ")),
-            _ => {}
-        }
-    }
-    out
+    let parsed = pdfcraft_content::DefaultAppearance::parse(da.as_bytes());
+    let (font, size) = match parsed.font {
+        Some((name, size)) => (String::from_utf8_lossy(&name).into_owned(), size),
+        None => ("Helv".into(), 0.0),
+    };
+    // The colour operation as written (its span is whole tokens, so on character boundaries).
+    let color = parsed.fill.and_then(|(_, at)| da.get(at)).map_or_else(|| "0 g".into(), |s| s.trim().to_owned());
+    Da { font, size: if size >= 0.0 { size.min(300.0) } else { 0.0 }, color }
 }
 
 /// How a field font's text is encoded and measured.

@@ -432,8 +432,12 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
             if app.dialog_epoch() != epoch {
                 return;
             }
-            app.marks_draft.file =
-                std::fs::read(&p).ok().map(|b| (p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), std::sync::Arc::new(b)));
+            let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+            match std::fs::read(&p) {
+                Ok(bytes) => app.marks_draft.file = Some((name, std::sync::Arc::new(bytes))),
+                // The file chosen before (if any) stays; the user is told why this one didn't.
+                Err(e) => app.notify_fmt("Couldn't read {name}: {e}", &[("name", &name), ("e", &e.to_string())]),
+            }
         });
     }
     #[cfg(target_arch = "wasm32")]

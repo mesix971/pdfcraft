@@ -903,7 +903,9 @@ impl PdfCraftApp {
             }
         }
         #[cfg(target_arch = "wasm32")]
-        let _ = crate::editing::download("report.csv", csv.as_bytes());
+        if let Err(e) = crate::editing::download("report.csv", csv.as_bytes()) {
+            self.notify_fmt("Couldn't download {name}: {e}", &[("name", "report.csv"), ("e", e.as_str())]);
+        }
     }
 
     pub fn export_data_dialog(&mut self, comments: bool, fields: bool) {
@@ -962,7 +964,10 @@ impl PdfCraftApp {
         #[cfg(target_arch = "wasm32")]
         match self.session.export_data(id, pdfcraft_engine::DataFormat::Xfdf, comments, fields) {
             Ok(bytes) => {
-                let _ = crate::editing::download(&format!("{stem}.xfdf"), &bytes);
+                let name = format!("{stem}.xfdf");
+                if let Err(e) = crate::editing::download(&name, &bytes) {
+                    self.notify_fmt("Couldn't download {name}: {e}", &[("name", &name), ("e", e.as_str())]);
+                }
             }
             Err(e) => self.notify_error(e),
         }

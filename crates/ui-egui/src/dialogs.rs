@@ -1,4 +1,8 @@
-//! Modal dialogs: Document Properties, Keyboard Shortcuts, About (with the Contributors and Models credits).
+//! Every modal dialog, from [`show`]: those of [`crate::Dialog`], framed here around a body most
+//! take from their tool's module (`optimize_ui::body`), with what they confirm applied here;
+//! Document Properties, Keyboard Shortcuts and About (with the Contributors and Models credits),
+//! drawn here whole; and the prompts that can come above any of them: a document's password,
+//! Unlock…, Save before closing, and opening a link.
 
 use crate::theme::{self, Tokens};
 use pdfcraft_engine::Edit;

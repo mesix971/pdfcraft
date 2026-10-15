@@ -3648,6 +3648,7 @@ name = "pdfcraft-annot"
 version = "0.7.1"
 dependencies = [
  "hayro-syntax",
+ "pdfcraft-content",
  "pdfcraft-cos",
  "pdfcraft-fonts",
  "pdfcraft-model",

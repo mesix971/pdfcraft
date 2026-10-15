@@ -27,33 +27,35 @@ impl Class {
     }
 }
 
-/// Every workspace crate (package name without the `pdfcraft-` prefix) and its layer.
+/// Every workspace crate (package name without the `pdfcraft-` prefix) and its layer. Crates
+/// marked `planned` don't exist yet: plan/architecture.md places them, and they are layered
+/// from the day they are created.
 pub const TABLE: &[(&str, Class)] = &[
     // L0 foundation (standalone, publishable)
     ("geom", Class::Standalone(0)),
     ("filters", Class::Standalone(0)),
     ("crypt", Class::Standalone(0)),
-    ("arlington", Class::Standalone(0)),
+    ("arlington", Class::Standalone(0)), // planned
     // L1 object layer
     ("cos", Class::Standalone(1)),
     // L2 core model
     ("content", Class::Layer(2)),
     ("model", Class::Layer(2)),
-    ("color", Class::Layer(2)),
+    ("color", Class::Layer(2)), // planned
     ("fonts", Class::Layer(2)),
-    ("ops", Class::Layer(2)),
+    ("ops", Class::Layer(2)), // planned
     // L3 core services
     ("render", Class::Layer(3)),
-    ("text", Class::Layer(3)),
+    ("text", Class::Layer(3)), // planned
     ("annot", Class::Layer(3)),
     ("forms", Class::Layer(3)),
     ("js", Class::Layer(3)),
     ("xfa", Class::Layer(3)),
-    ("ml", Class::Layer(3)),
+    ("ml", Class::Layer(3)), // planned
     // L4 features
     ("edit", Class::Layer(4)),
     ("organize", Class::Layer(4)),
-    ("security", Class::Layer(4)),
+    ("security", Class::Layer(4)), // planned
     ("redact", Class::Layer(4)),
     ("audit", Class::Layer(4)),
     ("xfdf", Class::Layer(4)),
@@ -63,27 +65,27 @@ pub const TABLE: &[(&str, Class)] = &[
     ("export", Class::Layer(4)),
     ("optimize", Class::Layer(4)),
     ("preflight", Class::Layer(4)),
-    ("prepress", Class::Layer(4)),
+    ("prepress", Class::Layer(4)), // planned
     ("a11y", Class::Layer(4)),
     ("compare", Class::Layer(4)),
     ("measure", Class::Layer(4)),
-    ("search", Class::Layer(4)),
+    ("search", Class::Layer(4)), // planned
     ("print", Class::Layer(4)),
-    ("media", Class::Layer(4)),
+    ("media", Class::Layer(4)), // planned
     ("ai", Class::Layer(4)),
     // L5 interaction
-    ("viewport", Class::Layer(5)),
-    ("tools", Class::Layer(5)),
+    ("viewport", Class::Layer(5)), // planned
+    ("tools", Class::Layer(5)),    // planned
     // L6 façade
     ("engine", Class::Layer(6)),
     // L7 platform + frontends
     ("platform", Class::Layer(7)),
-    ("ui-common", Class::Layer(7)),
+    ("ui-common", Class::Layer(7)), // planned
     ("ui-egui", Class::Layer(7)),
     ("automation", Class::Layer(7)),
     // test support
-    ("testkit", Class::Testkit),
-    ("oracle", Class::Testkit),
+    ("testkit", Class::Testkit), // planned
+    ("oracle", Class::Testkit),  // planned
     // L8 apps + tooling
     ("pdfcraft", Class::Exempt),
     ("cli", Class::Exempt),

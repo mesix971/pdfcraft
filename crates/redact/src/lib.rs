@@ -69,27 +69,14 @@ pub struct Mark {
 /// `/Q`, repetition from `/Repeat`.
 fn overlay_look(doc: &Document, d: &Dict) -> pdfcraft_annot::OverlayLook {
     let mut look = pdfcraft_annot::OverlayLook::default();
-    if let Some(da) = d.get(b"DA").and_then(|o| doc.resolve(o).as_string().map(|s| String::from_utf8_lossy(&s.bytes).into_owned())) {
-        let t: Vec<&str> = da.split_whitespace().collect();
-        for (i, w) in t.iter().enumerate() {
-            match *w {
-                "rg" if i >= 3 => {
-                    if let (Ok(r), Ok(g), Ok(b)) = (t[i - 3].parse::<f64>(), t[i - 2].parse::<f64>(), t[i - 1].parse::<f64>()) {
-                        look.color = [r, g, b];
-                    }
-                }
-                "g" if i >= 1 => {
-                    if let Ok(g) = t[i - 1].parse::<f64>() {
-                        look.color = [g; 3];
-                    }
-                }
-                "Tf" if i >= 2 => {
-                    look.font = pdfcraft_annot::OverlayFont::from_resource(t[i - 2].trim_start_matches('/'));
-                    // As the annotations' own overlay keeps it (0 is "fit the box").
-                    look.size = t[i - 1].parse::<f64>().ok().filter(|s| s.is_finite()).unwrap_or(0.0).clamp(0.0, 400.0);
-                }
-                _ => {}
-            }
+    if let Some(da) = d.get(b"DA").and_then(|o| doc.resolve(o).as_string().map(|s| pdfcraft_content::DefaultAppearance::parse(&s.bytes))) {
+        if let Some((fill, _)) = da.fill {
+            look.color = fill.rgb();
+        }
+        if let Some((name, size)) = da.font {
+            look.font = pdfcraft_annot::OverlayFont::from_resource(&String::from_utf8_lossy(&name));
+            // As the annotations' own overlay keeps it (0 is "fit the box").
+            look.size = size.clamp(0.0, 400.0);
         }
     }
     look.align = d.int(b"Q").unwrap_or(1).clamp(0, 2) as u8;

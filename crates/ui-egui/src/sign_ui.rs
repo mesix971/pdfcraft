@@ -182,10 +182,10 @@ pub(crate) fn page_input(ui: &egui::Ui, resp: &egui::Response, xf: &PageXform, p
     }
 }
 
-/// Where new digital IDs are saved: next to the recovery folder (`…/PdfCraft/Digital IDs`, or
-/// `PdfCraftData/Digital IDs` in portable mode).
+/// Where new digital IDs are saved: `Digital IDs` in PdfCraft's own data folder
+/// ([`crate::portable::app_data_dir`]; `PdfCraftData/Digital IDs` in portable mode).
 fn id_dir() -> Option<PathBuf> {
-    crate::recovery::RecoveryStore::default_dir().and_then(|d| d.parent().map(|p| p.join("Digital IDs")))
+    crate::portable::app_data_dir().map(|d| d.join("Digital IDs"))
 }
 
 /// Save a new digital ID as `<stem>.p12`, or `<stem> 2.p12`, … when the name is taken. The file
@@ -1295,6 +1295,16 @@ pub fn certificate_pem(c: &Certificate) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// New digital IDs go to PdfCraft's own data folder, the one the recovery folder is in.
+    #[test]
+    fn digital_ids_are_kept_in_pdfcrafts_data_folder() {
+        // No home folder to find (a bare CI environment): nothing to compare.
+        let Some(data) = crate::portable::app_data_dir() else { return };
+        assert_eq!(id_dir(), Some(data.join("Digital IDs")));
+        let recovery = crate::recovery::RecoveryStore::default_dir();
+        assert_eq!(recovery.as_deref().and_then(std::path::Path::parent), Some(data.as_path()));
+    }
 
     /// A fresh folder per call: tests run in parallel.
     fn scratch() -> PathBuf {

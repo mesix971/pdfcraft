@@ -118,3 +118,19 @@ fn pieces_parse_as_one_stream_and_splice_back() {
     assert_eq!(out.len(), 3);
     assert!(Pieces::join::<&[u8]>(&[]).splice([(0..1, b"x".to_vec())]).is_empty());
 }
+
+/// A default appearance string: the last font and colour set win, a colour is found where it is
+/// written, and what isn't a finite number (or a `Tf` without the font's name) counts as not set.
+#[test]
+fn default_appearance_strings() {
+    let da = b"/Helv 0 Tf 0 g /F#202 11 Tf 0.1 0.2 0.3 rg";
+    let parsed = DefaultAppearance::parse(da);
+    assert_eq!(parsed.font, Some((b"F 2".to_vec(), 11.0)));
+    let Some((fill, at)) = parsed.fill else { panic!("a colour") };
+    assert_eq!(fill, Fill::Rgb([0.1, 0.2, 0.3]));
+    assert_eq!(da.get(at), Some(&b"0.1 0.2 0.3 rg"[..]));
+    assert_eq!(DefaultAppearance::parse(b"/Cour 9 Tf 0 1 0 0 k").fill.map(|(f, _)| f.rgb()), Some([1.0, 0.0, 1.0]));
+    let infinite = format!("1{} g 12 Tf garbage", "0".repeat(400));
+    assert_eq!(DefaultAppearance::parse(infinite.as_bytes()), DefaultAppearance::default());
+    assert_eq!(Fill::Gray(7.0).rgb(), [1.0; 3], "components stay within 0..=1");
+}

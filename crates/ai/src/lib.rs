@@ -693,6 +693,7 @@ pub fn send(req: &Request) -> Result<Reply, AiError> {
 }
 
 /// `e` with `key` taken out of its message (a service may quote what it was sent).
+#[cfg(any(test, not(target_arch = "wasm32")))]
 fn hide_key(e: AiError, key: &str) -> AiError {
     if key.len() < 8 {
         return e;

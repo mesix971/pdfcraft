@@ -511,10 +511,6 @@ impl PdfCraftApp {
     }
 }
 
-/// The edits that make `proposed` (each with its place in the answer's list) in `doc`, and what
-/// becomes of each. A passage must read exactly once on its page, and not overlap another change;
-/// every passage found becomes part of its paragraph's rewrite (in the paragraph's own font, size
-/// and colour, rewrapped in its box), one rewrite per paragraph.
 /// The document's text for a service that doesn't read PDF files: its first `pages` pages, each
 /// after a "[Page N]" line, as the system prompt says. Empty when no page has any text (a scan),
 /// which the request refuses with the way out; it stops once past what a request may carry.
@@ -534,6 +530,10 @@ fn document_text(source: pdfcraft_engine::export::ExportSource, pages: usize) ->
     if any { out } else { String::new() }
 }
 
+/// The edits that make `proposed` (each with its place in the answer's list) in `doc`, and what
+/// becomes of each. A passage must read exactly once on its page, and not overlap another change;
+/// every passage found becomes part of its paragraph's rewrite (in the paragraph's own font, size
+/// and colour, rewrapped in its box), one rewrite per paragraph.
 fn text_changes(doc: &pdfcraft_engine::Document, proposed: &[(usize, ProposedEdit)]) -> (Vec<Edit>, Vec<(usize, Fate)>) {
     use std::collections::BTreeMap;
     let pages = doc.info.pages.len();

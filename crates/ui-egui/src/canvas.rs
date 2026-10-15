@@ -2985,16 +2985,12 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                         view.last_press_pos = Some(p);
 
                         // Multi-click highlights immediately on pointer press instead of release (#1024).
-                        let clicks = if view.clicks > 2 && tool != QuickTool::Select { 1 } else { view.clicks };
-                        if clicks >= 2 && over_text {
-                            let span = text.nearest(vx, vy).and_then(|a| match clicks {
-                                2 => text.word_at(a),
-                                3 => text.line_at(a),
-                                _ => text.glyphs.len().checked_sub(1).map(|last| (0, last)),
-                            });
-                            if let Some((first, last)) = span {
-                                view.selection = Some(Selection::run(i, first, last));
-                            }
+                        let clicks = effective_clicks(view.clicks, tool);
+                        if clicks >= 2
+                            && over_text
+                            && let Some((first, last)) = multi_click_span(&text, clicks, vx, vy)
+                        {
+                            view.selection = Some(Selection::run(i, first, last));
                         }
                     }
                     if resp.drag_started() && press_here && !over_link {
@@ -3041,20 +3037,15 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                     if release_clicks > 0 {
                         view.clicks = release_clicks;
                     }
-                    let clicks = if view.clicks > 2 && tool != QuickTool::Select { 1 } else { view.clicks };
+                    let clicks = effective_clicks(view.clicks, tool);
                     // Only on the frame egui reports the multi-click: `view.clicks` outlives it, and
                     // acting on every frame re-selected the word as soon as a selection was cleared
                     // (a highlight made by the double-click left its word selected).
                     if release_clicks > 0 && clicks >= 2 && over_text {
-                        if view.selection.is_none() {
-                            let span = text.nearest(vx, vy).and_then(|a| match clicks {
-                                2 => text.word_at(a),
-                                3 => text.line_at(a),
-                                _ => text.glyphs.len().checked_sub(1).map(|last| (0, last)),
-                            });
-                            if let Some((first, last)) = span {
-                                view.selection = Some(Selection::run(i, first, last));
-                            }
+                        if view.selection.is_none()
+                            && let Some((first, last)) = multi_click_span(&text, clicks, vx, vy)
+                        {
+                            view.selection = Some(Selection::run(i, first, last));
                         }
                     } else if resp.clicked() && view.clicks < 2 && !over_link {
                         // ⇧-click extends a selection on this page to the click, keeping its
@@ -3923,6 +3914,22 @@ enum Notice {
     Console,
     /// Unlock… (enter the permissions password).
     Unlock,
+}
+
+/// How many quick clicks count: only the Select tool goes past a double click (a third click
+/// of a highlight tool is a single one).
+fn effective_clicks(clicks: u32, tool: QuickTool) -> u32 {
+    if clicks > 2 && tool != QuickTool::Select { 1 } else { clicks }
+}
+
+/// What `clicks` (two or more) quick clicks at view point (`vx`, `vy`) select of a page's text:
+/// two a word, three its line, four or more the whole page.
+fn multi_click_span(text: &PageText, clicks: u32, vx: f32, vy: f32) -> Option<(usize, usize)> {
+    text.nearest(vx, vy).and_then(|a| match clicks {
+        2 => text.word_at(a),
+        3 => text.line_at(a),
+        _ => text.glyphs.len().checked_sub(1).map(|last| (0, last)),
+    })
 }
 
 /// The most of a page's text a screen reader is given at once (a page of small print is a few
