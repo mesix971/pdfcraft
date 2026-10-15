@@ -4,9 +4,10 @@
 //! 1. `cargo build -p pdfcraft-android --target <triple>` for each ABI, linked with the NDK's clang
 //!    for API level [`MIN_SDK`], then stripped.
 //! 2. `aapt2` compiles the launcher icons (`assets/app-icon`) and links them with
-//!    `packaging/android/AndroidManifest.xml` and, when `cargo xtask models` has fetched them, the
-//!    OCR models (`assets/models`, unpacked by the app on first start) into an APK.
-//! 3. `aapt add` puts the libraries in `lib/<abi>/`, `zipalign` aligns it, `apksigner` signs it.
+//!    `packaging/android/AndroidManifest.xml` into an APK.
+//! 3. `aapt add` puts in, when `cargo xtask models` has fetched them, the OCR models
+//!    (`assets/models/`, unpacked by the app on first start) and the libraries (`lib/<abi>/`); the
+//!    entries' names are checked, `zipalign` aligns the APK, `apksigner` signs it.
 //!
 //! Options: `--abi arm64-v8a|armeabi-v7a|x86_64|x86` (repeatable; default arm64-v8a),
 //! `--all-abis`, `--debug` (a dev build), `--test-key` (an optimized build signed with the debug
@@ -245,6 +246,28 @@ fn load_alignments(readelf: &str) -> Vec<u64> {
         .collect()
 }
 
+/// Refuse an APK whose entries [`entry_problems`] finds wrong.
+fn check_entries(aapt: &Path, apk: &Path, expected: &[String]) -> anyhow::Result<()> {
+    let out = Command::new(aapt).arg("list").arg(apk).output().with_context(|| format!("{}: failed to spawn", aapt.display()))?;
+    if !out.status.success() {
+        bail!("aapt list {}: exited with {}", apk.display(), out.status);
+    }
+    let problems = entry_problems(&String::from_utf8_lossy(&out.stdout), expected);
+    if !problems.is_empty() {
+        bail!("{}: {}", apk.display(), problems.join(", "));
+    }
+    Ok(())
+}
+
+/// What is wrong with the entries in `aapt list` output: names with `\` (Android looks entries up
+/// by their exact name, with `/`, so it never finds those) and `expected` ones that are missing.
+fn entry_problems(listing: &str, expected: &[String]) -> Vec<String> {
+    let names: Vec<&str> = listing.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
+    let mut problems: Vec<String> = names.iter().filter(|n| n.contains('\\')).map(|n| format!("{n} is named with \\")).collect();
+    problems.extend(expected.iter().filter(|e| !names.contains(&e.as_str())).map(|e| format!("{e} is missing")));
+    problems
+}
+
 fn run_tool(cmd: &mut Command, what: &str) -> anyhow::Result<()> {
     eprintln!("$ {what}");
     let status = cmd.status().with_context(|| format!("{what}: failed to spawn"))?;
@@ -266,19 +289,23 @@ fn package(options: &Options, bin: &Path, tools: &Path, android_jar: &Path, vers
         std::fs::copy(icons.join(format!("{size}x{size}/apps/ai.storyteller.pdfcraft.png")), dir.join("ic_launcher.png"))
             .with_context(|| format!("the {size} px app icon"))?;
     }
-    // OCR models, when fetched (`cargo xtask models`): the app unpacks them on first start.
-    let assets = work.join("assets");
+    // OCR models, when fetched (`cargo xtask models`): the app unpacks them on first start, from
+    // `models/<name>` in its assets.
     let models = root().join("assets/models");
-    let mut have_models = 0;
+    let mut model_entries = Vec::new();
     for name in ["text-detection.rten", "text-recognition.rten"] {
         let from = models.join(name);
         if from.is_file() {
-            std::fs::create_dir_all(assets.join("models"))?;
-            std::fs::copy(&from, assets.join("models").join(name))?;
-            have_models += 1;
+            let inside = format!("assets/models/{name}");
+            let to = work.join(&inside);
+            if let Some(dir) = to.parent() {
+                std::fs::create_dir_all(dir)?;
+            }
+            std::fs::copy(&from, &to)?;
+            model_entries.push(inside);
         }
     }
-    if have_models < 2 {
+    if model_entries.len() < 2 {
         eprintln!("android: warning: no OCR models in assets/models (run `cargo xtask models`); Recognize Text won't work in this APK");
     }
     let compiled = work.join("res.zip");
@@ -294,12 +321,15 @@ fn package(options: &Options, bin: &Path, tools: &Path, android_jar: &Path, vers
         .arg(root().join("packaging/android/AndroidManifest.xml"))
         .args(["--min-sdk-version", &MIN_SDK.to_string(), "--target-sdk-version", &TARGET_SDK.to_string()])
         .args(["--version-code", &version_code(version)?.to_string(), "--version-name", version]);
-    if have_models > 0 {
-        link.arg("-A").arg(&assets);
-    }
     link.arg(&compiled);
     run_tool(&mut link, "aapt2 link")?;
-    // The libraries, stripped, at lib/<abi>/ inside the APK (`aapt add` keeps the relative path).
+    // The models at their names with `/` (`aapt add` keeps the relative path as given): on Windows
+    // `aapt2 link -A` names them with `\`, and the app's asset manager never finds them.
+    for inside in &model_entries {
+        run_tool(Command::new(tools.join("aapt")).current_dir(&work).arg("add").arg(&unsigned).arg(inside), &format!("aapt add {inside}"))?;
+    }
+    let mut entries = model_entries;
+    // The libraries, stripped, at lib/<abi>/ inside the APK.
     for abi in &options.abis {
         let dir = work.join("lib").join(abi.name);
         std::fs::create_dir_all(&dir)?;
@@ -313,7 +343,9 @@ fn package(options: &Options, bin: &Path, tools: &Path, android_jar: &Path, vers
         check_page_alignment(&ndk_tool(bin, "llvm-readelf"), &to)?;
         let inside = format!("lib/{}/{LIB}", abi.name);
         run_tool(Command::new(tools.join("aapt")).current_dir(&work).arg("add").arg(&unsigned).arg(&inside), &format!("aapt add {inside}"))?;
+        entries.push(inside);
     }
+    check_entries(&tools.join("aapt"), &unsigned, &entries)?;
     let aligned = work.join("aligned.apk");
     // Uncompressed libraries at 16 KB in the APK too (`-P`, build-tools 35 and later).
     let build_tools = tools.file_name().map(|n| version_key(&n.to_string_lossy())).unwrap_or_default();
@@ -407,6 +439,20 @@ mod tests {
                    DYNAMIC 0x2fe 0x2fe 0x2fe 0x2 0x2 RW 0x8\n";
         assert_eq!(load_alignments(out), vec![0x4000, 0x1000]);
         assert!(load_alignments("no segments").is_empty());
+    }
+
+    #[test]
+    fn apk_entries_are_named_with_slashes_and_none_is_missing() {
+        let expected = vec!["assets/models/text-detection.rten".to_string(), format!("lib/arm64-v8a/{LIB}")];
+        let good = format!("AndroidManifest.xml\r\nassets/models/text-detection.rten\r\nlib/arm64-v8a/{LIB}\r\n");
+        assert!(entry_problems(&good, &expected).is_empty(), "{:?}", entry_problems(&good, &expected));
+        // As `aapt2 link -A` named it on Windows: the app never found its OCR models.
+        let windows = format!("AndroidManifest.xml\r\nassets/models\\text-detection.rten\r\nlib/arm64-v8a/{LIB}\r\n");
+        assert_eq!(
+            entry_problems(&windows, &expected),
+            ["assets/models\\text-detection.rten is named with \\", "assets/models/text-detection.rten is missing"]
+        );
+        assert_eq!(entry_problems("", &expected).len(), 2);
     }
 
     #[test]
