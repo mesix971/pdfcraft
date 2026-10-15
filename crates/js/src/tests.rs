@@ -254,6 +254,13 @@ fn errors_and_runaway_scripts_are_contained() {
     assert!(o.error.is_some(), "the loop limit stops it");
     let o = go("function f() { return f(); } f();", &Event::doc("Open"));
     assert!(o.error.is_some(), "the recursion limit stops it");
+    // Loops are counted per call: a loop calling a function with its own loop is stopped by the
+    // time limit, and the viewer doesn't wait for it.
+    let nested = "function f() { for (var i = 0; i < 900000; i++) {} } for (var j = 0; j < 900000; j++) { f(); }";
+    let started = std::time::Instant::now();
+    let o = run_timed(nested, &Event::doc("Open"), &doc(), &fields(), &[], Limits::default(), std::time::Duration::from_millis(300));
+    assert!(o.error.as_deref().is_some_and(|e| e.contains("abandoned")), "{o:?}");
+    assert!(started.elapsed() < std::time::Duration::from_secs(5), "not waited for: {:?}", started.elapsed());
     let o = go("getField('nope').value", &Event::doc("Open"));
     assert!(o.error.as_deref().unwrap_or("").contains("null") || o.error.is_some());
 }

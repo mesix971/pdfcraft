@@ -335,8 +335,12 @@ impl Document {
             doc.authenticate(&enc, password)?;
         }
         let max = doc.entries.keys().next_back().copied().unwrap_or(0);
-        let size = doc.trailer.int(b"Size").unwrap_or(0).max(0) as u32;
-        doc.next_num = max.max(size.saturating_sub(1)) + 1;
+        // The trailer's /Size counts the objects, at most as many as a PDF can number (the
+        // constant fits a u32). A file's own numbers may still run to the end of the range:
+        // `fresh_num` copes.
+        let most = MAX_XREF_OBJECTS as u32 + 1;
+        let size = doc.trailer.int(b"Size").and_then(|s| u32::try_from(s).ok()).unwrap_or(0).min(most);
+        doc.next_num = max.max(size.saturating_sub(1)).saturating_add(1);
         Ok(doc)
     }
 
@@ -861,14 +865,23 @@ impl Document {
         let obj = self.adopt(obj.into());
         self.overlay.insert(r.num, Slot::Set(r.generation, Arc::new(obj)));
         if r.num >= self.next_num {
-            self.next_num = r.num + 1;
+            self.next_num = r.num.saturating_add(1);
         }
+    }
+
+    /// A number no object has: the next one, or, once the numbers have run out (only a crafted
+    /// file numbers an object 4294967295), the first one no object uses. Never one in use: an
+    /// added object written over another would corrupt the file without a word.
+    fn fresh_num(&mut self) -> u32 {
+        if let Some(next) = self.next_num.checked_add(1) {
+            return std::mem::replace(&mut self.next_num, next);
+        }
+        (1..u32::MAX).find(|n| !self.entries.contains_key(n) && !self.overlay.contains_key(n)).unwrap_or(u32::MAX)
     }
 
     /// Add a new indirect object and return its reference.
     pub fn add(&mut self, obj: impl Into<Object>) -> ObjRef {
-        let r = ObjRef::new(self.next_num, 0);
-        self.next_num += 1;
+        let r = ObjRef::new(self.fresh_num(), 0);
         let obj = self.adopt(obj.into());
         self.overlay.insert(r.num, Slot::Set(0, Arc::new(obj)));
         r
@@ -1292,6 +1305,26 @@ mod tests {
                 assert_eq!(doc.get(ObjRef::new(1, 0)).as_dict().unwrap().name(b"Type"), Some(b"Catalog".as_slice()));
             }
         }
+    }
+
+    /// A file whose numbers run to the end of the range (an object numbered 4294967295, a /Size
+    /// to match): added objects still get numbers of their own, never 0 or one in use, and the
+    /// file saves and opens again with them.
+    #[test]
+    fn object_numbers_at_the_end_of_the_range_never_wrap() {
+        let mut bytes = build(&["<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [] /Count 0 >>"], "/Root 1 0 R");
+        let size = bytes.windows(7).position(|w| w == b"/Size 3").unwrap();
+        bytes.splice(size..size + 7, b"/Size 4294967295".iter().copied());
+        let mut doc = Document::open(Arc::new(bytes)).unwrap();
+        assert!(doc.next_num() <= MAX_XREF_OBJECTS as u32 + 1, "a /Size past what a PDF numbers isn't followed");
+        // An object numbered at the very end of the range.
+        doc.set(ObjRef::new(u32::MAX, 0), Object::Int(7));
+        let (a, b) = (doc.add(Object::Int(1)), doc.add(Object::Int(2)));
+        assert!(a.num != 0 && b.num != 0 && a.num != b.num, "{a:?} {b:?}");
+        assert!(![1, 2, u32::MAX].contains(&a.num) && ![1, 2, u32::MAX].contains(&b.num), "never one in use: {a:?} {b:?}");
+        let saved = crate::writer::write_incremental(&doc, &Default::default()).unwrap();
+        let again = Document::open(Arc::new(saved)).unwrap();
+        assert_eq!((again.get(a).as_int(), again.get(b).as_int()), (Some(1), Some(2)));
     }
 
     #[test]

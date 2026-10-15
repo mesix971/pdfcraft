@@ -20,24 +20,26 @@ rustup target add aarch64-linux-android
 sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;27.2.12479018"
 export ANDROID_HOME=~/Android/Sdk ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018
 cargo xtask models            # optional: the OCR models, so Recognize Text works
-cargo xtask android           # dist/android/pdfcraft-<version>-arm64-v8a.apk
+cargo xtask android --test-key  # dist/android/pdfcraft-<version>-arm64-v8a-test.apk
 ```
 
 - `--abi arm64-v8a|armeabi-v7a|x86_64|x86` (repeatable) or `--all-abis` choose the ABIs (one APK
   holds them all); the default is arm64-v8a, which nearly every phone sold since 2017 runs.
   `rustup target add` each one first.
 - `--debug` builds without optimizations (faster to build, much slower to run).
+- `--test-key` signs an optimized build with the debug key, to install it yourself.
 - `--check` only runs clippy (`-D warnings`) on this crate and `pdfcraft-ui-egui` for each ABI, as
   CI does; it needs the NDK but not the SDK.
 - `CRAFT_FONTS_DIR` embeds the Japanese and other craft-fonts faces, as on the desktop.
 
-The APK is signed with the standard debug key (`~/.android/debug.keystore`, created when missing),
-which is fine for installing it yourself. To sign with your own key, set
-`PDFCRAFT_ANDROID_KEYSTORE` (the keystore file), `PDFCRAFT_ANDROID_KEYSTORE_PASS` and, if it isn't
-`pdfcraft`, `PDFCRAFT_ANDROID_KEY_ALIAS`. Updates must be signed with the same key as the installed
-app.
+A release APK is signed with your own key: set `PDFCRAFT_ANDROID_KEYSTORE` (the keystore file),
+`PDFCRAFT_ANDROID_KEYSTORE_PASS` and, if it isn't `pdfcraft`, `PDFCRAFT_ANDROID_KEY_ALIAS`. Keep an
+encrypted copy of the keystore outside the repository: updates must be signed with the same key as
+the installed app, and a lost key means no more updates. Without a key, `cargo xtask android`
+refuses; `--test-key` (or `--debug`) signs with the standard debug key
+(`~/.android/debug.keystore`, created when missing), which is fine for installing it yourself.
 
-CI builds a debug-signed APK on every pull request (`.github/workflows/ci.yml`, job "Android"); it is
+CI builds a debug-signed APK (`--test-key`) on every pull request (`.github/workflows/ci.yml`, job "Android"); it is
 attached to the run as the `pdfcraft-android` artifact.
 
 ## Install

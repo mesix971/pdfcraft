@@ -766,6 +766,13 @@ fn mcp(args: &[String]) -> Result<(), CliError> {
         pdfcraft_automation::mcp::PROTOCOL_VERSIONS[0],
         if compact { ", compact tool list" } else { "" }
     );
+    // Without --root the tools read and write wherever the user can: say so where it is seen.
+    if flag(args, "--root").is_none() {
+        let _ = writeln!(
+            std::io::stderr().lock(),
+            "pdfcraft-cli: warning: no --root, so the tools may read and write any file this user can; pass --root DIR to confine them"
+        );
+    }
     server.serve(std::io::stdin().lock(), std::io::stdout().lock()).map_err(|e| CliError::Message(e.to_string()))
 }
 

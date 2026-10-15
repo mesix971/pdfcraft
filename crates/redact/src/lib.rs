@@ -85,7 +85,8 @@ fn overlay_look(doc: &Document, d: &Dict) -> pdfcraft_annot::OverlayLook {
                 }
                 "Tf" if i >= 2 => {
                     look.font = pdfcraft_annot::OverlayFont::from_resource(t[i - 2].trim_start_matches('/'));
-                    look.size = t[i - 1].parse::<f64>().unwrap_or(0.0).max(0.0);
+                    // As the annotations' own overlay keeps it (0 is "fit the box").
+                    look.size = t[i - 1].parse::<f64>().ok().filter(|s| s.is_finite()).unwrap_or(0.0).clamp(0.0, 400.0);
                 }
                 _ => {}
             }
@@ -202,6 +203,12 @@ pub(crate) fn page_streams(doc: &Document, page: &Dict, index: usize) -> Result<
     Ok((list, data))
 }
 
+/// A repeated overlay's most copies of its text across one line, and most lines: a mark's box
+/// comes from the file, and a huge one mustn't make a huge overlay (the area is clipped to the
+/// box anyway).
+const MAX_REPEAT_ACROSS: usize = 200;
+const MAX_REPEAT_LINES: usize = 500;
+
 /// The boxes and overlay text drawn for the applied marks.
 fn overlay_content(marks: &[&Mark]) -> Vec<u8> {
     let n = |v: f64| {
@@ -243,8 +250,9 @@ fn overlay_content(marks: &[&Mark]) -> Vec<u8> {
             // One line, or as many repeated lines as fit (each line the text repeated across).
             let lines: Vec<String> = if look.repeat {
                 let unit = width(&format!("{} ", m.overlay), size).max(0.01);
-                let per_line = ((w - 2.0) / unit).floor().max(1.0) as usize;
-                let count = ((h / (size * 1.2)).floor() as usize).max(1);
+                // `as` saturates (and makes NaN 0): the caps hold for any box.
+                let per_line = (((w - 2.0) / unit).floor().max(1.0) as usize).min(MAX_REPEAT_ACROSS);
+                let count = ((h / (size * 1.2)).floor() as usize).clamp(1, MAX_REPEAT_LINES);
                 vec![vec![m.overlay.as_str(); per_line].join(" "); count]
             } else {
                 vec![m.overlay.clone()]

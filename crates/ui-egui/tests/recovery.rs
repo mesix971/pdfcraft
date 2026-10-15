@@ -6,7 +6,7 @@ use egui::{Key, Modifiers};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use pdfcraft_engine::Edit;
-use pdfcraft_ui_egui::{PdfCraftApp, RecoveryStore};
+use pdfcraft_ui_egui::{PdfCraftApp, RecoveryMeta, RecoveryStore};
 
 fn fixture(n: usize) -> Vec<u8> {
     let mut objs: Vec<String> = vec!["<< /Type /Catalog /Pages 2 0 R >>".into()];
@@ -39,8 +39,9 @@ fn store(tag: &str) -> RecoveryStore {
     RecoveryStore::new(dir)
 }
 
+/// The snapshots and their metadata in the folder (not the running instances' locks).
 fn files_in(s: &RecoveryStore) -> usize {
-    std::fs::read_dir(s.dir()).map(|d| d.count()).unwrap_or(0)
+    std::fs::read_dir(s.dir()).map(|d| d.flatten().filter(|e| e.file_type().is_ok_and(|t| t.is_file())).count()).unwrap_or(0)
 }
 
 /// A session that edits a document, autosaves, and then "crashes" (is dropped).
@@ -367,4 +368,28 @@ fn control_click_effects_are_visible_when_the_reply_arrives() {
     call(&mut h, "ui.click", serde_json::json!({ "label": "Discard" }));
     assert_eq!(files_in(&s), 0, "discarded by the time the click is answered");
     assert_eq!(call(&mut h, "ui.state", serde_json::json!({}))["dialog"], serde_json::Value::Null);
+}
+
+/// Two PdfCraft windows share the recovery folder: one's unsaved work isn't offered to the other
+/// while it runs, nor removed by the other's clean quit; once it has ended, it is offered.
+#[test]
+fn another_running_windows_work_is_left_alone() {
+    let s = store("instances");
+    // Another process's entry: its key names that process, which holds its lock.
+    let other = 4_000_000_000u32;
+    let key = format!("1-{other}-1");
+    let meta = RecoveryMeta { key: key.clone(), name: "theirs.pdf".into(), path: None, saved_at: 1, encrypted: false };
+    s.write(&meta, &fixture(1)).unwrap();
+    std::fs::create_dir_all(s.dir().join("instances")).unwrap();
+    let lock =
+        std::fs::OpenOptions::new().create(true).write(true).truncate(false).open(s.dir().join("instances").join(format!("{other}.lock"))).unwrap();
+    lock.lock().unwrap();
+    let mut app = PdfCraftApp::new();
+    app.enable_recovery(s.clone());
+    assert!(app.recoverable.is_empty(), "not offered while it runs");
+    s.clear();
+    assert!(s.list().iter().any(|m| m.key == key), "nor cleared by another window");
+    drop(lock);
+    assert!(s.left_behind().iter().any(|m| m.key == key), "once it has ended, it is left behind");
+    let _ = std::fs::remove_dir_all(s.dir());
 }

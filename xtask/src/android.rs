@@ -9,17 +9,19 @@
 //! 3. `aapt add` puts the libraries in `lib/<abi>/`, `zipalign` aligns it, `apksigner` signs it.
 //!
 //! Options: `--abi arm64-v8a|armeabi-v7a|x86_64|x86` (repeatable; default arm64-v8a),
-//! `--all-abis`, `--debug` (a dev build), `--check` (only clippy, with `-D warnings`, the app and
-//! the shell for each ABI, as CI does; needs no SDK). The APK goes to
-//! `dist/android/pdfcraft-<version>-<abis>.apk`.
+//! `--all-abis`, `--debug` (a dev build), `--test-key` (an optimized build signed with the debug
+//! key, for testing), `--check` (only clippy, with `-D warnings`, the app and the shell for each
+//! ABI, as CI does; needs no SDK). The APK goes to `dist/android/pdfcraft-<version>-<abis>.apk`
+//! (`-debug.apk`, `-test.apk` for those two).
 //!
 //! Where the tools are: `ANDROID_NDK_HOME` (or `ANDROID_NDK_ROOT`, `ANDROID_NDK_LATEST_HOME`,
 //! `NDK_HOME`) and `ANDROID_HOME` (or `ANDROID_SDK_ROOT`), whose newest `build-tools/` is used
 //! with `platforms/android-<TARGET_SDK>` (or the newest platform). Signing: the keystore in
 //! `PDFCRAFT_ANDROID_KEYSTORE` (password `PDFCRAFT_ANDROID_KEYSTORE_PASS`, alias
-//! `PDFCRAFT_ANDROID_KEY_ALIAS`, default `pdfcraft`), else the standard debug keystore
-//! (`~/.android/debug.keystore`, made with `keytool` when missing). A debug-signed APK installs
-//! for testing; releases need a key of their own (apps/pdfcraft-android/README.md).
+//! `PDFCRAFT_ANDROID_KEY_ALIAS`, default `pdfcraft`). Without one, only `--debug` and
+//! `--test-key` builds are signed, with the standard debug keystore (`~/.android/debug.keystore`,
+//! made with `keytool` when missing): a release build refuses, so an APK meant to be shared never
+//! ties its updates to a throwaway key (apps/pdfcraft-android/README.md).
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -56,12 +58,14 @@ pub const ABIS: [Abi; 4] = [
 struct Options {
     abis: Vec<Abi>,
     debug: bool,
+    /// A release build signed with the debug key, for testing.
+    test_key: bool,
     check: bool,
 }
 
 fn parse(args: &[String]) -> anyhow::Result<Options> {
     let mut abis = Vec::new();
-    let (mut debug, mut check) = (false, false);
+    let (mut debug, mut test_key, mut check) = (false, false, false);
     let mut it = args.iter();
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -74,6 +78,7 @@ fn parse(args: &[String]) -> anyhow::Result<Options> {
             }
             "--all-abis" => abis = ABIS.to_vec(),
             "--debug" => debug = true,
+            "--test-key" => test_key = true,
             "--check" => check = true,
             other => bail!("unknown option {other}"),
         }
@@ -81,7 +86,7 @@ fn parse(args: &[String]) -> anyhow::Result<Options> {
     if abis.is_empty() {
         abis.push(ABIS[0]);
     }
-    Ok(Options { abis, debug, check })
+    Ok(Options { abis, debug, test_key, check })
 }
 
 pub fn run(args: &[String]) -> anyhow::Result<()> {
@@ -283,7 +288,14 @@ fn package(options: &Options, bin: &Path, tools: &Path, android_jar: &Path, vers
     let names: Vec<&str> = options.abis.iter().map(|a| a.name).collect();
     let out_dir = root().join("dist/android");
     std::fs::create_dir_all(&out_dir)?;
-    let apk = out_dir.join(format!("pdfcraft-{version}-{}{}.apk", names.join("+"), if options.debug { "-debug" } else { "" }));
+    let kind = if options.debug {
+        "-debug"
+    } else if options.test_key {
+        "-test"
+    } else {
+        ""
+    };
+    let apk = out_dir.join(format!("pdfcraft-{version}-{}{kind}.apk", names.join("+")));
     let mut sign = Command::new(tools.join(if cfg!(windows) { "apksigner.bat" } else { "apksigner" }));
     sign.arg("sign");
     match std::env::var_os("PDFCRAFT_ANDROID_KEYSTORE") {
@@ -292,6 +304,9 @@ fn package(options: &Options, bin: &Path, tools: &Path, android_jar: &Path, vers
             // Passed by name, so the password never shows in the process list or this log.
             sign.arg("--ks").arg(keystore).args(["--ks-key-alias", &alias, "--ks-pass", "env:PDFCRAFT_ANDROID_KEYSTORE_PASS"]);
         }
+        None if !options.debug && !options.test_key => bail!(
+            "no release key: set PDFCRAFT_ANDROID_KEYSTORE and PDFCRAFT_ANDROID_KEYSTORE_PASS, or pass --test-key to sign with the debug key for testing (the APK is then named -test.apk)"
+        ),
         None => {
             let keystore = debug_keystore()?;
             eprintln!("android: signing with the debug keystore {} (for testing only)", keystore.display());
@@ -333,7 +348,8 @@ mod tests {
 
     #[test]
     fn options_default_to_a_release_arm64_apk() {
-        assert_eq!(parse(&[]).unwrap(), Options { abis: vec![ABIS[0]], debug: false, check: false });
+        assert_eq!(parse(&[]).unwrap(), Options { abis: vec![ABIS[0]], debug: false, test_key: false, check: false });
+        assert!(parse(&args(&["--test-key"])).unwrap().test_key);
         let o = parse(&args(&["--abi", "x86_64", "--abi", "x86_64", "--abi", "arm64-v8a", "--debug"])).unwrap();
         assert_eq!(o.abis.iter().map(|a| a.name).collect::<Vec<_>>(), ["x86_64", "arm64-v8a"]);
         assert!(o.debug);

@@ -972,8 +972,10 @@ impl PdfCraftApp {
     pub fn bookmark_action(&mut self, action: crate::panels::BmAction) {
         use crate::panels::BmAction as A;
         let Some((i, id)) = self.active_ids() else { return };
-        let current = self.views[i].current;
-        let parent_of = |p: &[usize]| p[..p.len() - 1].to_vec();
+        let current = self.views.get(i).map_or(0, |v| v.current);
+        // A bookmark's parent and its place among its siblings; none for an empty path (the
+        // outline itself, which has neither).
+        let split = |p: &[usize]| p.split_last().map(|(&at, parent)| (parent.to_vec(), at));
         let edit = match action {
             A::New => {
                 let n = self.session.get(id).map_or(0, |d| d.info.outline.len());
@@ -992,23 +994,24 @@ impl PdfCraftApp {
             A::SetToCurrentPage(path) => Edit::SetBookmarkPage { path, page: current },
             A::Delete(path) => Edit::DeleteBookmark { path },
             A::MoveUp(path) => {
-                let at = path[path.len() - 1].saturating_sub(1);
-                Edit::MoveBookmark { to_parent: parent_of(&path), from: path, index: at }
+                let Some((to_parent, at)) = split(&path) else { return };
+                Edit::MoveBookmark { to_parent, from: path, index: at.saturating_sub(1) }
             }
             A::MoveDown(path) => {
-                let at = path[path.len() - 1] + 1;
-                Edit::MoveBookmark { to_parent: parent_of(&path), from: path, index: at }
+                let Some((to_parent, at)) = split(&path) else { return };
+                Edit::MoveBookmark { to_parent, from: path, index: at.saturating_add(1) }
             }
             A::Indent(path) => {
-                let mut to_parent = parent_of(&path);
-                to_parent.push(path[path.len() - 1].saturating_sub(1));
+                // Under the bookmark above it: the first of its siblings has none.
+                let Some((mut to_parent, at)) = split(&path).filter(|(_, at)| *at > 0) else { return };
+                to_parent.push(at - 1);
                 Edit::MoveBookmark { from: path, to_parent, index: usize::MAX }
             }
             A::Outdent(path) => {
-                let parent = parent_of(&path);
-                let grand = parent_of(&parent);
-                let at = parent[parent.len() - 1] + 1;
-                Edit::MoveBookmark { from: path, to_parent: grand, index: at }
+                // After its parent: a top-level bookmark has no parent to follow.
+                let Some((parent, _)) = split(&path) else { return };
+                let Some((grand, at)) = split(&parent) else { return };
+                Edit::MoveBookmark { from: path, to_parent: grand, index: at.saturating_add(1) }
             }
             A::FromStructure => {
                 self.right = Some(crate::RightPanel::Bookmarks);
@@ -1028,6 +1031,27 @@ fn bookmark_at<'a>(items: &'a [pdfcraft_render::OutlineItem], path: &[usize]) ->
 #[cfg(test)]
 mod tests {
     use super::{SaveTarget, is_mail_temp_copy, write_atomically, write_atomically_with};
+
+    /// Moves a bookmark can't make (out of the top level, above the first, from an empty path)
+    /// do nothing, and never take the app down.
+    #[test]
+    fn impossible_bookmark_moves_do_nothing() {
+        use crate::panels::BmAction as A;
+        let mut app = crate::PdfCraftApp::new();
+        let pdf = b"%PDF-1.7
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >> endobj
+trailer << /Root 1 0 R >>
+%%EOF";
+        app.open_bytes("b.pdf", None, pdf.to_vec()).unwrap();
+        let generation = |app: &crate::PdfCraftApp| app.active_ids().and_then(|(_, id)| app.session.get(id)).map(|d| d.edit_generation());
+        let before = generation(&app);
+        for action in [A::MoveUp(vec![]), A::MoveDown(vec![]), A::Indent(vec![]), A::Indent(vec![0]), A::Outdent(vec![]), A::Outdent(vec![0])] {
+            app.bookmark_action(action);
+        }
+        assert_eq!(generation(&app), before, "nothing changed");
+    }
     use pdfcraft_platform::staging::{STAGING_ATTEMPTS, staging_suffixes};
     use std::path::{Path, PathBuf};
 

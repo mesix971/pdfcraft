@@ -763,27 +763,72 @@ pub struct Endpoint {
     pub token: String,
 }
 
+/// The longest request line before `auth` (an auth request is well under it), and after.
+#[cfg(not(target_arch = "wasm32"))]
+const MAX_LINE_BEFORE_AUTH: usize = 4096;
+#[cfg(not(target_arch = "wasm32"))]
+const MAX_LINE: usize = 16 << 20;
+/// How long a connection may wait before authenticating, and how many may be open at once: any
+/// local process can connect, and none may tie up memory or threads without the token.
+#[cfg(all(not(target_arch = "wasm32"), not(test)))]
+const AUTH_WAIT: std::time::Duration = std::time::Duration::from_secs(10);
+#[cfg(all(not(target_arch = "wasm32"), test))]
+const AUTH_WAIT: std::time::Duration = std::time::Duration::from_millis(500);
+#[cfg(not(target_arch = "wasm32"))]
+const MAX_CONNECTIONS: usize = 16;
+
 /// Listen on `127.0.0.1` (random port) and forward authenticated requests to `client`.
 ///
 /// Protocol: newline-delimited JSON-RPC 2.0. The first request on a connection must be
-/// `{"method": "auth", "params": {"token": …}}`; anything else closes the connection.
+/// `{"method": "auth", "params": {"token": …}}`; anything else closes the connection, and so
+/// does a line too long, no `auth` within a few seconds, or more connections open than allowed.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn serve(client: ControlClient) -> std::io::Result<Endpoint> {
-    use std::io::{BufRead, BufReader, Write};
+    use std::io::{BufRead, BufReader, Read, Write};
+    use std::sync::atomic::{AtomicUsize, Ordering};
     let listener = std::net::TcpListener::bind(("127.0.0.1", 0))?;
     let port = listener.local_addr()?.port();
     let token = random_token()?;
     let expected = token.clone();
+    let open = std::sync::Arc::new(AtomicUsize::new(0));
+    /// One open connection, counted until its thread ends.
+    struct Counted(std::sync::Arc<AtomicUsize>);
+    impl Drop for Counted {
+        fn drop(&mut self) {
+            self.0.fetch_sub(1, Ordering::SeqCst);
+        }
+    }
     std::thread::Builder::new().name("pdfcraft-control".into()).spawn(move || {
         for stream in listener.incoming().flatten() {
+            if open.fetch_add(1, Ordering::SeqCst) >= MAX_CONNECTIONS {
+                open.fetch_sub(1, Ordering::SeqCst);
+                continue; // dropped: closed
+            }
+            let counted = Counted(open.clone());
             let client = client.clone();
             let expected = expected.clone();
             let _ = std::thread::Builder::new().name("pdfcraft-control-conn".into()).spawn(move || {
+                let _counted = counted;
                 let Ok(read) = stream.try_clone() else { return };
+                if read.set_read_timeout(Some(AUTH_WAIT)).is_err() {
+                    return;
+                }
                 let mut write = stream;
                 let mut authed = false;
-                for line in BufReader::new(read).lines() {
-                    let Ok(line) = line else { break };
+                let mut reader = BufReader::new(read);
+                loop {
+                    let limit = if authed { MAX_LINE } else { MAX_LINE_BEFORE_AUTH };
+                    let mut bytes = Vec::new();
+                    // At most one byte past the limit: enough to know the line is too long.
+                    match (&mut reader).take(limit as u64 + 1).read_until(b'\n', &mut bytes) {
+                        Ok(0) | Err(_) => break,
+                        Ok(_) => {}
+                    }
+                    if bytes.len() > limit {
+                        let _ = writeln!(write, "{}", rpc_error(Value::Null, -32600, "the request line is too long"));
+                        break;
+                    }
+                    let Ok(line) = String::from_utf8(bytes) else { break };
                     if line.trim().is_empty() {
                         continue;
                     }
@@ -799,6 +844,10 @@ pub fn serve(client: ControlClient) -> std::io::Result<Endpoint> {
                                     method == "auth" && params.get("token").and_then(Value::as_str).is_some_and(|t| constant_time_eq(t, &expected));
                                 authed = ok;
                                 if ok {
+                                    // Authenticated: a client may wait as long as it likes.
+                                    if reader.get_ref().set_read_timeout(None).is_err() {
+                                        break;
+                                    }
                                     (json!({ "jsonrpc": "2.0", "id": id, "result": { "ok": true } }), false)
                                 } else {
                                     (rpc_error(id, -32001, "authenticate first: auth {token}"), true)
@@ -866,5 +915,48 @@ mod transport_tests {
             Err(e) => matches!(e.kind(), ErrorKind::ConnectionReset | ErrorKind::ConnectionAborted),
         };
         assert!(closed, "the connection stayed open: {next:?}");
+    }
+
+    /// Whether the server closed `s` (end of stream or a reset) within a few seconds.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn closed(s: &std::net::TcpStream) -> bool {
+        use std::io::{ErrorKind, Read};
+        s.set_read_timeout(Some(std::time::Duration::from_secs(5))).unwrap();
+        let mut buf = [0u8; 256];
+        let mut r = s;
+        loop {
+            match r.read(&mut buf) {
+                Ok(0) => return true,
+                Ok(_) => continue,
+                Err(e) => return matches!(e.kind(), ErrorKind::ConnectionReset | ErrorKind::ConnectionAborted),
+            }
+        }
+    }
+
+    /// Without the token, a connection can't hold memory or a thread: a line too long, or no
+    /// `auth` in time, closes it, and past the cap a new one is closed at once.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn connections_without_the_token_are_bounded() {
+        use std::io::Write;
+        let (_control, client) = super::attach(&egui::Context::default());
+        let ep = super::serve(client).unwrap();
+        let connect = || std::net::TcpStream::connect(("127.0.0.1", ep.port)).unwrap();
+        // A line with no end: closed as soon as it is too long, not when the wait runs out.
+        let long = connect();
+        let started = std::time::Instant::now();
+        let _ = long.try_clone().unwrap().write_all(&vec![b'x'; super::MAX_LINE_BEFORE_AUTH + 10]);
+        assert!(closed(&long) && started.elapsed() < super::AUTH_WAIT, "a line too long closes it: {:?}", started.elapsed());
+        // Silence: closed once the wait runs out.
+        let started = std::time::Instant::now();
+        assert!(closed(&connect()) && started.elapsed() >= super::AUTH_WAIT, "no auth in time closes it");
+        // Many at once: the ones past the cap are closed straight away.
+        let held: Vec<_> = (0..super::MAX_CONNECTIONS).map(|_| connect()).collect();
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        let extra = connect();
+        extra.set_read_timeout(Some(std::time::Duration::from_millis(300))).unwrap();
+        let started = std::time::Instant::now();
+        assert!(closed(&extra) && started.elapsed() < super::AUTH_WAIT, "closed at once, not after the wait");
+        drop(held);
     }
 }

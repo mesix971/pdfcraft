@@ -2268,10 +2268,11 @@ fn write_atomic_with(path: &Path, bytes: &[u8], suffixes: impl IntoIterator<Item
     std::fs::create_dir_all(dir).map_err(|e| failed(format!("{}: {e}", dir.display())))?;
     let (tmp, file) =
         create_staging(dir, &name.to_string_lossy(), StagingName::SuffixThenTag, suffixes).map_err(|e| failed(format!("{}: {e}", dir.display())))?;
-    // Closed at the end of the block, before the rename.
+    // On the disk before it takes the file's name (a crash right after the rename mustn't leave
+    // an empty file where the document was), and closed at the end of the block.
     let written = {
         let mut file = file;
-        file.write_all(bytes)
+        file.write_all(bytes).and_then(|()| file.sync_all())
     };
     if let Err(e) = written {
         let _ = std::fs::remove_file(&tmp);

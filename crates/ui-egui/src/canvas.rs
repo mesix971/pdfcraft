@@ -2092,6 +2092,11 @@ pub fn shortcuts(view: &mut DocView, ctx: &egui::Context) {
 const KEY_SCROLL_LINE: f32 = 40.0;
 
 pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
+    // Every `app.views[index]` below is in range: checked here, and nothing in this function
+    // closes a document.
+    if app.views.get(index).is_none() {
+        return;
+    }
     let t = Tokens::get(ui.ctx());
     // Keyboard scrolling applies to this frame's page view only, never later.
     let key_scroll = std::mem::take(&mut app.views[index].key_scroll);
@@ -3641,6 +3646,12 @@ fn selection_actions(ui: &mut egui::Ui, viewport: Rect, view: &mut DocView, info
 /// Run a push button's action (the ones that need no JavaScript engine).
 fn run_button(app: &mut PdfCraftApp, index: usize, name: &str, action: pdfcraft_engine::form_scripts::ButtonAction) {
     use pdfcraft_engine::form_scripts::ButtonAction as B;
+    // Every `app.views[index]` below is in range: checked here, and nothing in this function
+    // closes a document.
+    if app.views.get(index).is_none() {
+        return;
+    }
+
     let pages = app.session.get(app.views[index].id).map_or(0, |d| d.info.pages.len());
     match action {
         B::Reset { fields, exclude } => {
@@ -3721,7 +3732,7 @@ fn run_button(app: &mut PdfCraftApp, index: usize, name: &str, action: pdfcraft_
 /// Run a set-layer-visibility action from a button or link. It changes what is shown, as the
 /// Layers panel does (which follows), not the document.
 fn set_layers(app: &mut PdfCraftApp, index: usize, changes: &[(LayerOp, (u32, u16))], preserve_rb: bool) {
-    let id = app.views[index].id;
+    let Some(id) = app.views.get(index).map(|v| v.id) else { return };
     if app.session.set_layer_state(id, changes, preserve_rb) {
         app.views[index].invalidate_content();
     }

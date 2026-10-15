@@ -729,6 +729,9 @@ pub struct PdfCraftApp {
     pub recovery: Option<RecoveryStore>,
     /// Entries left by a previous session, offered in the Recovery dialog.
     pub recoverable: Vec<RecoveryMeta>,
+    /// This process's lock in the recovery folder: other PdfCraft windows leave its entries
+    /// alone while it runs.
+    recovery_lock: Option<std::fs::File>,
     recovery_keys: std::collections::HashMap<DocId, String>,
     last_autosave: f64,
     allow_quit: bool,
@@ -1014,6 +1017,7 @@ impl PdfCraftApp {
             window_title: String::new(),
             recovery: None,
             recoverable: Vec::new(),
+            recovery_lock: None,
             recovery_keys: Default::default(),
             last_autosave: 0.0,
             allow_quit: false,

@@ -8,6 +8,11 @@
 //!
 //! Encrypted documents are stored encrypted (the working file is), so recovery never writes
 //! plaintext of a protected document to disk. The web build has no recovery store yet.
+//!
+//! Several PdfCraft windows may run at once (another process each), sharing the folder. Each
+//! holds a lock on `instances/<pid>.lock` while it runs, and an entry (its key carries the
+//! process id) whose process still holds its lock is that process's: never offered for recovery
+//! nor removed by another one's clean quit.
 
 use std::path::{Path, PathBuf};
 
@@ -76,6 +81,45 @@ impl RecoveryStore {
         let _ = std::fs::remove_file(self.dir.join(format!("{key}.pdf")));
     }
 
+    /// Mark this process as running: a lock on its file in `instances`, held as long as the
+    /// returned file is. `None` where the system can't lock files (other instances' entries are
+    /// then taken as left behind, as before).
+    pub fn claim(&self) -> Option<std::fs::File> {
+        let dir = self.dir.join("instances");
+        std::fs::create_dir_all(&dir).ok()?;
+        let file =
+            std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(dir.join(format!("{}.lock", std::process::id()))).ok()?;
+        file.try_lock().ok()?;
+        Some(file)
+    }
+
+    /// Whether entry `key` belongs to another PdfCraft that is still running: its process (named
+    /// in the key) holds its lock. One whose process is gone, or ours, is not.
+    fn running_elsewhere(&self, key: &str) -> bool {
+        // "<time>-<pid>-<document>" (see `autosave_now`).
+        let Some(pid) = key.split('-').nth(1).and_then(|p| p.parse::<u32>().ok()) else { return false };
+        if pid == std::process::id() {
+            return false;
+        }
+        let path = self.dir.join("instances").join(format!("{pid}.lock"));
+        let Ok(file) = std::fs::OpenOptions::new().write(true).open(&path) else { return false };
+        match file.try_lock() {
+            Err(std::fs::TryLockError::WouldBlock) => true,
+            // Ours now: that process is gone, and so is its lock file.
+            Ok(()) => {
+                drop(file);
+                let _ = std::fs::remove_file(&path);
+                false
+            }
+            Err(std::fs::TryLockError::Error(_)) => false,
+        }
+    }
+
+    /// Snapshots left behind (by this process before, or by one that has ended), newest first.
+    pub fn left_behind(&self) -> Vec<RecoveryMeta> {
+        self.list().into_iter().filter(|m| !self.running_elsewhere(&m.key)).collect()
+    }
+
     /// Snapshots, newest first. Listing never removes files; missing metadata uses the file name.
     pub fn list(&self) -> Vec<RecoveryMeta> {
         let Ok(dir) = std::fs::read_dir(&self.dir) else { return Vec::new() };
@@ -131,9 +175,10 @@ impl RecoveryStore {
         std::fs::read(self.dir.join(format!("{key}.pdf")))
     }
 
-    /// Remove every entry (clean quit, or "Discard all"), and metadata left without a snapshot.
+    /// Remove every entry (clean quit, or "Discard all"), and metadata left without a snapshot;
+    /// not another running PdfCraft's.
     pub fn clear(&self) {
-        for m in self.list() {
+        for m in self.left_behind() {
             self.remove(&m.key);
         }
         let Ok(dir) = std::fs::read_dir(&self.dir) else { return };
@@ -157,7 +202,8 @@ fn now_secs() -> u64 {
 impl PdfCraftApp {
     /// Turn on autosave into `store`, and look for documents a previous session left behind.
     pub fn enable_recovery(&mut self, store: RecoveryStore) {
-        self.recoverable = store.list();
+        self.recovery_lock = store.claim();
+        self.recoverable = store.left_behind();
         if !self.recoverable.is_empty() {
             self.dialog = Some(crate::Dialog::Recovery);
         }

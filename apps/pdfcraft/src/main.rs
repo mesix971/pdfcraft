@@ -275,6 +275,15 @@ fn native_options(integrated: bool, renderer: eframe::Renderer) -> eframe::Nativ
         viewport = viewport.with_fullsize_content_view(true).with_titlebar_shown(false).with_title_shown(false);
     }
     let persistence_path = settings_dir().map(|d| d.join("app.ron"));
+    // The settings hold the AI services' keys: on Unix the folder is the user's alone.
+    #[cfg(unix)]
+    if let Some(dir) = settings_dir() {
+        use std::os::unix::fs::PermissionsExt;
+        let made = std::fs::create_dir_all(&dir).and_then(|()| std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)));
+        if let Err(e) = made {
+            log::warn!("settings folder {}: {e}", dir.display());
+        }
+    }
     // Set explicitly, so the renderer never depends on which one eframe defaults to.
     let mut native = eframe::NativeOptions { viewport, persistence_path, renderer, ..Default::default() };
     if renderer == eframe::Renderer::Wgpu {
