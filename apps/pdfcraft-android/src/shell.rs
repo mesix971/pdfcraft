@@ -38,6 +38,9 @@ pub fn run(android: AndroidApp) {
     // App-private storage: settings, the log of recovered work. Shared storage holds documents.
     let data = android.internal_data_path();
     let persistence_path = data.as_ref().map(|d| d.join("settings").join("app.ron"));
+    // Typing shows and hides the soft keyboard itself (`typing`): winit's own, as egui's text
+    // input goes off and on, raced it and could leave a field without a keyboard.
+    winit::platform::android::set_app_soft_keyboard(true);
     let options =
         eframe::NativeOptions { android_app: Some(android.clone()), persistence_path, renderer: eframe::Renderer::Wgpu, ..Default::default() };
     let creator: eframe::AppCreator<'static> = Box::new(move |cc| {

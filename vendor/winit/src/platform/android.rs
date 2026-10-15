@@ -82,6 +82,13 @@ pub fn set_keys_to_views(on: bool) {
     crate::platform_impl::KEYS_TO_VIEWS.store(on, std::sync::atomic::Ordering::Relaxed);
 }
 
+/// Leave the soft keyboard to the app while `on`: `Window::set_ime_allowed` no longer shows or
+/// hides it, for an app that does (one that types through its own Android text views). PdfCraft
+/// patch (13), see vendor/README.md.
+pub fn set_app_soft_keyboard(on: bool) {
+    crate::platform_impl::APP_SOFT_KEYBOARD.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// Additional methods on [`EventLoop`] that are specific to Android.
 pub trait EventLoopExtAndroid {
     /// Get the [`AndroidApp`] which was used to create this event loop.

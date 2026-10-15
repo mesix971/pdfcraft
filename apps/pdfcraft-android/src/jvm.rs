@@ -736,9 +736,10 @@ pub struct TextMirror {
 struct MirrorShared {
     phase: MirrorPhase,
     seen: Option<crate::typing::Seen>,
-    /// How many times the keyboard has been asked for (the view takes the focus a moment after
-    /// it is added, so the first asks can come too early).
-    asks: u32,
+    /// Until when the reads ask for the keyboard while the view has the focus and the keyboard
+    /// isn't seen: it takes the focus a moment after it is added, so the first asks can come too
+    /// early, and a show can be cut short by a hide still on its way (seen on Android 16).
+    ask_until: std::time::Instant,
 }
 
 enum MirrorPhase {
@@ -751,8 +752,15 @@ enum MirrorPhase {
 
 /// `Context.INPUT_METHOD_SERVICE`.
 const INPUT_METHOD_SERVICE: &str = "input_method";
-/// How many reads ask for the keyboard again.
-const KEYBOARD_ASKS: u32 = 4;
+/// For how long after the view opens, or its field is tapped, the reads ask for the keyboard until
+/// they see it.
+const KEYBOARD_ASK_FOR: std::time::Duration = std::time::Duration::from_millis(1200);
+
+/// When the reads stop asking for the keyboard, from now.
+fn ask_deadline() -> std::time::Instant {
+    let now = std::time::Instant::now();
+    now.checked_add(KEYBOARD_ASK_FOR).unwrap_or(now)
+}
 /// `EditorInfo.TYPE_TEXT_FLAG_CAP_SENTENCES`: a capital to start each sentence, as phone apps do.
 const TYPE_TEXT_FLAG_CAP_SENTENCES: i32 = 0x4000;
 
@@ -764,7 +772,7 @@ impl TextMirror {
     /// Add the view with `request`'s text and give it the keyboard (on the Java UI thread; it
     /// shows a moment later).
     pub fn open(app: &AndroidApp, request: crate::typing::Request) -> TextMirror {
-        let shared = std::sync::Arc::new(std::sync::Mutex::new(MirrorShared { phase: MirrorPhase::Opening, seen: None, asks: 0 }));
+        let shared = std::sync::Arc::new(std::sync::Mutex::new(MirrorShared { phase: MirrorPhase::Opening, seen: None, ask_until: ask_deadline() }));
         let for_java = shared.clone();
         let main = app.clone();
         app.run_on_java_main_thread(Box::new(move || {
@@ -806,16 +814,25 @@ impl TextMirror {
             let main = self.app.clone();
             self.app.run_on_java_main_thread(Box::new(move || {
                 let mut state = lock(&shared);
-                let ask = state.asks < KEYBOARD_ASKS;
+                let ask = std::time::Instant::now() < state.ask_until;
+                let mut shown = false;
                 let read = match &state.phase {
-                    MirrorPhase::Open(edit) => Some(with_activity(&main, |env, activity| read_mirror(env, activity, edit, ask))),
+                    MirrorPhase::Open(edit) => Some(with_activity(&main, |env, activity| {
+                        let seen = read_mirror(env, edit)?;
+                        if ask && seen.as_ref().is_some_and(|s| s.focused) {
+                            shown = ask_keyboard(env, activity, edit);
+                        }
+                        Ok(seen)
+                    })),
                     _ => None,
                 };
+                // Seen: no more asks, so a Back or the keyboard's own button puts it away for good
+                // (a tap on the field brings it back).
+                if shown {
+                    state.ask_until = std::time::Instant::now();
+                }
                 match read {
-                    Some(Ok(Some(seen))) => {
-                        state.seen = Some(seen);
-                        state.asks = state.asks.saturating_add(u32::from(ask));
-                    }
+                    Some(Ok(Some(seen))) => state.seen = Some(seen),
                     Some(Ok(None)) => {
                         winit::platform::android::set_keys_to_views(false);
                         state.phase = MirrorPhase::Gone;
@@ -843,7 +860,9 @@ impl TextMirror {
         let shared = self.shared.clone();
         let main = self.app.clone();
         self.app.run_on_java_main_thread(Box::new(move || {
-            let state = lock(&shared);
+            let mut state = lock(&shared);
+            // The reads ask again until they see it: a hide on its way may cut this show short.
+            state.ask_until = ask_deadline();
             if let MirrorPhase::Open(edit) = &state.phase {
                 let shown = with_activity(&main, |env, activity| {
                     env.call_method(edit, jni_str!("requestFocus"), jni_sig!("()Z"), &[])?;
@@ -872,8 +891,8 @@ impl TextMirror {
 }
 
 impl Drop for TextMirror {
-    /// However typing ends, the keyboard goes, the view with it, and the window takes the keys
-    /// back at once.
+    /// However typing ends, the view goes, with the keyboard it has ([`remove_mirror`]), and the
+    /// window takes the keys back at once.
     fn drop(&mut self) {
         let edit = {
             let mut state = lock(&self.shared);
@@ -957,16 +976,43 @@ fn show_keyboard(env: &mut Env, activity: &JObject, edit: &JObject) -> Jni<()> {
     Ok(())
 }
 
-/// What the view holds, or `None` once it is gone from its window. `ask` asks for the keyboard
-/// again (the first reads).
-fn read_mirror(env: &mut Env, activity: &JObject, edit: &JObject, ask: bool) -> Jni<Option<crate::typing::Seen>> {
+/// Whether the soft keyboard shows in `edit`'s window, or `None` where Android can't say (before
+/// Android 11, or a view not attached).
+fn keyboard_shown(env: &mut Env, edit: &JObject) -> Jni<Option<bool>> {
+    if AndroidApp::sdk_version() < API_R {
+        return Ok(None);
+    }
+    let insets = env.call_method(edit, jni_str!("getRootWindowInsets"), jni_sig!("()Landroid/view/WindowInsets;"), &[])?.l()?;
+    if insets.is_null() {
+        return Ok(None);
+    }
+    let ime = env.call_static_method(jni_str!("android/view/WindowInsets$Type"), jni_str!("ime"), jni_sig!("()I"), &[])?.i()?;
+    Ok(Some(env.call_method(&insets, jni_str!("isVisible"), jni_sig!("(I)Z"), &[JValue::Int(ime)])?.z()?))
+}
+
+/// Ask for the keyboard for `edit` again, unless it shows already; whether it does. A failure
+/// costs only this ask (it is logged): the view and its typing go on.
+fn ask_keyboard(env: &mut Env, activity: &JObject, edit: &JObject) -> bool {
+    let asked = (|| -> Jni<bool> {
+        if keyboard_shown(env, edit)? == Some(true) {
+            return Ok(true);
+        }
+        show_keyboard(env, activity, edit)?;
+        Ok(false)
+    })();
+    asked.unwrap_or_else(|e| {
+        env.exception_clear();
+        log::debug!("asking for the keyboard: {e}");
+        false
+    })
+}
+
+/// What the view holds, or `None` once it is gone from its window.
+fn read_mirror(env: &mut Env, edit: &JObject) -> Jni<Option<crate::typing::Seen>> {
     if !env.call_method(edit, jni_str!("isAttachedToWindow"), jni_sig!("()Z"), &[])?.z()? {
         return Ok(None);
     }
     let focused = env.call_method(edit, jni_str!("hasFocus"), jni_sig!("()Z"), &[])?.z()?;
-    if ask && focused {
-        show_keyboard(env, activity, edit)?;
-    }
     let text = env.call_method(edit, jni_str!("getText"), jni_sig!("()Landroid/text/Editable;"), &[])?.l()?;
     let text = string_of(env, &text)?.unwrap_or_default();
     let start = env.call_method(edit, jni_str!("getSelectionStart"), jni_sig!("()I"), &[])?.i()?;
@@ -984,11 +1030,14 @@ fn select_mirror(env: &mut Env, edit: &JObject, start: usize, end: usize) -> Jni
     Ok(())
 }
 
-/// Put the keyboard away and take the view out of its window.
+/// Put the view's keyboard away, if the keyboard is still its, and take it out of its window.
 fn remove_mirror(env: &mut Env, activity: &JObject, edit: &JObject) -> Jni<()> {
     let imm = input_methods(env, activity)?;
     let token = env.call_method(edit, jni_str!("getWindowToken"), jni_sig!("()Landroid/os/IBinder;"), &[])?.l()?;
-    if !imm.is_null() && !token.is_null() {
+    // Only its own keyboard: a view that typing moved on from (another field took it) is no
+    // longer the one the keyboard serves, and hiding by the window would hide the new one's.
+    let active = !imm.is_null() && env.call_method(&imm, jni_str!("isActive"), jni_sig!("(Landroid/view/View;)Z"), &[JValue::Object(edit)])?.z()?;
+    if active && !token.is_null() {
         env.call_method(&imm, jni_str!("hideSoftInputFromWindow"), jni_sig!("(Landroid/os/IBinder;I)Z"), &[JValue::Object(&token), JValue::Int(0)])?;
     }
     let parent = env.call_method(edit, jni_str!("getParent"), jni_sig!("()Landroid/view/ViewParent;"), &[])?.l()?;

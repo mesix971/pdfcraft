@@ -202,9 +202,14 @@ impl<D, M> Typing<D, M> {
                     if let (Some(field), Some(ime)) = (focused, ime)
                         && (self.handled != Some(field) || tapped)
                     {
-                        // winit asked for the window's keyboard; the system's view brings its own.
-                        host.soft_keyboard(false);
-                        self.keyboard = false;
+                        // The system's view brings its own keyboard. The window's goes only if
+                        // typing asked for it: a hide sent now goes another way than the view's
+                        // show (the activity's pipe, the UI thread's queue) and could land after
+                        // it, leaving the field without a keyboard until a long press.
+                        if self.keyboard {
+                            host.soft_keyboard(false);
+                            self.keyboard = false;
+                        }
                         let password = ime.purpose == egui::IMEPurpose::Password;
                         let multiline = ime.rect.height() >= MULTILINE_HEIGHT;
                         self.state = State::Reading { field, sent: false, password, multiline };
@@ -349,10 +354,10 @@ impl<D, M> Typing<D, M> {
         self.soft_keyboard(true, true, host);
     }
 
-    /// Typing straight into the window: winit asks for the keyboard implicitly, which some
-    /// devices ignore, so ask outright while a text field has focus, and again when the field is
-    /// tapped after the keyboard was put away (focus didn't change, so nothing else would bring
-    /// it back).
+    /// Typing straight into the window: winit leaves the keyboard to the app (the shell's
+    /// `set_app_soft_keyboard`), so ask for it while a text field has focus, and again when the
+    /// field is tapped after the keyboard was put away (focus didn't change, so nothing else
+    /// would bring it back).
     fn soft_keyboard(&mut self, want: bool, tapped: bool, host: &mut impl Host<Dialog = D, Mirror = M>) {
         if want != self.keyboard || (want && tapped) {
             host.soft_keyboard(want);
@@ -580,6 +585,9 @@ mod tests {
         assert_eq!(a.enters, 0, "still typing");
         assert!(host.opened.is_empty(), "no dialog");
         assert_eq!(host.closed, 0);
+        // Nothing put the keyboard away: a hide sent as the view opens could land after its show
+        // and leave the field without one (Android 16, a Samsung keyboard).
+        assert!(host.keyboard.is_empty(), "{:?}", host.keyboard);
     }
 
     #[test]

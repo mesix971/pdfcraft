@@ -39,6 +39,10 @@ static HAS_FOCUS: AtomicBool = AtomicBool::new(true);
 /// input method's keys (Delete, Enter) that way. PdfCraft patch (13), see vendor/README.md.
 pub(crate) static KEYS_TO_VIEWS: AtomicBool = AtomicBool::new(false);
 
+/// While set, the app shows and hides the soft keyboard itself, and `set_ime_allowed` leaves it
+/// alone. PdfCraft patch (13), see vendor/README.md.
+pub(crate) static APP_SOFT_KEYBOARD: AtomicBool = AtomicBool::new(false);
+
 /// Returns the minimum `Option<Duration>`, taking into account that `None`
 /// equates to an infinite timeout, not a zero timeout (so can't just use
 /// `Option::min`)
@@ -936,6 +940,13 @@ impl Window {
     pub fn set_ime_cursor_area(&self, _position: Position, _size: Size) {}
 
     pub fn set_ime_allowed(&self, allowed: bool) {
+        // PdfCraft patch (13): an app that shows and hides the soft keyboard itself, or whose text
+        // view has the keys, keeps it. Shown here, it would go to the window; hidden here, when
+        // the app's text input goes off and on, the hide could land after the app's own show and
+        // leave the field without a keyboard.
+        if APP_SOFT_KEYBOARD.load(Ordering::Relaxed) || KEYS_TO_VIEWS.load(Ordering::Relaxed) {
+            return;
+        }
         if allowed {
             self.app.show_soft_input(true);
         } else {
