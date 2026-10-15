@@ -456,7 +456,11 @@ fn back_closes_one_thing_at_a_time_and_never_leaves_home() {
 #[test]
 fn the_page_pill_goes_to_a_page() {
     let mut h = harness(true);
-    click(&mut h, "Page 1 of 3");
+    // The pill, a button: the page on screen goes by the same name for screen readers.
+    let pill = h.get_by_role_and_label(Role::Button, "Page 1 of 3").rect();
+    assert!(pill.height() >= 48.0, "{pill:?} is a finger tall");
+    h.get_by_role_and_label(Role::Button, "Page 1 of 3").click();
+    h.run_steps(4);
     assert_eq!(h.state().phone_sheet(), Some(Sheet::GoTo));
     h.get_by_role(Role::TextInput).click();
     h.run_steps(2);
@@ -546,6 +550,20 @@ fn a_notice_shows_below_the_top_bar_and_takes_its_taps() {
     assert!(!h.state().views[0].disk_changed, "the bar didn't take the tap");
 }
 
+/// A job's progress card, and a notice above it, sit over the bars along the bottom (64 tall),
+/// not under them.
+#[test]
+fn the_progress_card_and_notices_clear_the_bottom_bars() {
+    let mut h = harness(true);
+    h.state_mut().progress_notice = Some(pdfcraft_ui_egui::ProgressNotice { label: "Working".into(), fraction: 0.5, cancellable: false });
+    h.state_mut().notify("A notice");
+    h.run_steps(4);
+    let card = h.get_by_label("Working").rect();
+    assert!(card.bottom() <= 892.0 - 64.0, "{card:?} is above the bottom bar");
+    let notice = h.get_by_label("A notice").rect();
+    assert!(notice.bottom() < card.top(), "{notice:?} is above the card {card:?}");
+}
+
 #[test]
 fn a_tool_panel_left_open_in_the_desktop_layout_doesnt_stop_scrolling() {
     let mut h = harness_with(Some(FIXTURE), |app| app.set_option("tool", "edit").unwrap());
@@ -583,6 +601,9 @@ fn the_assistant_asks_for_a_key_and_says_why_it_cant_answer() {
     h.state_mut().ai.max_pages = 1;
     // Set up: Back leaves the settings for the conversation.
     click(&mut h, "Back");
+    h.get_by_role_and_label(Role::Heading, "AI assistant");
+    // Send lights up once there is a question, but is a button, not a switch.
+    assert_eq!(h.get_by_label("Send").accesskit_node().data().toggled(), None);
     click(&mut h, "Summarize");
     for _ in 0..200 {
         h.run_steps(1);
@@ -1773,4 +1794,20 @@ fn a_document_opened_again_brings_its_bars_with_it() {
         .collect();
     let rest = tops.last().copied().flatten().expect("the bars shown");
     assert!(tops.iter().all(|t| t.is_none_or(|t| t == rest)), "never sliding: {tops:?}");
+}
+
+/// Everything that takes the focus says what it is to a screen reader: the pages, the sheet's
+/// scrim (a tap there closes it); and the bars' backgrounds, which only stop taps, don't take it.
+#[test]
+fn whatever_takes_the_focus_has_a_name() {
+    let mut h = harness(true);
+    h.get_by_role_and_label(Role::Button, "Page 1 of 3").click();
+    h.run_steps(6);
+    assert_eq!(h.state().phone_sheet(), Some(Sheet::GoTo));
+    let nameless: Vec<_> = h
+        .query_all_by(|n| n.data().supports_action(egui::accesskit::Action::Focus) && n.label().is_none() && n.value().is_none())
+        .map(|n| (n.accesskit_node().role(), n.rect()))
+        .collect();
+    assert!(nameless.is_empty(), "{nameless:?}");
+    assert!(h.query_all_by_role_and_label(Role::Button, "Close").any(|n| n.rect().height() >= 892.0), "the scrim");
 }

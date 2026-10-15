@@ -1264,10 +1264,12 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
                 } else {
                     app.notify_fmt("Removed {n} hidden items. Save to remove them from the file.", &[("n", &n.to_string())]);
                 }
+                app.offer_undo();
             }
         }
         Some(Dialog::Sanitize) if app.apply_edit(Edit::Sanitize) => {
             app.notify_tr("Document sanitized. Save to finish: saving rewrites the whole file.");
+            app.offer_undo();
         }
         Some(Dialog::RedactApply) => {
             let marks = app.active_ids().and_then(|(_, id)| app.session.get(id)).map_or(0, |d| d.redaction_marks());
@@ -1277,6 +1279,7 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
                 } else {
                     app.notify_fmt("Applied {n} redaction marks. Save to remove the content from the file.", &[("n", &marks.to_string())]);
                 }
+                app.offer_undo();
             }
         }
         _ => {}

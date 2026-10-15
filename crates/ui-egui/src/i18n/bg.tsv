@@ -2444,3 +2444,5 @@ decimal separator	.	,
 	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Обобщавайте, питайте и коригирайте своите PDF файлове с Claude, ChatGPT или Gemini, със собствения си ключ.
 	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	Адресът на услугата не е валиден: той започва с https:// (http:// само за това устройство или локалната мрежа).
 	This document doesn't allow copying its content, so it isn't sent to the assistant.	Този документ не позволява копиране на съдържанието му, затова не се изпраща до асистента.
+	Try again	Опитайте отново
+	Price per million tokens read / written	Цена за милион прочетени / написани токена

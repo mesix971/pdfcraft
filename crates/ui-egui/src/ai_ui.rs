@@ -73,8 +73,9 @@ impl Fate {
 enum Entry {
     /// A question (as shown) and its answer, with the changes it proposed.
     Answered { shown: String, prompt: String, reply: Reply, model: String, edits: Vec<(ProposedEdit, Fate)> },
-    /// A question that got no answer, and why.
-    Failed { shown: String, error: String },
+    /// A question that got no answer, and why; with what to ask again when asking again may
+    /// get one (not when the document refused to be sent).
+    Failed { shown: String, error: String, retry: Option<Task> },
     /// A new conversation starts here: the document or the model changed, or the last one grew
     /// long. Earlier answers stay on screen but aren't sent again.
     NewConversation,
@@ -152,6 +153,8 @@ impl Chat {
 struct Pending {
     doc: DocId,
     shown: String,
+    /// What was asked, to ask again if no answer comes.
+    task: Task,
     prompt: String,
     /// The service and the model asked.
     provider: Provider,
@@ -291,8 +294,8 @@ impl AiState {
             .unwrap_or_default()
     }
 
-    fn fail(&mut self, doc: DocId, shown: String, error: String) {
-        self.chats.entry(doc).or_default().entries.push(Entry::Failed { shown, error });
+    fn fail(&mut self, doc: DocId, shown: String, error: String, retry: Option<Task>) {
+        self.chats.entry(doc).or_default().entries.push(Entry::Failed { shown, error, retry });
     }
 }
 
@@ -362,7 +365,7 @@ impl PdfCraftApp {
         // Sending a document to a service copies its content: not one that forbids copying.
         if !doc.allows_copying() {
             let error = tl!("This document doesn't allow copying its content, so it isn't sent to the assistant.").to_owned();
-            self.ai.fail(id, shown, error);
+            self.ai.fail(id, shown, error, None);
             return;
         }
         // The working file as it is now, edits included. It stays the same object until the
@@ -392,6 +395,7 @@ impl PdfCraftApp {
         });
         let history = chat.history();
         let prompt = task.prompt();
+        let again = task.clone();
         let (tx, rx) = channel();
         let ctx = self.ctx.clone();
         let asked = model.clone();
@@ -419,9 +423,28 @@ impl PdfCraftApp {
             }
         });
         match spawned {
-            Ok(_) => self.ai.pending = Some(Pending { doc: id, shown, prompt, provider, model: asked, rx }),
-            Err(e) => self.ai.fail(id, shown, e.to_string()),
+            Ok(_) => self.ai.pending = Some(Pending { doc: id, shown, task: again, prompt, provider, model: asked, rx }),
+            Err(e) => self.ai.fail(id, shown, e.to_string(), Some(again)),
         }
+    }
+
+    /// Stop waiting for the question on its way: its answer, if one still comes, is dropped. The
+    /// request itself can't be called back, so the service may still finish it.
+    pub fn cancel_ai(&mut self) {
+        if let Some(Pending { doc, shown, task, .. }) = self.ai.pending.take() {
+            self.ai.fail(doc, shown, tl!("Cancelled").to_owned(), Some(task));
+        }
+    }
+
+    /// Ask again the question of failed answer `entry` of `doc`'s conversation (which it replaces).
+    fn retry_ai(&mut self, doc: DocId, entry: usize) {
+        if self.ai.pending.is_some() || self.active_ids().map(|(_, id)| id) != Some(doc) {
+            return;
+        }
+        let Some(chat) = self.ai.chats.get_mut(&doc) else { return };
+        let Some(Entry::Failed { retry: Some(_), .. }) = chat.entries.get(entry) else { return };
+        let Entry::Failed { shown, retry: Some(task), .. } = chat.entries.remove(entry) else { return };
+        self.ask_ai(task, shown);
     }
 
     /// Take an answer that arrived (called every frame).
@@ -438,7 +461,7 @@ impl PdfCraftApp {
             // The worker stopped without an answer (it can't panic, but a lost answer is still an answer).
             Err(TryRecvError::Disconnected) => Err(AiError::Network("no answer".into())),
         };
-        let Some(Pending { doc, shown, prompt, provider, model, .. }) = self.ai.pending.take() else { return };
+        let Some(Pending { doc, shown, task, prompt, provider, model, .. }) = self.ai.pending.take() else { return };
         if self.session.get(doc).is_none() {
             // Closed while the question was on its way.
             return;
@@ -448,7 +471,7 @@ impl PdfCraftApp {
                 let edits = reply.edits.iter().map(|e| (e.clone(), Fate::Proposed)).collect();
                 Entry::Answered { shown, prompt, reply, model, edits }
             }
-            Err(e) => Entry::Failed { shown, error: error_text(&e, &service_name(provider, &self.ai.base_url)) },
+            Err(e) => Entry::Failed { shown, error: error_text(&e, &service_name(provider, &self.ai.base_url)), retry: Some(task) },
         };
         self.ai.chats.entry(doc).or_default().entries.push(entry);
     }
@@ -720,6 +743,7 @@ fn settings_form(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
                     ui.add(widgets::line(draft).password(true).hint_text(hint).desired_width(f32::INFINITY).char_limit(512));
                 }
                 heading(ui, tl!("Model"));
+                ui.label(egui::RichText::new(tl!("Price per million tokens read / written")).small().color(t.text_muted));
                 for m in provider.models() {
                     if let Some(model) = app.ai.models.get_mut(index)
                         && ui.add(widgets::radio(model.as_str() == m.id, format!("{}  ·  {}", m.name, price_line(m)))).clicked()
@@ -839,6 +863,9 @@ fn chat(app: &mut PdfCraftApp, doc: DocId, ui: &mut egui::Ui, t: &Tokens) {
     let mut ask: Option<(Task, String)> = None;
     // An answer's proposed changes applied (true) or discarded (false).
     let mut decide: Option<(usize, bool)> = None;
+    // A failed question asked again, or the one on its way cancelled.
+    let mut retry: Option<usize> = None;
+    let mut cancel = false;
     // The question box at the bottom, the conversation above it.
     let input_h = 64.0;
     let full = ui.max_rect();
@@ -880,9 +907,12 @@ fn chat(app: &mut PdfCraftApp, doc: DocId, ui: &mut egui::Ui, t: &Tokens) {
                                     decide = Some((index, apply));
                                 }
                             }
-                            Entry::Failed { shown, error } => {
+                            Entry::Failed { shown, error, retry: again } => {
                                 bubble(ui, shown, t);
                                 answer(ui, error, t, None);
+                                if again.is_some() && ui.add_enabled_ui(!busy, |ui| pill(ui, tl!("Try again"), false, t)).inner.clicked() {
+                                    retry = Some(index);
+                                }
                             }
                             Entry::NewConversation => {
                                 ui.vertical_centered(|ui| ui.label(egui::RichText::new(tl!("New conversation")).small().color(t.text_faint)));
@@ -895,6 +925,8 @@ fn chat(app: &mut PdfCraftApp, doc: DocId, ui: &mut egui::Ui, t: &Tokens) {
                     ui.horizontal(|ui| {
                         ui.add(egui::Spinner::new().size(18.0));
                         ui.label(egui::RichText::new(tl!("Thinking…")).color(t.text_muted));
+                        ui.add_space(8.0);
+                        cancel = pill(ui, tl!("Cancel"), false, t).clicked();
                     });
                 }
             });
@@ -912,11 +944,14 @@ fn chat(app: &mut PdfCraftApp, doc: DocId, ui: &mut egui::Ui, t: &Tokens) {
             .font(theme::regular(15.5))
             .desired_width(ui.available_width() - send_w - 8.0)
             .char_limit(4000);
-        let r = ui.add(edit);
+        let r = widgets::named_edit(ui, edit, tl!("Ask about this document"));
         let enter = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
         ui.add_space(8.0);
         let ready = !busy && !app.ai.input.trim().is_empty();
-        let send = ui.add_enabled_ui(ready, |ui| icons::button(ui, "send", send_w, ready, tl!("Send"))).inner.clicked();
+        // Lit when there is a question to send; a button, not a switch, to a screen reader.
+        let send = ui.add_enabled_ui(ready, |ui| icons::button(ui, "send", send_w, ready, tl!("Send"))).inner;
+        ui.ctx().accesskit_node_builder(send.id, |node| node.clear_toggled());
+        let send = send.clicked();
         if (send || enter) && ready {
             let question = app.ai.input.trim().to_owned();
             app.ai.input.clear();
@@ -927,6 +962,12 @@ fn chat(app: &mut PdfCraftApp, doc: DocId, ui: &mut egui::Ui, t: &Tokens) {
         Some((entry, true)) => app.apply_ai_edits(doc, entry),
         Some((entry, false)) => app.discard_ai_edits(doc, entry),
         None => {}
+    }
+    if cancel {
+        app.cancel_ai();
+    }
+    if let Some(entry) = retry {
+        app.retry_ai(doc, entry);
     }
     if let Some((task, shown)) = ask {
         app.ask_ai(task, shown);
@@ -1020,9 +1061,8 @@ fn answer(ui: &mut egui::Ui, text: &str, t: &Tokens, reply: Option<(&Reply, &str
         .inner_margin(egui::Margin::symmetric(12, 10))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
-            // Why there is no answer, in a red that keeps its contrast on either theme's card.
-            let error = if t.dark() { Color32::from_rgb(0xFF, 0x8A, 0x80) } else { Color32::from_rgb(0xC6, 0x28, 0x28) };
-            let color = if reply.is_some() { t.text } else { error };
+            // Why there is no answer, in the red that keeps its contrast on either theme.
+            let color = if reply.is_some() { t.text } else { t.error };
             // An answer may be nothing but proposed changes, shown below it.
             if !text.is_empty() {
                 ui.add(egui::Label::new(egui::RichText::new(text).font(theme::regular(15.0)).color(color)).wrap().selectable(true));
@@ -1034,7 +1074,9 @@ fn answer(ui: &mut egui::Ui, text: &str, t: &Tokens, reply: Option<(&Reply, &str
             ui.horizontal(|ui| {
                 ui.label(egui::RichText::new(cost_line(reply, model)).small().color(t.text_faint));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if icons::button(ui, "copy", 36.0, false, tl!("Copy")).clicked() {
+                    if icons::button(ui, "copy", if widgets::phone_dialogs(ui.ctx()) { crate::phone::TARGET } else { 36.0 }, false, tl!("Copy"))
+                        .clicked()
+                    {
                         ui.ctx().copy_text(reply.text.clone());
                     }
                 });
@@ -1172,6 +1214,53 @@ mod tests {
         // The model hears what became of each proposal.
         let history = app.ai.chats.get(&doc).unwrap().history();
         assert_eq!(history[0].results, vec![("t1".into(), "Applied.".into()), ("t2".into(), Fate::NotFound(1).result().unwrap())]);
+    }
+
+    /// A question on its way can be cancelled (an answer arriving after is dropped), and one that
+    /// got no answer is asked again in its place; one the document refused isn't. No key is set up,
+    /// so nothing reaches the network.
+    #[test]
+    fn a_question_can_be_cancelled_and_asked_again() {
+        let mut app = PdfCraftApp::new();
+        app.open_bytes("three.pdf", None, three_paragraphs()).unwrap();
+        let (_, doc) = app.active_ids().unwrap();
+        let (tx, rx) = channel();
+        let (provider, model) = (Provider::Anthropic, "claude-opus-5-5".to_owned());
+        app.ai.pending = Some(Pending { doc, shown: "Sum up".into(), task: Task::Summarize, prompt: Task::Summarize.prompt(), provider, model, rx });
+        app.cancel_ai();
+        assert!(!app.ai.busy());
+        let _ = tx.send(Err(AiError::Network("late".into())));
+        app.poll_ai();
+        let failures = |app: &PdfCraftApp| -> Vec<(String, String, Option<Task>)> {
+            let entries = app.ai.chats.get(&doc).map_or(&[][..], |c| c.entries.as_slice());
+            entries
+                .iter()
+                .filter_map(|e| match e {
+                    Entry::Failed { shown, error, retry } => Some((shown.clone(), error.clone(), retry.clone())),
+                    _ => None,
+                })
+                .collect()
+        };
+        assert_eq!(failures(&app), vec![("Sum up".into(), "Cancelled".into(), Some(Task::Summarize))], "the late answer is nobody's");
+        app.retry_ai(doc, 0);
+        assert!(app.ai.busy(), "asked again");
+        for _ in 0..1000 {
+            app.poll_ai();
+            if !app.ai.busy() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let again = failures(&app);
+        assert_eq!(again.len(), 1, "in the cancelled one's place: {:?}", again);
+        assert_eq!((again[0].0.as_str(), again[0].2.clone()), ("Sum up", Some(Task::Summarize)));
+        assert_ne!(again[0].1, "Cancelled", "this time the service's answer: no key");
+        // What the document refused isn't offered again.
+        app.ai.chats.clear();
+        app.ai.fail(doc, "Sum up".into(), "refused".into(), None);
+        app.retry_ai(doc, 0);
+        assert!(!app.ai.busy());
+        assert_eq!(failures(&app).len(), 1);
     }
 
     /// What the model was told about a proposal never changes once told, and a conversation

@@ -72,6 +72,10 @@ pub struct Tokens {
     /// The icon's green, for large surfaces (the phone's Home header); `on_brand` is the text on it.
     pub brand: Color32,
     pub on_brand: Color32,
+    /// What failed or is wrong, and what needs a look: text and icons readable (4.5:1) on every
+    /// surface of their theme.
+    pub error: Color32,
+    pub warning: Color32,
 }
 
 impl Tokens {
@@ -102,6 +106,8 @@ impl Tokens {
                 radius: 6,
                 brand: Color32::from_rgb(0x12, 0xA5, 0x8A),
                 on_brand: Color32::WHITE,
+                error: Color32::from_rgb(0xC4, 0x2B, 0x32),
+                warning: Color32::from_rgb(0x9C, 0x51, 0x00),
             },
             ThemeKind::Dark => Self {
                 kind,
@@ -128,6 +134,8 @@ impl Tokens {
                 radius: 6,
                 brand: Color32::from_rgb(0x0F, 0x86, 0x70),
                 on_brand: Color32::WHITE,
+                error: Color32::from_rgb(0xF8, 0x71, 0x71),
+                warning: Color32::from_rgb(0xF5, 0x9E, 0x0B),
             },
         }
     }
@@ -168,9 +176,23 @@ pub struct Press {
     pub down: f32,
 }
 
+/// How thick the keyboard focus ring is, and how far its corners round at most.
+const FOCUS_RING: f32 = 2.0;
+const FOCUS_RADIUS: f32 = 8.0;
+
 impl Press {
+    /// The control's hover and press, and a ring around it while it has keyboard focus (a click
+    /// never gives one focus in egui: only Tab and assistive technology do).
     pub fn track(ui: &egui::Ui, resp: &Response) -> Self {
-        let hot = resp.hovered() || resp.is_pointer_button_down_on();
+        if resp.has_focus() {
+            focus_ring(ui, resp.rect);
+        }
+        Self::track_without_ring(ui, resp)
+    }
+
+    /// [`Self::track`] for a control that draws its own focus ring (craft-ui's buttons and tabs).
+    pub fn track_without_ring(ui: &egui::Ui, resp: &Response) -> Self {
+        let hot = resp.hovered() || resp.is_pointer_button_down_on() || resp.has_focus();
         let ease = egui::emath::easing::quadratic_out;
         // With animation effects off the wash and the press are simply there.
         let (hover, down) = if crate::motion::animated(ui.ctx()) { (0.12, 0.06) } else { (0.0, 0.0) };
@@ -205,6 +227,18 @@ impl Press {
             ui.painter().rect_filled(rect, radius, fill);
         }
     }
+}
+
+/// The keyboard focus ring around `rect`, outside it: the control's own fill, painted after,
+/// would cover a ring inside it. In the accent's text shade: the accent itself is under 3:1 on
+/// the dark theme's surfaces.
+fn focus_ring(ui: &egui::Ui, rect: Rect) {
+    if !rect.is_positive() {
+        return;
+    }
+    let radius = (rect.height() / 2.0).min(FOCUS_RADIUS);
+    let stroke = Stroke::new(FOCUS_RING, Tokens::get(ui.ctx()).accent_text);
+    ui.painter().rect_stroke(rect, radius, stroke, egui::StrokeKind::Outside);
 }
 
 /// Pointing hand, the cursor for a control that clicks.
@@ -698,6 +732,59 @@ mod tests {
         let held = Press { hover: 1.0, down: 1.0 };
         assert_eq!(held.fill(rest, hover, pressed), pressed);
         assert_eq!(held.offset(), Vec2::new(0.0, 1.0));
+    }
+
+    /// A control with keyboard focus is ringed, and lit as if hovered; without focus, or when it
+    /// draws its own ring, it isn't.
+    #[test]
+    fn keyboard_focus_rings_a_control() {
+        let ctx = egui::Context::default();
+        // Effects off: the wash is there or not, not easing in.
+        ctx.all_styles_mut(|s| s.animation_time = 0.0);
+        let id = egui::Id::new("focus-ring-probe");
+        let frame = |focus: bool, ring: bool| {
+            let mut lit = 0.0;
+            let mut target = Rect::NOTHING;
+            let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
+                let resp = ui.interact(Rect::from_min_size(egui::pos2(20.0, 20.0), Vec2::new(80.0, 30.0)), id, egui::Sense::click());
+                if focus {
+                    resp.request_focus();
+                } else {
+                    resp.surrender_focus();
+                }
+                target = resp.rect;
+                lit = if ring { Press::track(ui, &resp) } else { Press::track_without_ring(ui, &resp) }.hover;
+            });
+            out.textures_delta.clear();
+            let ink = Tokens::get(&ctx).accent_text;
+            let ringed = out.shapes.iter().any(|s| {
+                matches!(&s.shape, egui::Shape::Rect(r) if r.rect == target && r.stroke.color == ink && r.stroke_kind == egui::StrokeKind::Outside)
+            });
+            (ringed, lit)
+        };
+        // Focus asked for one frame is the widget's from the next.
+        let _ = frame(true, true);
+        assert_eq!(frame(true, true), (true, 1.0), "focused: ringed and lit");
+        assert!(!frame(true, false).0, "its own ring: not a second one");
+        let _ = frame(false, true);
+        assert_eq!(frame(false, true), (false, 0.0), "not focused");
+    }
+
+    /// Errors and warnings are read as text, and the focus ring is seen, on every surface of
+    /// their theme. The signature bar's red was 4.1:1 on the light pasteboard and its amber 2.4:1.
+    #[test]
+    fn status_colours_and_the_focus_ring_stand_out() {
+        for kind in [ThemeKind::Light, ThemeKind::Dark] {
+            for t in [Tokens::for_kind(kind), Tokens::for_kind(kind).true_black()] {
+                let look = crate::phone_home::look(&t);
+                for (name, fg) in [("error", t.error), ("warning", t.warning), ("focus ring", t.accent_text)] {
+                    for bg in [t.titlebar, t.chrome, t.panel, t.card, t.pasteboard, t.field, look.ground, look.surface] {
+                        let r = contrast(fg, bg);
+                        assert!(r >= 4.5, "{kind:?} {name} on {bg:?}: {r:.2}:1, WCAG AA needs 4.5:1");
+                    }
+                }
+            }
+        }
     }
 
     #[test]

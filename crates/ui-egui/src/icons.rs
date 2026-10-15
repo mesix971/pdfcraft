@@ -57,7 +57,7 @@ pub fn button(ui: &mut egui::Ui, name: &str, box_size: f32, selected: bool, tool
         pressed: Some(clear(t.icon)),
         selected: clear(t.accent_text),
         corner_radius: t.radius.into(),
-        focus_stroke: Stroke::new(1.0, t.accent),
+        focus_stroke: Stroke::new(1.0, t.accent_text),
     };
     let label = if tooltip.is_empty() { name } else { tooltip };
     // The wash eases from the response, so reserve its place under the icon and focus ring.
@@ -65,7 +65,7 @@ pub fn button(ui: &mut egui::Ui, name: &str, box_size: f32, selected: bool, tool
     let mut painted = None;
     let resp = IconButton::new(label, Vec2::splat(box_size), &style).selected(selected).show(ui, |_, rect, tint| painted = Some((rect, tint)));
     if let Some((rect, tint)) = painted {
-        let press = theme::Press::track(ui, &resp);
+        let press = theme::Press::track_without_ring(ui, &resp);
         let mut shapes = Vec::with_capacity(2);
         let fill = press.wash_color(&t, selected);
         if fill.a() > 0 {

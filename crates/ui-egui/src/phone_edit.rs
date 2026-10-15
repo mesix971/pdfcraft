@@ -128,7 +128,7 @@ pub(crate) fn screen(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, scr
                     formatted |= format_row(ui, style, underline.take(), &t, &look);
                     if compact {
                         divider(ui, &look);
-                        formatted |= colour_row(ui, style, &t, &look);
+                        formatted |= colour_row(ui, style, &t, &look, TARGET);
                     }
                     ui.add_space(12.0);
                 });
@@ -142,7 +142,10 @@ pub(crate) fn screen(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, scr
                     ui.horizontal_centered(|ui| {
                         ui.add_space(10.0);
                         ui.spacing_mut().item_spacing.x = 2.0;
-                        formatted |= colour_row(ui, style, &t, &look);
+                        // A finger wide each where the screen has room for every colour; never
+                        // narrower than 40 (the row swipes for the rest).
+                        let room = colours.width() - 20.0 - 2.0 * (COLOURS.len() as f32 - 1.0);
+                        formatted |= colour_row(ui, style, &t, &look, (room / COLOURS.len() as f32).clamp(40.0, TARGET));
                         ui.add_space(10.0);
                     });
                 });
@@ -156,7 +159,7 @@ pub(crate) fn screen(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, scr
             let warning = Rect::from_min_size(pos2(screen.left() + 16.0, below), vec2(screen.width() - 32.0, 40.0));
             ui.scope_builder(egui::UiBuilder::new().max_rect(warning), |ui| {
                 let message = crate::content_ui::undrawable_message(c);
-                ui.add(egui::Label::new(egui::RichText::new(message).font(theme::regular(13.5)).color(crate::combine_ui::ERROR)).wrap());
+                ui.add(egui::Label::new(egui::RichText::new(message).font(theme::regular(13.5)).color(t.error)).wrap());
             });
             below += 44.0;
         }
@@ -174,7 +177,7 @@ pub(crate) fn screen(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, scr
                         .desired_width(field.width())
                         .desired_rows(((field.height() - 28.0) / 24.0).floor().clamp(3.0, 40.0) as usize)
                         .lock_focus(true);
-                    let r = ui.add(edit);
+                    let r = widgets::named_edit(ui, edit, tl!("Text"));
                     if first || refocus {
                         r.request_focus();
                     }
@@ -238,12 +241,13 @@ fn format_row(ui: &mut egui::Ui, look: &mut pdfcraft_engine::AddedText, underlin
     before != (look.size, look.bold, look.italic, look.align, underlined)
 }
 
-/// The colours text can take, the one it has ringed. Returns whether one was chosen.
-fn colour_row(ui: &mut egui::Ui, look: &mut pdfcraft_engine::AddedText, t: &Tokens, l: &phone_home::Look) -> bool {
+/// The colours text can take, the one it has ringed, each `width` wide and a finger tall.
+/// Returns whether one was chosen.
+fn colour_row(ui: &mut egui::Ui, look: &mut pdfcraft_engine::AddedText, t: &Tokens, l: &phone_home::Look, width: f32) -> bool {
     let mut chosen = false;
     for (name, c) in COLOURS {
         let on = look.color.iter().zip(c).all(|(a, b)| (a - b).abs() < 0.02);
-        let (r, resp) = ui.allocate_exact_size(Vec2::splat(40.0), Sense::click());
+        let (r, resp) = ui.allocate_exact_size(vec2(width, TARGET), Sense::click());
         let name = tl!(name);
         resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::RadioButton, true, on, name));
         let fill = Color32::from_rgb((c[0] * 255.0) as u8, (c[1] * 255.0) as u8, (c[2] * 255.0) as u8);
@@ -297,7 +301,7 @@ fn divider(ui: &mut egui::Ui, l: &phone_home::Look) {
 const HOLD: f64 = 0.45;
 /// A corner handle of what is picked: its dot's radius, and the finger-sized room around it.
 const HANDLE_DOT: f32 = 9.0;
-const HANDLE_TARGET: f32 = 44.0;
+const HANDLE_TARGET: f32 = TARGET;
 
 /// A corner handle on the page (the phone's Edit): what a finger on it resizes.
 #[derive(Clone, Copy, Debug)]

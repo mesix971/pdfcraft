@@ -2358,3 +2358,5 @@ decimal separator	.	.
 	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	服務位址無效：它以 https:// 開頭（http:// 僅限本裝置或區域網路）。
 	This document doesn't allow copying its content, so it isn't sent to the assistant.	此文件不允許複製其內容，因此不會傳送給助理。
 	Sign yourself	自行簽名
+	Try again	重試
+	Price per million tokens read / written	每百萬權杖價格（讀取 / 寫入）

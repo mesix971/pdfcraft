@@ -83,7 +83,7 @@ fn print_dialog_lays_out_sheets_and_saves_a_pdf() {
     assert!(h.state_mut().execute("print.dialog"));
     h.run_steps(3);
     assert_eq!(h.state().dialog, Some(Dialog::Print));
-    h.get_by_label("Pages to Print".to_uppercase().as_str());
+    h.get_by_role_and_label(egui::accesskit::Role::Heading, "Pages to Print");
     h.get_by_label("Sheet 1 of 1");
     // Two copies of the one page, as a 2-up poster-free layout: Multiple.
     h.get_by_label("Multiple").click();

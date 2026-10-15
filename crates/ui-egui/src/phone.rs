@@ -600,7 +600,8 @@ pub(crate) fn bar_filled(
     let fade = ui.opacity();
     egui::Area::new(egui::Id::new(id)).order(egui::Order::Middle).fixed_pos(rect.min).constrain(false).show(ui.ctx(), |ui| {
         crate::transition::follow_screen(ui, fade);
-        let (r, _) = ui.allocate_exact_size(rect.size(), Sense::click());
+        // Takes the taps that miss its buttons (they'd reach the page under it), not the focus.
+        let (r, _) = ui.allocate_exact_size(rect.size(), Sense::CLICK);
         ui.painter().rect_filled(r, CornerRadius::ZERO, fill);
         let edge = if top { r.bottom() } else { r.top() };
         if let Some(line) = divider {
@@ -614,8 +615,10 @@ pub(crate) fn bar_filled(
     });
 }
 
+/// A screen's title in its top bar, its heading for screen readers.
 pub(crate) fn title_text(ui: &mut egui::Ui, title: &str, width: f32, t: &Tokens) {
-    let (r, _) = ui.allocate_exact_size(vec2(width.max(0.0), TOP_BAR), Sense::hover());
+    let (r, said) = ui.allocate_exact_size(vec2(width.max(0.0), TOP_BAR), Sense::hover());
+    widgets::heading(ui, &said, title);
     widgets::row_text(ui, r.left_center() + vec2(8.0, 0.0), crate::bidi::visual(title), theme::semibold(17.0), t.text, r.width() - 8.0);
 }
 
@@ -893,6 +896,8 @@ pub(crate) fn sheet(ctx: &egui::Context, id: &str, screen: Rect, title: Option<&
     crate::transition::place_layer(ctx, egui::LayerId::new(egui::Order::Foreground, sheet_id), vec2(0.0, rising.offset(height)));
     egui::Area::new(egui::Id::new(("phone-scrim", id))).order(egui::Order::Middle).fixed_pos(screen.min).constrain(false).show(ctx, |ui| {
         let (r, resp) = ui.allocate_exact_size(screen.size(), Sense::click());
+        // A tap beside the sheet closes it: to a screen reader, the button that does.
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!("Close")));
         ui.painter().rect_filled(r, CornerRadius::ZERO, Color32::from_black_alpha(scrim));
         if resp.clicked() {
             open = false;
@@ -1285,7 +1290,7 @@ fn search_bar(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, rect: Rect
             .font(theme::regular(16.0))
             .desired_width(field_w)
             .frame(egui::Frame::NONE);
-        let r = ui.add(edit);
+        let r = widgets::named_edit(ui, edit, tl!("Find text"));
         if find.focus {
             r.request_focus();
             find.focus = false;
@@ -1339,13 +1344,16 @@ fn page_pill(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, bottom: Rec
     let text = format!("{} / {n}", view.current.saturating_add(1).min(n));
     let font = theme::medium(13.5);
     let w = ui.fonts_mut(|f| f.layout_no_wrap(text.clone(), font.clone(), t.text).size().x) + 28.0;
-    let pos = pos2(bottom.left() + 12.0, bottom.top() - 12.0 - 36.0);
+    // The pill is 36 tall; its target, a finger's, reaches above and below it.
+    let reach = (TARGET - 36.0) / 2.0;
+    let pos = pos2(bottom.left() + 12.0, bottom.top() - 12.0 - 36.0 - reach);
     let mut tapped = false;
     let fade = ui.opacity();
     egui::Area::new(egui::Id::new("phone-page-pill")).order(egui::Order::Middle).fixed_pos(pos).constrain(false).show(ui.ctx(), |ui| {
         crate::transition::follow_screen(ui, fade);
         // A finger-tall target around the pill.
-        let (r, resp) = ui.allocate_exact_size(vec2(w.max(TARGET), 36.0), Sense::click());
+        let (target, resp) = ui.allocate_exact_size(vec2(w.max(TARGET), TARGET), Sense::click());
+        let r = target.shrink2(vec2(0.0, reach));
         let label = crate::i18n::fmt(tl!("Page {p} of {n}"), &[("p", &view.current.saturating_add(1).to_string()), ("n", &n.to_string())]);
         resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &label));
         let press = theme::Press::track(ui, &resp);
@@ -1502,7 +1510,7 @@ fn go_to_sheet(app: &mut PdfCraftApp, index: usize, ctx: &egui::Context, screen:
                 .desired_width(110.0)
                 .char_limit(9)
                 .horizontal_align(egui::Align::Center);
-            let r = ui.add(field);
+            let r = widgets::named_edit(ui, field, tl!("Page number"));
             if r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
                 go = true;
             }

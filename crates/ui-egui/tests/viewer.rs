@@ -2,7 +2,7 @@
 //! cover page, a scroll position per tab.
 
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use pdfcraft_ui_egui::{Dialog, PdfCraftApp};
 
 /// `n` pages of 200×300; page i says "Page i+1" plus "page" and "Pages" for find tests.
@@ -1043,4 +1043,28 @@ fn a_picture_inside_form_artwork_under_text_is_selected_and_copied() {
     assert_eq!(name, "scan p1 img1.png");
     let png = image::load_from_memory_with_format(&bytes, image::ImageFormat::Png).unwrap().into_rgba8();
     assert_eq!(png.into_raw(), vec![255, 0, 0, 255, 0, 0, 255, 255]);
+}
+
+/// A screen reader finds each page on screen by its number and reads its text: the pages were
+/// one nameless node. Pages off screen aren't there.
+#[test]
+fn each_page_on_screen_is_read_by_its_number_and_text() {
+    let mut h = harness();
+    let read = |h: &Harness<'static, PdfCraftApp>, label: &str| {
+        h.query_all_by_label(label).filter_map(|n| n.accesskit_node().description()).collect::<Vec<_>>()
+    };
+    let first = read(&h, "Page 1 of 2");
+    assert!(first.iter().any(|d| d.contains("Page 1 pages PAGE")), "{first:?}");
+    assert!(read(&h, "Page 2 of 2").is_empty(), "below the window");
+    let i = h.state().active.unwrap();
+    h.state_mut().views[i].go_to_page(1);
+    for _ in 0..3000 {
+        h.run_steps(2);
+        if !h.state().render_pending() && !read(&h, "Page 2 of 2").is_empty() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    let second = read(&h, "Page 2 of 2");
+    assert!(second.iter().any(|d| d.contains("Page 2 pages PAGE")), "{second:?}");
 }

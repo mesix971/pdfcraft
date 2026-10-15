@@ -214,6 +214,7 @@ impl PdfCraftApp {
             } else {
                 self.notify_fmt("Removed {n} links", &[("n", &count.to_string())]);
             }
+            self.offer_undo();
         }
     }
 }

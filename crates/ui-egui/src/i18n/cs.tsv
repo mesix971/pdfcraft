@@ -2555,3 +2555,5 @@ decimal separator	.	,
 	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Shrnujte, ptejte se a opravujte své PDF s Claudem, ChatGPT nebo Gemini, s vlastním klíčem.
 	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	Adresa služby není platná: začíná na https:// (http:// jen pro toto zařízení nebo místní síť).
 	This document doesn't allow copying its content, so it isn't sent to the assistant.	Tento dokument nedovoluje kopírovat svůj obsah, proto se asistentovi neodesílá.
+	Try again	Zkusit znovu
+	Price per million tokens read / written	Cena za milion přečtených / napsaných tokenů

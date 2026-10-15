@@ -26,6 +26,8 @@ pub struct Catalog {
     ids: HashMap<String, String>,
     /// plural messages: `one|other` → forms
     plurals: HashMap<String, Vec<String>>,
+    /// translations rewritten by [`Catalog::map_translations`]: as rewritten → as written
+    written: HashMap<String, String>,
 }
 
 fn unescape(text: &str) -> Result<String, String> {
@@ -159,9 +161,18 @@ impl Catalog {
     /// right-to-left language. Keys are untouched.
     pub fn map_translations(&mut self, f: impl Fn(&str) -> String) {
         let tables = std::iter::once(&mut self.plain).chain(self.contextual.values_mut()).chain(std::iter::once(&mut self.ids));
+        let written = &mut self.written;
         for translation in tables.flat_map(HashMap::values_mut).chain(self.plurals.values_mut().flatten()) {
-            *translation = f(translation);
+            let mapped = f(translation);
+            if mapped != *translation {
+                written.insert(mapped.clone(), std::mem::replace(translation, mapped));
+            }
         }
+    }
+
+    /// A translation as the catalog wrote it, given it as [`Self::map_translations`] rewrote it.
+    pub fn written(&self, mapped: &str) -> Option<&str> {
+        self.written.get(mapped).map(String::as_str)
     }
 
     pub fn plain(&self, s: &str) -> Option<&str> {

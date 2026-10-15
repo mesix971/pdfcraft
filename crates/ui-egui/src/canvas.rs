@@ -2205,7 +2205,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     // Opened without the owner password and something is restricted.
     let secured = doc.security_summary().is_some_and(|s| !(s.owner || (s.permissions.modify() && s.permissions.assemble())));
     let repaired = !doc.repair_log().is_empty();
-    let banner = crate::sign_ui::banner(&doc.signatures);
+    let banner = crate::sign_ui::banner(&doc.signatures, &t);
     let notice = if phone {
         // Over the pages, like the bars, so showing or hiding them never moves the pages.
         let at = ui.available_rect_before_wrap();
@@ -2567,6 +2567,8 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         // Reading on a phone the pages take taps only, so a drag reaches the scroll area under them.
         let sense = if touch_view || tap_edit { Sense::click() } else { Sense::click_and_drag() };
         let (resp_rect, resp) = ui.allocate_exact_size(vec2(content_w, content_h), sense);
+        // Named for screen readers; each page on screen is a node inside it ([`page_node`]).
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Other, true, tl!("Pages")));
         // The Hand tool pans: the content widget takes every drag, so scroll by its delta.
         if hand {
             if resp.dragged() {
@@ -2607,6 +2609,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
             }
             if r.intersects(visible) {
                 visible_now.push(i);
+                page_node(ui, view.texts.get(&i).map(Arc::as_ref), i, info.pages.len(), r);
                 view.screen_rects.push((i, r));
                 view.screen_xforms
                     .push((i, PageXform { rect: r, rot: view.rotation, pw: info.pages[i].width.max(1.0), ph: info.pages[i].height.max(1.0) }));
@@ -3920,6 +3923,30 @@ enum Notice {
     Console,
     /// Unlock… (enter the permissions password).
     Unlock,
+}
+
+/// The most of a page's text a screen reader is given at once (a page of small print is a few
+/// thousand characters).
+const PAGE_NODE_TEXT: usize = 20_000;
+
+/// A page on screen as a screen reader's node, "Page 3 of 10", its text the description once it
+/// is extracted: the pages were one nameless node. Hover only, so the pages' own widget keeps
+/// the pointer. The text is built only while a screen reader listens.
+fn page_node(ui: &egui::Ui, text: Option<&PageText>, page: usize, pages: usize, rect: Rect) {
+    let node = ui.interact(rect, ui.id().with(("page-node", page)), Sense::hover());
+    let label = crate::i18n::fmt(tl!("Page {p} of {n}"), &[("p", &page.saturating_add(1).to_string()), ("n", &pages.to_string())]);
+    // Where it is, as any widget's node says; then a group rather than a widget.
+    node.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Other, true, &label));
+    ui.ctx().accesskit_node_builder(node.id, |b| {
+        b.set_role(egui::accesskit::Role::Group);
+        if let Some(text) = text {
+            let mut words = text.plain_text();
+            if let Some((cut, _)) = words.char_indices().nth(PAGE_NODE_TEXT) {
+                words.truncate(cut);
+            }
+            b.set_description(words);
+        }
+    });
 }
 
 /// The notice bar above the pages: the signature status first (Acrobat's signature bar), then

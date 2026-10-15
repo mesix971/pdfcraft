@@ -2503,3 +2503,5 @@ decimal separator	.	.
 	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	لخّص ملفات PDF واسألها وصحّحها مع Claude أو ChatGPT أو Gemini، بمفتاحك الخاص.
 	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	عنوان الخدمة غير صالح: يبدأ بـ https://‏ (و http://‏ لهذا الجهاز أو للشبكة المحلية فقط).
 	This document doesn't allow copying its content, so it isn't sent to the assistant.	لا يسمح هذا المستند بنسخ محتواه، لذا لا يُرسَل إلى المساعد.
+	Try again	أعد المحاولة
+	Price per million tokens read / written	السعر لكل مليون رمز مقروء / مكتوب

@@ -2462,3 +2462,5 @@ decimal separator	.	,
 	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Podsumowuj, wypytuj i poprawiaj swoje pliki PDF z Claude, ChatGPT lub Gemini, używając własnego klucza.
 	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	Adres usługi jest nieprawidłowy: zaczyna się od https:// (http:// tylko dla tego urządzenia lub sieci lokalnej).
 	This document doesn't allow copying its content, so it isn't sent to the assistant.	Ten dokument nie pozwala kopiować swojej treści, więc nie jest wysyłany do asystenta.
+	Try again	Spróbuj ponownie
+	Price per million tokens read / written	Cena za milion tokenów odczytanych / zapisanych

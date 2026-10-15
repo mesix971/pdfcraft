@@ -457,7 +457,12 @@ fn find_counts_matches_across_pages() {
         app.set_option("find", "brown").unwrap();
     });
     settle(&mut h);
-    h.get_by_label_contains("of 2");
+    // The count of matches ("1 of 2"), not a page on screen ("Page 1 of 2").
+    let counted = h.query_all_by(|n| {
+        let text = if n.role() == egui::accesskit::Role::Label { n.value() } else { n.label() };
+        text.is_some_and(|t| t.contains("of 2") && !t.starts_with("Page"))
+    });
+    assert_eq!(counted.count(), 1);
     let v = &h.state().views[0];
     let f = v.find.as_ref().expect("find open");
     assert_eq!(f.matches.iter().map(|(p, _)| *p).collect::<Vec<_>>(), vec![0, 1]);

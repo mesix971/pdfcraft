@@ -2445,3 +2445,5 @@ decimal separator	.	.
 	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	使用您自己的密钥，借助 Claude、ChatGPT 或 Gemini 总结、询问和修改您的 PDF。
 	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	服务地址无效：它以 https:// 开头（http:// 仅限本设备或局域网）。
 	This document doesn't allow copying its content, so it isn't sent to the assistant.	此文档不允许复制其内容，因此不会发送给助手。
+	Try again	重试
+	Price per million tokens read / written	每百万令牌价格（读取 / 写入）

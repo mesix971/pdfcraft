@@ -556,10 +556,7 @@ fn header(app: &mut PdfCraftApp, ui: &mut egui::Ui, rect: Rect, t: &Tokens) {
                     .background_color(look(t).surface)
                     .desired_width(ui.available_width() - 8.0)
                     .char_limit(200);
-                // The field's name for screen readers (its hint isn't one).
-                let name = ui.allocate_response(Vec2::ZERO, Sense::hover());
-                name.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, tl!("Search files")));
-                let r = ui.add(edit).labelled_by(name.id);
+                let r = widgets::named_edit(ui, edit, tl!("Search files"));
                 // On the frame it shows: focus asked for earlier would name a widget not there yet.
                 if std::mem::take(&mut app.phone.home.focus_search) {
                     r.request_focus();
@@ -797,7 +794,8 @@ fn indented<R>(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
 
 fn section_title(ui: &mut egui::Ui, title: &str, t: &Tokens) {
     egui::Frame::NONE.inner_margin(egui::Margin { left: 16, right: 16, top: 12, bottom: 10 }).show(ui, |ui| {
-        ui.add(egui::Label::new(egui::RichText::new(title).font(theme::semibold(18.0)).color(t.text)).wrap());
+        let r = ui.add(egui::Label::new(egui::RichText::new(title).font(theme::semibold(18.0)).color(t.text)).wrap());
+        widgets::heading(ui, &r, title);
     });
 }
 

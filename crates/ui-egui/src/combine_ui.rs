@@ -19,9 +19,6 @@ use pdfcraft_engine::SourceProblem;
 use crate::theme::{self, Tokens};
 use crate::{PdfCraftApp, icons, widgets};
 
-/// Same reds and ambers as the signature status (`sign_ui`).
-pub(crate) const ERROR: Color32 = Color32::from_rgb(0xD7, 0x37, 0x3F);
-pub(crate) const WARNING: Color32 = Color32::from_rgb(0xE6, 0x86, 0x19);
 /// Undo steps kept for the list (each holds the list itself; the files' bytes are shared).
 const HISTORY: usize = 100;
 
@@ -872,7 +869,7 @@ pub(crate) fn page(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                         } else {
                             crate::i18n::fmt(tl!("{n} files need attention"), &[("n", &bad.to_string())])
                         };
-                        ui.label(egui::RichText::new(text).color(ERROR));
+                        ui.label(egui::RichText::new(text).color(t.error));
                     });
                 }
             });
@@ -920,7 +917,7 @@ fn skip_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
     let modal = widgets::show_modal(ctx, "combine-skip", |ui| {
         widgets::set_dialog_width(ui, 460.0);
         ui.horizontal(|ui| {
-            ui.add(icons::image("triangle-alert", 22.0, ERROR));
+            ui.add(icons::image("triangle-alert", 22.0, t.error));
             ui.add(egui::Label::new(egui::RichText::new(tl!("Leave out files that can't be read?")).font(theme::semibold(16.0))).wrap());
         });
         ui.add_space(6.0);
@@ -1011,7 +1008,7 @@ fn unlock_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
                 }
             });
             if let Some(e) = &prompt.error {
-                ui.label(egui::RichText::new(e).color(ERROR));
+                ui.label(egui::RichText::new(e).color(t.error));
             }
             ui.add_space(6.0);
             ui.label(egui::RichText::new(tl!("The password is only used to read the file; it isn't saved.")).small().color(t.text_faint));
@@ -1478,7 +1475,7 @@ fn table_body(
                                     crate::widgets::line(&mut f.range).frame(egui::Frame::NONE).hint_text(tl!("All pages")).desired_width(88.0),
                                 );
                                 // A visible field on plain and striped rows alike; red when the range is wrong.
-                                let border = if check.is_err() { Stroke::new(1.5, ERROR) } else { Stroke::new(1.0, t.border) };
+                                let border = if check.is_err() { Stroke::new(1.5, t.error) } else { Stroke::new(1.0, t.border) };
                                 ui.painter().rect_stroke(edit.rect, CornerRadius::same(4), border, egui::StrokeKind::Inside);
                                 if let Err(e) = &check {
                                     edit.clone().on_hover_text(e);
@@ -1498,7 +1495,7 @@ fn table_body(
                                     (Ok(k), _) => crate::i18n::fmt(tl!("{k} of {n}"), &[("k", &k.to_string()), ("n", &f.pages.to_string())]),
                                     (Err(_), _) => crate::i18n::fmt(tl!("? of {n}"), &[("n", &f.pages.to_string())]),
                                 };
-                                ui.label(egui::RichText::new(count).small().color(if check.is_err() { ERROR } else { t.text_faint }));
+                                ui.label(egui::RichText::new(count).small().color(if check.is_err() { t.error } else { t.text_faint }));
                             }
                             SortKey::Size => {
                                 ui.label(egui::RichText::new(crate::panels::human_size(f.bytes.len())).color(t.text_muted));
@@ -1535,8 +1532,8 @@ fn table_body(
                                     ));
                                 }
                                 let (icon, colour, first) = match (errors.first(), warnings.first()) {
-                                    (Some(e), _) => ("circle-x", ERROR, e.clone()),
-                                    (None, Some(w)) => ("triangle-alert", WARNING, w.clone()),
+                                    (Some(e), _) => ("circle-x", t.error, e.clone()),
+                                    (None, Some(w)) => ("triangle-alert", t.warning, w.clone()),
                                     (None, None) => return,
                                 };
                                 let all = errors.iter().chain(&warnings).cloned().collect::<Vec<_>>().join("\n");
@@ -1552,7 +1549,7 @@ fn table_body(
                                     }
                                 }
                                 ui.add(
-                                    egui::Label::new(egui::RichText::new(first).color(if colour == ERROR { ERROR } else { t.text }))
+                                    egui::Label::new(egui::RichText::new(first).color(if colour == t.error { t.error } else { t.text }))
                                         .truncate()
                                         .selectable(false),
                                 )

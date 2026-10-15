@@ -156,6 +156,7 @@ pub use editing::{CloseRequest, SaveTarget};
 pub use files::{ExtractDraft, FilePurpose, FileRequest, RotateDraft, SplitDraft, SplitMode, SplitPlan};
 pub use recovery::{AUTOSAVE_SECS, RecoveryMeta, RecoveryStore};
 use theme::{ThemeKind, ThemePreference};
+pub use widgets::ProgressNotice;
 
 /// Top-level workspace modes (Acrobat's mode bar).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -579,7 +580,14 @@ pub struct PdfCraftApp {
     pub(crate) watch: file_watch::FileWatch,
     /// Folders pinned to Home, and what they held when last listed.
     pub pinned: folders_ui::PinnedFolders,
+    /// The latest notice and when it was first shown (0 until it is).
     pub toast: Option<(String, f64)>,
+    /// Notices still showing when a newer one came, oldest first: shown above it until their own
+    /// time is up, so two notices close together are both read.
+    pub(crate) toast_earlier: Vec<(String, f64)>,
+    /// The latest notice reports this document's edit, undone by the notice's Undo while the
+    /// document's edit generation is still this one.
+    pub(crate) toast_undo: Option<(DocId, u64)>,
     /// Whether the macOS title bar is drawn by us (traffic lights over our tab strip).
     pub integrated_titlebar: bool,
     pub password_prompt: Option<PasswordPrompt>,
@@ -936,6 +944,8 @@ impl PdfCraftApp {
             watch: Default::default(),
             pinned: Default::default(),
             toast: None,
+            toast_earlier: Vec::new(),
+            toast_undo: None,
             integrated_titlebar: false,
             password_prompt: None,
             unlock_prompt: None,
@@ -1650,7 +1660,21 @@ impl PdfCraftApp {
     }
 
     pub fn notify(&mut self, msg: impl Into<String>) {
-        self.toast = Some((msg.into(), 0.0));
+        let msg = msg.into();
+        // The notice showing stays, above the new one, until its time is up.
+        if let Some(earlier) = self.toast.take().filter(|(m, _)| *m != msg) {
+            self.toast_earlier.push(earlier);
+            let extra = self.toast_earlier.len().saturating_sub(widgets::EARLIER_TOASTS);
+            self.toast_earlier.drain(..extra);
+        }
+        self.toast_undo = None;
+        self.toast = Some((msg, 0.0));
+    }
+
+    /// Give the notice just shown an Undo for the edit it reports: the active document's last.
+    /// It goes once anything else changes the document.
+    pub(crate) fn offer_undo(&mut self) {
+        self.toast_undo = self.active_ids().and_then(|(_, id)| self.session.get(id).map(|d| (id, d.edit_generation())));
     }
 
     /// Notify with a static message in the UI language.
@@ -2671,6 +2695,7 @@ impl eframe::App for PdfCraftApp {
         let cjk = theme::CjkPreference::for_language(lang.code());
         if !self.styled {
             egui_extras::install_image_loaders(ctx);
+            ctx.add_plugin(i18n::SpokenOrder);
             theme::install_fonts_for(ctx, cjk);
             self.fonts_cjk = cjk;
             self.apply_theme(ctx);

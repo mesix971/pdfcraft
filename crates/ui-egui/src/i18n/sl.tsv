@@ -2486,3 +2486,5 @@ decimal separator	.	,
 	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Povzemajte, sprašujte in popravljajte svoje PDF-je s Claudom, ChatGPT ali Gemini, z lastnim ključem.
 	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	Naslov storitve ni veljaven: začne se s https:// (http:// samo za to napravo ali lokalno omrežje).
 	This document doesn't allow copying its content, so it isn't sent to the assistant.	Ta dokument ne dovoli kopiranja vsebine, zato se ne pošlje pomočniku.
+	Try again	Poskusi znova
+	Price per million tokens read / written	Cena na milijon prebranih / napisanih žetonov

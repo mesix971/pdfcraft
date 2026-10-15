@@ -8,14 +8,14 @@ use std::collections::BTreeSet;
 
 use egui::{Align2, Color32, CornerRadius, Rect, Sense, Stroke, Vec2, pos2, vec2};
 
-use super::{CombineFile, ERROR, Lock, RowAction, WARNING, blocker, skip_prompt, unlock_prompt};
+use super::{CombineFile, Lock, RowAction, blocker, skip_prompt, unlock_prompt};
 use crate::phone::{self, TARGET, TOP_BAR};
 use crate::phone_home::{self, Look};
 use crate::theme::{self, Tokens};
 use crate::{PdfCraftApp, i18n, icons, widgets};
 
 /// A file's card, and its first page in it.
-const CARD: f32 = 88.0;
+const CARD: f32 = 96.0;
 const PAPER: Vec2 = vec2(46.0, 62.0);
 /// The bar along the bottom with Combine.
 const BOTTOM: f32 = 84.0;
@@ -190,11 +190,11 @@ fn card(
     if let Some(tex) = tex {
         egui::Image::new((tex, paper.size())).corner_radius(CornerRadius::same(3)).paint_at(ui, paper);
     } else if f.lock.is_some() {
-        icons::paint(ui, paper, "lock", 22.0, WARNING);
+        icons::paint(ui, paper, "lock", 22.0, t.warning);
     } else if f.problem.is_some() {
-        icons::paint(ui, paper, "circle-x", 22.0, ERROR);
+        icons::paint(ui, paper, "circle-x", 22.0, t.error);
     } else if failed {
-        icons::paint(ui, paper, "triangle-alert", 22.0, WARNING);
+        icons::paint(ui, paper, "triangle-alert", 22.0, t.warning);
     }
     ui.painter().rect_stroke(paper, CornerRadius::same(3), Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
     let badge = paper.left_top() + vec2(-2.0, -2.0);
@@ -204,14 +204,14 @@ fn card(
 
     // The name, and what it adds or what is wrong.
     let text_left = slot.right() + 14.0;
-    let buttons = 2.0 * 40.0 + 6.0;
+    let buttons = 2.0 * TARGET + 6.0;
     let width = (rect.right() - buttons - text_left - 4.0).max(0.0);
     let pages = if f.pages == 1 { tl!("1 page").to_owned() } else { i18n::fmt(tl!("{n} pages"), &[("n", &f.pages.to_string())]) };
     let (detail, colour) = match (&f.lock, &f.problem, check) {
-        (Some(Lock::Open), ..) => (format!("{} · {}", tl!("Password-protected"), tl!("Tap to unlock")), WARNING),
-        (Some(Lock::Permissions), ..) => (tl!("Its security settings don't allow copying pages").to_owned(), WARNING),
-        (None, Some(problem), _) => (problem.clone(), ERROR),
-        (None, None, Err(_)) => (tl!("Check the pages").to_owned(), ERROR),
+        (Some(Lock::Open), ..) => (format!("{} · {}", tl!("Password-protected"), tl!("Tap to unlock")), t.warning),
+        (Some(Lock::Permissions), ..) => (tl!("Its security settings don't allow copying pages").to_owned(), t.warning),
+        (None, Some(problem), _) => (problem.clone(), t.error),
+        (None, None, Err(_)) => (tl!("Check the pages").to_owned(), t.error),
         (None, None, Ok(k)) if !f.range.trim().is_empty() => {
             (i18n::fmt(tl!("Pages: {k} of {n}"), &[("k", &k.to_string()), ("n", &f.pages.to_string())]), t.text_faint)
         }
@@ -226,8 +226,8 @@ fn card(
 
     // Up and down, one above the other, and the cross. Drawn after the card, so a tap on one is
     // theirs and not the card's.
-    let column = Rect::from_min_size(pos2(rect.right() - buttons, rect.top()), vec2(40.0, rect.height()));
-    let half = |k: f32| Rect::from_min_size(pos2(column.left(), column.top() + k * column.height() / 2.0), vec2(40.0, column.height() / 2.0));
+    let column = Rect::from_min_size(pos2(rect.right() - buttons, rect.top()), vec2(TARGET, rect.height()));
+    let half = |k: f32| Rect::from_min_size(pos2(column.left(), column.top() + k * column.height() / 2.0), vec2(TARGET, column.height() / 2.0));
     // A button keeps its taps even when it can't be used (the first file's Up), so a tap there
     // never shows the file large instead.
     let button = |ui: &mut egui::Ui, at: Rect, icon: &str, label: &str, enabled: bool| {
@@ -249,7 +249,7 @@ fn card(
     if button(ui, half(1.0), "chevron-down", &down, i + 1 < n) {
         act = Some(Act::Down(f.id));
     }
-    let cross = Rect::from_min_size(pos2(column.right() + 6.0, rect.top()), vec2(40.0, rect.height()));
+    let cross = Rect::from_min_size(pos2(column.right() + 6.0, rect.top()), vec2(TARGET, rect.height()));
     let remove = i18n::fmt(tl!("Remove {name}"), &[("name", &f.name)]);
     if button(ui, cross, "x", &remove, true) {
         act = Some(Act::Remove(f.id));
@@ -352,7 +352,7 @@ fn bottom(
         match blocked {
             Some(why) => {
                 widgets::row_text(ui, pos2(r.left(), r.center().y - 10.0), format!("{files} · {pages}"), theme::medium(15.0), t.text, width);
-                widgets::row_text(ui, pos2(r.left(), r.center().y + 12.0), why, theme::regular(12.5), ERROR, width);
+                widgets::row_text(ui, pos2(r.left(), r.center().y + 12.0), why, theme::regular(12.5), t.error, width);
             }
             None => widgets::row_text(ui, pos2(r.left(), r.center().y), format!("{files} · {pages}"), theme::medium(15.0), t.text, width),
         }
@@ -412,6 +412,11 @@ trailer << /Root 1 0 R >>
         let mut h = harness("en", false, 3);
         assert_eq!(order(&h), ["Lease.pdf", "Invoice.pdf", "Report.pdf"]);
         assert!(h.query_by_label("1. Lease.pdf").is_some(), "each card says its place in the order");
+        h.get_by_role_and_label(egui::accesskit::Role::Heading, "Combine files");
+        for name in ["Move up · Invoice.pdf", "Move down · Invoice.pdf", "Remove Invoice.pdf"] {
+            let r = h.get_by_label(name).rect();
+            assert!(r.width() >= 48.0 && r.height() >= 48.0, "{name}: {r:?} is a finger's");
+        }
         // The first card's Down, the last card's Up.
         h.get_by_label("Move down · Lease.pdf").click();
         h.run_steps(3);

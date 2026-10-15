@@ -334,7 +334,7 @@ fn top_bar(ui: &mut egui::Ui, b: &mut Browser, rect: Rect, t: &Tokens, look: &Lo
                     .background_color(look.surface)
                     .desired_width((room - 8.0).max(0.0))
                     .char_limit(200);
-                let r = ui.add(edit);
+                let r = widgets::named_edit(ui, edit, tl!("Search files"));
                 if std::mem::take(&mut b.phone.focus_search) {
                     r.request_focus();
                 }
@@ -751,7 +751,7 @@ fn bottom(ui: &mut egui::Ui, b: &mut Browser, rect: Rect, t: &Tokens, look: &Loo
                         .background_color(look.ground)
                         .desired_width((ui.available_width() - pill_w - 10.0).max(60.0))
                         .char_limit(MAX_NAME_CHARS);
-                    let r = ui.add(field);
+                    let r = widgets::named_edit(ui, field, tl!("File name"));
                     if r.changed() {
                         b.replace = None;
                     }
@@ -823,7 +823,7 @@ fn new_folder_field(ui: &mut egui::Ui, b: &mut Browser, t: &Tokens, look: &Look)
         .background_color(look.ground)
         .desired_width((ui.available_width() - pill_w - 10.0).max(60.0))
         .char_limit(MAX_NAME_CHARS);
-    let r = ui.add(field);
+    let r = widgets::named_edit(ui, field, tl!("New folder"));
     if r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
         create = true;
     }
@@ -851,7 +851,7 @@ fn message(ui: &mut egui::Ui, b: &Browser, t: &Tokens) {
         ui.add(egui::Label::new(egui::RichText::new(text).font(theme::regular(13.5)).color(t.text)).wrap());
     }
     if let Some(error) = &b.error {
-        ui.add(egui::Label::new(egui::RichText::new(error).font(theme::regular(13.5)).color(crate::combine_ui::ERROR)).wrap());
+        ui.add(egui::Label::new(egui::RichText::new(error).font(theme::regular(13.5)).color(t.error)).wrap());
     }
 }
 

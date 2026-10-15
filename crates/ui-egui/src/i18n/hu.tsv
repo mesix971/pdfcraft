@@ -2480,3 +2480,5 @@ decimal separator	.	,
 	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Foglald össze, kérdezd ki és javítsd a PDF-jeidet a Claude-dal, a ChatGPT-vel vagy a Geminivel, a saját kulcsoddal.
 	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	A szolgáltatás címe érvénytelen: https:// előtaggal kezdődik (http:// csak ehhez az eszközhöz vagy a helyi hálózathoz).
 	This document doesn't allow copying its content, so it isn't sent to the assistant.	Ez a dokumentum nem engedi a tartalma másolását, ezért nem kerül az asszisztenshez.
+	Try again	Próbáld újra
+	Price per million tokens read / written	Ár millió olvasott / írt tokenenként

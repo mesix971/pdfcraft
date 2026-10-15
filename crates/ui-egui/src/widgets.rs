@@ -9,8 +9,9 @@ use crate::{PdfCraftApp, icons};
 const FIELD_MARGIN: egui::Margin = egui::Margin::symmetric(10, 6);
 /// Outer height of a single-line field, including its inset.
 const FIELD_MIN_HEIGHT: f32 = 30.0;
-/// On a phone: the height of a dialog's controls and buttons (a finger's), and its text sizes.
-const PHONE_CONTROL: f32 = 40.0;
+/// On a phone: the height of a dialog's controls and buttons (a finger's: Android's 48 dp), and
+/// its text sizes.
+const PHONE_CONTROL: f32 = 48.0;
 const PHONE_TEXT: f32 = 14.5;
 const PHONE_SMALL: f32 = 13.0;
 /// Padding inside every modal.
@@ -279,6 +280,16 @@ pub(crate) fn fit_line(text: &str, max_width: f32, mut width_of: impl FnMut(&str
     }
 }
 
+/// Add text field `edit` named `name` for screen readers: its hint isn't a name (AccessKit's
+/// placeholder, gone once there is text), and a field beside no label has none. The name takes
+/// no room.
+pub(crate) fn named_edit(ui: &mut egui::Ui, edit: egui::TextEdit<'_>, name: &str) -> Response {
+    let at = Rect::from_min_size(ui.cursor().min, egui::Vec2::ZERO);
+    let label = ui.interact(at, ui.id().with(("field-name", name)), Sense::hover());
+    label.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, name));
+    ui.add(edit).labelled_by(label.id)
+}
+
 pub(crate) fn text_width(ui: &egui::Ui, text: &str, font: &egui::FontId) -> f32 {
     ui.fonts_mut(|f| f.layout_no_wrap(text.to_owned(), font.clone(), Color32::WHITE).size().x)
 }
@@ -463,8 +474,22 @@ pub fn section_title(ui: &mut egui::Ui, text: &str) {
     let t = Tokens::get(ui.ctx());
     ui.add_space(10.0);
     // Section titles across every panel go through here, so one translation point covers them.
-    ui.label(egui::RichText::new(tl!(text).to_uppercase()).font(theme::semibold(10.5)).color(t.text_faint).extra_letter_spacing(0.6));
+    let title = tl!(text);
+    let r = ui.label(egui::RichText::new(crate::i18n::upper(title)).font(theme::semibold(10.5)).color(t.text_faint).extra_letter_spacing(0.6));
+    // Named as written, not in capitals: a screen reader may spell those out.
+    heading(ui, &r, title);
     ui.add_space(2.0);
+}
+
+/// Make `resp` a heading named `name` for screen readers, which jump from heading to heading.
+pub(crate) fn heading(ui: &egui::Ui, resp: &Response, name: &str) {
+    // Where it is, as any widget's node says.
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, name));
+    ui.ctx().accesskit_node_builder(resp.id, |node| {
+        node.set_role(egui::accesskit::Role::Heading);
+        node.set_label(name);
+        node.clear_value();
+    });
 }
 
 /// Paint one line of `text` left-aligned and vertically centred on `pos`, cut with "…" so it is
@@ -566,45 +591,97 @@ fn wrapped_lines(ui: &egui::Ui, text: &str, font: &egui::FontId, width: f32, tru
     lines
 }
 
-/// Transient message at the bottom centre.
+/// How long a notice shows, in seconds.
+const TOAST_SECS: f64 = 3.5;
+/// How many earlier notices may show above the latest one.
+pub(crate) const EARLIER_TOASTS: usize = 2;
+/// On a phone, how far above the screen's bottom edge the notices and the progress card sit: over
+/// the bars along the bottom (a tool's, Home's tabs).
+const TOAST_PHONE_BARS: f32 = 72.0;
+
+/// Transient messages at the bottom centre: the latest, and above it those it came after that
+/// are still showing. The latest may offer Undo for the edit it reports.
 pub fn toast(app: &mut PdfCraftApp, ctx: &egui::Context) {
-    let Some((msg, start)) = app.toast.clone() else { return };
     let now = ctx.input(|i| i.time);
-    let start = if start == 0.0 { now } else { start };
-    app.toast = Some((msg.clone(), start));
-    if now - start > 3.5 {
+    for (_, start) in app.toast.iter_mut().chain(app.toast_earlier.iter_mut()) {
+        if *start == 0.0 {
+            *start = now;
+        }
+    }
+    if app.toast.as_ref().is_some_and(|(_, start)| now - start > TOAST_SECS) {
         app.toast = None;
+    }
+    app.toast_earlier.retain(|(_, start)| now - start <= TOAST_SECS);
+    if app.toast.is_none() && app.toast_earlier.is_empty() {
+        app.toast_undo = None;
         return;
     }
-    let t = Tokens::get(ctx);
     let screen = ctx.content_rect();
     // Above the progress notice while a job runs.
     let card = if app.progress_notice.is_some() { ctx.data(|d| d.get_temp::<f32>(egui::Id::new(PROGRESS_HEIGHT))).unwrap_or(0.0) } else { 0.0 };
-    // On a phone, above the bars along the bottom (a tool's, Home's tabs).
-    let bars = if app.phone_layout() { 72.0 } else { 0.0 };
+    // On a phone, above the bars along the bottom (a tool's, Home's tabs), as the progress card is.
+    let bars = if app.phone_layout() { TOAST_PHONE_BARS } else { 0.0 };
     let lift = if card > 0.0 { 28.0 + card + 10.0 } else { 28.0 } + bars;
-    egui::Area::new(egui::Id::new("toast"))
-        .order(egui::Order::Tooltip)
-        .pivot(Align2::CENTER_BOTTOM)
-        .fixed_pos(screen.center_bottom() - vec2(0.0, lift))
-        .show(ctx, |ui| {
-            egui::Frame::NONE
-                .fill(if t.dark() { Color32::from_rgb(0xEC, 0xEC, 0xEF) } else { Color32::from_rgb(0x2A, 0x2A, 0x2F) })
-                .corner_radius(CornerRadius::same(8))
-                .inner_margin(egui::Margin::symmetric(16, 10))
-                .show(ui, |ui| {
-                    // An Area remembers its previous content width. A short notice
-                    // must not force the next validation message into a narrow column.
-                    // Allow natural short labels; wrap longer ones within the viewport,
-                    // including the frame's 32 points and 16-point outside margins.
-                    ui.set_max_width((screen.width() - 64.0).clamp(1.0, 560.0));
-                    ui.add(
-                        egui::Label::new(egui::RichText::new(msg).color(if t.dark() { Color32::from_rgb(0x22, 0x22, 0x26) } else { Color32::WHITE }))
-                            .wrap(),
-                    );
-                });
+    // Undo while the document is still as the edit left it (and is the one shown).
+    let undo = app.toast.is_some()
+        && app.toast_undo.is_some_and(|(id, generation)| {
+            app.active_ids().is_some_and(|(_, shown)| shown == id) && app.session.get(id).is_some_and(|d| d.edit_generation() == generation)
         });
+    let mut bottom = screen.center_bottom() - vec2(0.0, lift);
+    let mut undo_clicked = false;
+    if let Some((msg, _)) = &app.toast {
+        let (rect, clicked) = toast_card(ctx, egui::Id::new("toast"), bottom, msg, undo, app.phone_layout());
+        undo_clicked = clicked;
+        bottom.y = rect.top() - 8.0;
+    }
+    for (k, (msg, _)) in app.toast_earlier.iter().rev().enumerate() {
+        let (rect, _) = toast_card(ctx, egui::Id::new(("toast-earlier", k)), bottom, msg, false, false);
+        bottom.y = rect.top() - 8.0;
+    }
+    if undo_clicked {
+        app.toast = None;
+        app.toast_undo = None;
+        app.undo();
+    }
     ctx.request_repaint_after(std::time::Duration::from_millis(100));
+}
+
+/// One notice's card, its bottom centre at `bottom`, with Undo when `undo` (a finger tall on a
+/// phone). Returns where it is and whether Undo was clicked.
+fn toast_card(ctx: &egui::Context, id: egui::Id, bottom: egui::Pos2, msg: &str, undo: bool, phone: bool) -> (Rect, bool) {
+    let t = Tokens::get(ctx);
+    let screen = ctx.content_rect();
+    let ink = if t.dark() { Color32::from_rgb(0x22, 0x22, 0x26) } else { Color32::WHITE };
+    // The card inverts the theme: its action takes the other theme's accent text.
+    let action = Tokens::for_kind(if t.dark() { theme::ThemeKind::Light } else { theme::ThemeKind::Dark }).accent_text;
+    let mut clicked = false;
+    let shown = egui::Area::new(id).order(egui::Order::Tooltip).pivot(Align2::CENTER_BOTTOM).fixed_pos(bottom).show(ctx, |ui| {
+        egui::Frame::NONE
+            .fill(if t.dark() { Color32::from_rgb(0xEC, 0xEC, 0xEF) } else { Color32::from_rgb(0x2A, 0x2A, 0x2F) })
+            .corner_radius(CornerRadius::same(8))
+            .inner_margin(egui::Margin::symmetric(16, 10))
+            .show(ui, |ui| {
+                // An Area remembers its previous content width. A short notice
+                // must not force the next validation message into a narrow column.
+                // Allow natural short labels; wrap longer ones within the viewport,
+                // including the frame's 32 points and 16-point outside margins.
+                ui.set_max_width((screen.width() - 64.0).clamp(1.0, 560.0));
+                let message = egui::Label::new(egui::RichText::new(msg).color(ink)).wrap();
+                if !undo {
+                    ui.add(message);
+                    return;
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let button = egui::Button::new(egui::RichText::new(tl!("Undo")).strong().color(action))
+                        .frame(false)
+                        .min_size(vec2(0.0, if phone { PHONE_CONTROL } else { 0.0 }));
+                    clicked = theme::hand(ui.add(button)).clicked();
+                    ui.add_space(12.0);
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| ui.add(message));
+                });
+            });
+    });
+    (shown.response.rect, clicked)
 }
 
 /// A background job's progress, shown at the bottom centre until the job is done.
@@ -635,6 +712,8 @@ pub fn progress_notice(app: &PdfCraftApp, ctx: &egui::Context) -> bool {
         (Color32::from_rgb(0x2A, 0x2A, 0x2F), Color32::WHITE)
     };
     let fraction = if p.fraction.is_finite() { p.fraction.clamp(0.0, 1.0) } else { 0.0 };
+    // On a phone, above the bars along the bottom, as the notices are.
+    let lift = 28.0 + if app.phone_layout() { TOAST_PHONE_BARS } else { 0.0 };
     let animated = crate::motion::animated(ctx);
     let shown = ctx.animate_value_with_time(egui::Id::new("progress-notice-bar"), fraction, if animated { 0.3 } else { 0.0 });
     let now = ctx.input(|i| i.time);
@@ -642,7 +721,7 @@ pub fn progress_notice(app: &PdfCraftApp, ctx: &egui::Context) -> bool {
     let area = egui::Area::new(egui::Id::new("progress-notice"))
         .order(egui::Order::Tooltip)
         .pivot(Align2::CENTER_BOTTOM)
-        .fixed_pos(screen.center_bottom() - vec2(0.0, 28.0))
+        .fixed_pos(screen.center_bottom() - vec2(0.0, lift))
         .show(ctx, |ui| {
             egui::Frame::NONE.fill(fill).corner_radius(CornerRadius::same(10)).inner_margin(egui::Margin::symmetric(16, 12)).show(ui, |ui| {
                 let width = 340.0_f32.min(screen.width() - 64.0).max(160.0);
