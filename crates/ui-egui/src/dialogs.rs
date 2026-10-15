@@ -1038,28 +1038,43 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
                 number_now = Some(Edit::NumberPages { from: d.from - 1, to: d.to - 1, style: d.style, prefix: d.prefix.clone(), first: d.start });
             }
             Dialog::Recovery => {
+                // The title wraps: on a phone it is wider than the screen, and would widen the
+                // dialog and push its buttons off it.
                 ui.horizontal(|ui| {
                     ui.add(crate::icons::image("clock-3", 22.0, t.accent));
-                    ui.label(egui::RichText::new(tl!("Recover unsaved documents?")).font(theme::semibold(18.0)));
+                    ui.add(egui::Label::new(egui::RichText::new(tl!("Recover unsaved documents?")).font(theme::semibold(18.0))).wrap());
                 });
                 ui.add_space(6.0);
                 ui.label(tl!("PdfCraft didn't shut down normally. These documents had changes that were autosaved:"));
                 ui.add_space(8.0);
                 let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
-                egui::Grid::new("recoverable").num_columns(2).spacing([18.0, 6.0]).show(ui, |ui| {
+                let when = |m: &crate::RecoveryMeta| {
+                    let mins = now.saturating_sub(m.saved_at) / 60;
+                    let when = match mins {
+                        0 => tl!("just now").to_string(),
+                        1..=59 => crate::i18n::fmt(tl!("{n} min ago"), &[("n", &mins.to_string())]),
+                        _ => crate::i18n::fmt(tl!("{n} h ago"), &[("n", &(mins / 60).to_string())]),
+                    };
+                    let lock = if m.encrypted { tl!(" · password-protected") } else { "" };
+                    format!("{when}{lock}")
+                };
+                if widgets::phone_dialogs(ui.ctx()) {
+                    // A file name and its time side by side don't fit a phone: one under the
+                    // other, the name cut short with "…".
                     for m in &app.recoverable {
-                        ui.label(egui::RichText::new(&m.name).font(theme::medium(13.0)));
-                        let mins = now.saturating_sub(m.saved_at) / 60;
-                        let when = match mins {
-                            0 => tl!("just now").to_string(),
-                            1..=59 => crate::i18n::fmt(tl!("{n} min ago"), &[("n", &mins.to_string())]),
-                            _ => crate::i18n::fmt(tl!("{n} h ago"), &[("n", &(mins / 60).to_string())]),
-                        };
-                        let lock = if m.encrypted { tl!(" · password-protected") } else { "" };
-                        ui.label(egui::RichText::new(format!("{when}{lock}")).color(t.text_muted));
-                        ui.end_row();
+                        ui.add(egui::Label::new(egui::RichText::new(&m.name).font(theme::medium(14.0))).truncate());
+                        ui.label(egui::RichText::new(when(m)).color(t.text_muted));
+                        ui.add_space(6.0);
                     }
-                });
+                } else {
+                    egui::Grid::new("recoverable").num_columns(2).spacing([18.0, 6.0]).show(ui, |ui| {
+                        for m in &app.recoverable {
+                            ui.label(egui::RichText::new(&m.name).font(theme::medium(13.0)));
+                            ui.label(egui::RichText::new(when(m)).color(t.text_muted));
+                            ui.end_row();
+                        }
+                    });
+                }
             }
             Dialog::Shortcuts => {
                 ui.label(egui::RichText::new(tl!("Keyboard shortcuts")).font(theme::semibold(18.0)));

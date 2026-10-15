@@ -175,6 +175,7 @@ fn every_dialog_keeps_its_controls_on_a_phone_screen() {
         Dialog::PdfA,
         Dialog::CreateStamp,
         Dialog::AuditSpace,
+        Dialog::Recovery,
     ];
     for tab in [PropsTab::Description, PropsTab::InitialView, PropsTab::Security, PropsTab::Fonts, PropsTab::Advanced] {
         dialogs.push(Dialog::Properties(tab));
@@ -216,8 +217,6 @@ fn every_dialog_keeps_its_controls_on_a_phone_screen() {
     ];
     // Controls, and text too: a line too long to wrap is cut off, and widens the whole dialog,
     // which pushes its buttons off the screen.
-    // Controls, and text too: a line too long to wrap is cut off, and widens the whole dialog,
-    // which pushes its buttons off the screen.
     let containers = [Role::Window, Role::GenericContainer, Role::ScrollView, Role::Group, Role::Unknown, Role::ScrollBar];
     // The narrowest common phone (360 points), in languages whose words run long.
     const WIDTH: f32 = 360.0;
@@ -230,6 +229,14 @@ fn every_dialog_keeps_its_controls_on_a_phone_screen() {
             app.set_option("language", lang).unwrap();
             app.set_option("shell", "phone").unwrap();
             app.open_bytes("text.pdf", None, FIXTURE.to_vec()).unwrap();
+            // A document to recover, with a long name: the Recovery dialog lists it.
+            app.recoverable = vec![pdfcraft_ui_egui::RecoveryMeta {
+                key: "k".into(),
+                name: "lettre-info-familles-2-07-10-2026-version-relue-par-le-bureau.pdf".into(),
+                path: None,
+                saved_at: 0,
+                encrypted: true,
+            }];
             app
         });
         h.run_steps(8);
