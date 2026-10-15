@@ -2461,3 +2461,21 @@ decimal separator	.	,
 	Tap text or a picture to change it	Өзгерту үшін мәтінді немесе суретті түртіңіз
 	Tap where the text goes	Мәтін тұратын жерді түртіңіз
 	White	Ақ
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	Сұрағыңыз бен ашық құжат өзіңіз таңдаған қызметке, өз API кілтіңізбен, тек сіз сұрағанда жіберіледі. Сұраулар осы қызметтегі тіркелгіңізге есептеледі.
+	Service	Қызмет
+	Another service (OpenAI-compatible)	Басқа қызмет (OpenAI үйлесімді)
+	API key	API кілті
+	On Google's free tier, what you send may be used to improve Google's products.	Google-дың тегін деңгейінде жіберген деректеріңіз Google өнімдерін жақсартуға пайдаланылуы мүмкін.
+	Fill in for	Толтыру:
+	Service address	Қызмет мекенжайы
+	API key (if the service asks for one)	API кілті (қызмет сұраса)
+	The service reads PDF files	Қызмет PDF файлдарын оқиды
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	Әйтпесе құжаттың мәтіні бет-бетімен жіберіледі (суреттері мен сканерленген беттерінсіз).
+	Add your API key for {service} in the assistant's settings.	Көмекші баптауларында {service} үшін API кілтіңізді қосыңыз.
+	Your {service} account can't use this model, or has no credit left: {error}	{service} тіркелгіңіз бұл модельді пайдалана алмайды немесе кредиті таусылды: {error}
+	Choose the model to ask in the assistant's settings.	Сұрақ қойылатын модельді көмекші баптауларында таңдаңыз.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	Бұл құжатта жіберетін мәтін жоқ (сканер ме?). PDF файлдарын оқитын қызметті таңдаңыз немесе алдымен оның мәтінін танып алыңыз.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	Бұл құжаттың мәтіні көмекші үшін тым ұзын ({chars} таңба, ең көбі {max}).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	PDF файлдарыңызды өз кілтіңізбен Claude, ChatGPT немесе Gemini арқылы түйіндеп, сұрап, түзетіңіз.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	Қызмет мекенжайы жарамсыз: ол https:// арқылы басталады (http:// тек осы құрылғы немесе жергілікті желі үшін).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	Бұл құжат мазмұнын көшіруге рұқсат бермейді, сондықтан көмекшіге жіберілмейді.

@@ -2339,3 +2339,22 @@ decimal separator	.	.
 	Tap text or a picture to change it	點一下文字或圖片即可變更
 	Tap where the text goes	點一下要放置文字的位置
 	White	白色
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	只有在您提問時，您的問題和開啟的文件才會使用您自己的 API 金鑰傳送到您選擇的服務。請求費用計入您在該服務的帳戶。
+	Service	服務
+	Another service (OpenAI-compatible)	其他服務（相容 OpenAI）
+	API key	API 金鑰
+	On Google's free tier, what you send may be used to improve Google's products.	使用 Google 的免費方案時，您傳送的內容可能被用於改善 Google 的產品。
+	Fill in for	填入：
+	Service address	服務位址
+	API key (if the service asks for one)	API 金鑰（如服務要求）
+	The service reads PDF files	該服務可讀取 PDF 檔案
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	否則將逐頁傳送文件的文字（不含其圖片或掃描內容）。
+	Add your API key for {service} in the assistant's settings.	請在助理設定中新增您的 {service} API 金鑰。
+	Your {service} account can't use this model, or has no credit left: {error}	您的 {service} 帳戶無法使用此模型，或已無餘額：{error}
+	Choose the model to ask in the assistant's settings.	請在助理設定中選擇要提問的模型。
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	此文件沒有可傳送的文字（是掃描檔嗎？）。請選擇可讀取 PDF 檔案的服務，或先辨識其文字。
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	此文件的文字對助理來說太長（{chars} 個字元，最多 {max} 個）。
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	使用您自己的金鑰，透過 Claude、ChatGPT 或 Gemini 摘要、詢問和修正您的 PDF。
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	服務位址無效：它以 https:// 開頭（http:// 僅限本裝置或區域網路）。
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	此文件不允許複製其內容，因此不會傳送給助理。
+	Sign yourself	自行簽名

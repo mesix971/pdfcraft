@@ -64,7 +64,11 @@ Android 8.0 (API 26) or later, 64-bit ARM by default.
   already runs too: a `NativeActivity` never hears of a new intent, so Android starts a second
   window, which hands the document to the running PdfCraft, brings it forward and closes.
 - **Back key** closes the open menu or dialog, like Escape. It never closes the app, so unsaved work
-  isn't dropped without the usual question.
+  isn't dropped without the usual question: on Home's first screen it sends PdfCraft to the back
+  (`moveTaskToBack`), as Android's own apps do, and it comes back where it was.
+- **The phone's settings.** Settings ▸ Display ▸ Font size grows the phone layout (up to 130%,
+  and only as far as the screen keeps 360 points across), read at launch; Accessibility ▸ Remove
+  animations turns PdfCraft's off too (asked again every few seconds).
 - **Typing.** Typing goes into the field itself. An Android text view out of sight takes the
   keyboard, so every keyboard works: accents, other alphabets, predictive text, voice typing (a
   `NativeActivity`'s window only gets key events, and loses the characters a keyboard map can't
@@ -113,17 +117,20 @@ Android 8.0 (API 26) or later, 64-bit ARM by default.
   - Dialogs are screens of their own, scrolling, no wider than the phone: their rows wrap, and
     two-column settings put each label above its controls
     (`tests/phone.rs::every_dialog_keeps_its_controls_on_a_phone_screen` checks every dialog).
-  - Back closes one thing at a time and never leaves Home.
+  - Back closes one thing at a time; on Home's first screen it sends the app to the back.
   - Colour: the accent is the icon's green. Home sits on a deeper ground under a glow that goes
     from that green to the ArtCraft mark's blue, with its header over it rather than on a bar;
     each tool keeps its group's colour (Home's tiles, the bottom bar), and a tool mode's bar takes
     a wash of it. Sizes are written the UI language's way ("30,5 Ko" in French). The strips under Android's status and navigation bars are PdfCraft's to paint (a `NativeActivity` window takes the whole screen), in the colours of the screen's top and bottom.
 - **The AI assistant** (`crates/ai`): summarize the document, ask about it, translate a page,
-  with the user's own Anthropic API key. Asked to correct, reword or translate the document
+  with the service the user chooses and the user's own key: Claude (Anthropic), ChatGPT
+  (OpenAI), Gemini (Google), or any OpenAI-compatible service (OpenRouter, Mistral, DeepSeek,
+  Groq, Ollama on the local network…), which gets the document's text unless it reads PDF files.
+  Each service keeps its own key and model in the assistant's settings. Asked to correct, reword or translate the document
   itself, it proposes the changes (each passage and its replacement); **Apply** rewrites each
   paragraph in its own font, size and colour, rewrapped in its box, as one step that Undo (in
   the ⋮ menu) takes back. It is the only reason the app has the INTERNET permission: nothing is
-  sent until a key is entered and a question asked.
+  sent until the service is set up and a question asked.
 - **Files.** Choosing a file is a screen of its own: a pick of PDFs starts on every PDF
   found on the device, newest first, each with its first page, and one tap opens it. Recent
   files and the places (Downloads, Documents, the storage, PdfCraft's folder) are chips across
@@ -144,6 +151,11 @@ Android 8.0 (API 26) or later, 64-bit ARM by default.
   black pages (pictures keep their colours, and the file isn't changed), from the same place or
   the reader's ⋮ menu, which also switches the dark mode. Android's status and navigation bars take
   the colours of the screen's top and bottom, with icons that read on them.
+- **Transitions.** A screen slides in from the side it leads to (further in from the right, back
+  from the left), a Home tab from its side of the tab bar, a sheet rises from the bottom, the
+  reader's bars slide away at a tap, and the file browser's folders slide in and out; Home's tiles
+  come in one after another when the app starts. Each takes about a fifth of a second, and none
+  moves with Preferences ▸ Animation effects off (or the system's animations off).
 
 ## Known limits
 

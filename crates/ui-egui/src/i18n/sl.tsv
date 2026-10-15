@@ -2468,3 +2468,21 @@ decimal separator	.	,
 	Tap text or a picture to change it	Tapnite besedilo ali sliko, da ju spremenite
 	Tap where the text goes	Tapnite, kam naj gre besedilo
 	White	Bela
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	Vaše vprašanje in odprti dokument se pošljeta storitvi, ki jo izberete, z vašim lastnim ključem API, samo ko to zahtevate. Zahteve se zaračunajo vašemu računu pri tej storitvi.
+	Service	Storitev
+	Another service (OpenAI-compatible)	Druga storitev (združljiva z OpenAI)
+	API key	Ključ API
+	On Google's free tier, what you send may be used to improve Google's products.	Pri brezplačni ravni Googla se lahko to, kar pošljete, uporabi za izboljšanje Googlovih izdelkov.
+	Fill in for	Izpolni za
+	Service address	Naslov storitve
+	API key (if the service asks for one)	Ključ API (če ga storitev zahteva)
+	The service reads PDF files	Storitev bere datoteke PDF
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	Sicer se pošlje besedilo dokumenta, stran za stranjo (brez slik in skenov).
+	Add your API key for {service} in the assistant's settings.	Dodajte svoj ključ API za {service} v nastavitvah pomočnika.
+	Your {service} account can't use this model, or has no credit left: {error}	Vaš račun {service} ne more uporabljati tega modela ali nima več dobroimetja: {error}
+	Choose the model to ask in the assistant's settings.	V nastavitvah pomočnika izberite model, ki ga vprašate.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	Ta dokument nima besedila za pošiljanje (je to sken?). Izberite storitev, ki bere datoteke PDF, ali najprej prepoznajte njegovo besedilo.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	Besedilo tega dokumenta je predolgo za pomočnika ({chars} znakov, največ {max}).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Povzemajte, sprašujte in popravljajte svoje PDF-je s Claudom, ChatGPT ali Gemini, z lastnim ključem.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	Naslov storitve ni veljaven: začne se s https:// (http:// samo za to napravo ali lokalno omrežje).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	Ta dokument ne dovoli kopiranja vsebine, zato se ne pošlje pomočniku.

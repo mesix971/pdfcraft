@@ -2463,3 +2463,21 @@ decimal separator	.	.
 	Tap text or a picture to change it	テキストや画像をタップして変更
 	Tap where the text goes	テキストを置く場所をタップ
 	White	白
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	質問と開いている文書は、依頼したときにだけ、あなた自身の API キーで、選んだサービスに送信されます。リクエストはそのサービスのあなたのアカウントに請求されます。
+	Service	サービス
+	Another service (OpenAI-compatible)	その他のサービス（OpenAI 互換）
+	API key	API キー
+	On Google's free tier, what you send may be used to improve Google's products.	Google の無料枠では、送信した内容が Google の製品改善に使われることがあります。
+	Fill in for	入力例:
+	Service address	サービスのアドレス
+	API key (if the service asks for one)	API キー（サービスが求める場合）
+	The service reads PDF files	サービスが PDF ファイルを読める
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	読めない場合は、文書のテキストをページごとに送信します（画像やスキャンは含みません）。
+	Add your API key for {service} in the assistant's settings.	アシスタントの設定で {service} の API キーを追加してください。
+	Your {service} account can't use this model, or has no credit left: {error}	お使いの {service} アカウントではこのモデルを使用できないか、クレジットが残っていません: {error}
+	Choose the model to ask in the assistant's settings.	アシスタントの設定で、質問するモデルを選んでください。
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	この文書には送信できるテキストがありません（スキャンですか？）。PDF ファイルを読めるサービスを選ぶか、先にテキストを認識してください。
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	この文書のテキストはアシスタントには長すぎます（{chars} 文字、最大 {max} 文字）。
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	自分のキーを使い、Claude・ChatGPT・Gemini で PDF を要約・質問・修正できます。
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	サービスのアドレスが正しくありません。https:// で始まります（http:// はこの端末またはローカルネットワークのみ）。
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	この文書は内容のコピーを許可していないため、アシスタントには送信されません。

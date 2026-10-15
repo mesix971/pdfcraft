@@ -1,12 +1,13 @@
 //! The AI assistant's screen: summarize the open document, ask about it, translate a page, with
-//! the user's own Anthropic API key (`pdfcraft-ai`). Off until a key is entered; each request
-//! runs on a worker thread and its answer arrives in [`PdfCraftApp::poll_ai`].
+//! the service the user chooses and the user's own key (`pdfcraft-ai`): Claude, ChatGPT, Gemini,
+//! or any OpenAI-compatible service. Off until the service is set up; each request runs on a
+//! worker thread and its answer arrives in [`PdfCraftApp::poll_ai`].
 
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, TryRecvError, channel};
 
 use egui::{Align2, Color32, CornerRadius, Rect, Sense, Stroke, vec2};
-use pdfcraft_ai::{AiError, Model, ProposedEdit, Reply, Task, Turn};
+use pdfcraft_ai::{AiError, ProposedEdit, Provider, Reply, Task, Turn};
 use pdfcraft_engine::{DocId, Edit};
 
 use crate::theme::{self, Tokens};
@@ -71,7 +72,7 @@ impl Fate {
 /// One exchange of a conversation.
 enum Entry {
     /// A question (as shown) and its answer, with the changes it proposed.
-    Answered { shown: String, prompt: String, reply: Reply, model: Model, edits: Vec<(ProposedEdit, Fate)> },
+    Answered { shown: String, prompt: String, reply: Reply, model: String, edits: Vec<(ProposedEdit, Fate)> },
     /// A question that got no answer, and why.
     Failed { shown: String, error: String },
     /// A new conversation starts here: the document or the model changed, or the last one grew
@@ -80,14 +81,19 @@ enum Entry {
 }
 
 /// What a conversation was had about: everything that goes into what the model has already
-/// read (the document, its title, the system prompt's language and tool). The conversation as
-/// the model saw it can't change after the fact, so when any of this does — an edit, an Undo,
-/// Save As, another interface language — a new one starts.
+/// read (the service and model, the document, its title, the system prompt's language and tool).
+/// The conversation as the model saw it can't change after the fact, so when any of this does —
+/// another service or model, an edit, an Undo, Save As, another interface language — a new one
+/// starts.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct About {
     /// The document's edit generation: it moves with every edit, Undo, Redo and save.
     generation: u64,
-    model: Model,
+    provider: Provider,
+    model: String,
+    /// A compatible service's address, and whether it gets the PDF or the text.
+    base_url: String,
+    reads_pdfs: bool,
     title: String,
     language: String,
     edits: bool,
@@ -147,21 +153,37 @@ struct Pending {
     doc: DocId,
     shown: String,
     prompt: String,
-    model: Model,
+    /// The service and the model asked.
+    provider: Provider,
+    model: String,
     rx: Receiver<Result<Reply, AiError>>,
 }
 
 /// The assistant's settings and conversations.
 pub struct AiState {
-    /// The user's Anthropic API key. Empty: the assistant is off and nothing is ever sent.
-    pub key: String,
-    pub model: Model,
+    /// The service asked.
+    pub provider: Provider,
+    /// Each service's API key, by [`Provider::index`]. Empty: that service is off and nothing is
+    /// ever sent to it (a compatible service may take none).
+    pub keys: [String; 4],
+    /// Each service's model, by [`Provider::index`].
+    pub models: [String; 4],
+    /// The compatible service's address, up to its version ("https://openrouter.ai/api/v1").
+    pub base_url: String,
+    /// The compatible service reads PDF files: it gets the PDF rather than the document's text.
+    pub reads_pdfs: bool,
+    /// The host the compatible service's key was saved for: it goes nowhere else (another
+    /// address filled in later gets no key until one is saved for it).
+    pub key_host: String,
     /// The most pages a question may send.
     pub max_pages: usize,
     chats: HashMap<DocId, Chat>,
     pending: Option<Pending>,
     input: String,
-    key_draft: String,
+    /// The keys being typed in the settings, by [`Provider::index`]: saved with Save.
+    key_drafts: [String; 4],
+    /// The service chosen in the settings: asked once saved.
+    provider_draft: Provider,
     settings_open: bool,
     /// The language pages are translated into (a language's own name, "Français").
     translate_to: String,
@@ -170,13 +192,18 @@ pub struct AiState {
 impl Default for AiState {
     fn default() -> Self {
         Self {
-            key: String::new(),
-            model: Model::default(),
+            provider: Provider::default(),
+            keys: Default::default(),
+            models: Provider::ALL.map(|p| p.default_model().to_owned()),
+            base_url: String::new(),
+            reads_pdfs: false,
+            key_host: String::new(),
             max_pages: DEFAULT_MAX_PAGES,
             chats: HashMap::new(),
             pending: None,
             input: String::new(),
-            key_draft: String::new(),
+            key_drafts: Default::default(),
+            provider_draft: Provider::default(),
             settings_open: false,
             translate_to: String::new(),
         }
@@ -184,6 +211,63 @@ impl Default for AiState {
 }
 
 impl AiState {
+    /// The key of the service asked.
+    pub fn key(&self) -> &str {
+        self.keys.get(self.provider.index()).map_or("", String::as_str)
+    }
+
+    /// Set the key of the service asked (one line: a pasted key's spaces and breaks go).
+    pub fn set_key(&mut self, key: &str) {
+        if let Some(k) = self.keys.get_mut(self.provider.index()) {
+            *k = key.split_whitespace().collect();
+        }
+    }
+
+    /// The model of the service asked.
+    pub fn model(&self) -> &str {
+        self.models.get(self.provider.index()).map_or("", String::as_str)
+    }
+
+    /// The service asked is set up: its key (a compatible service: its address and model), and a
+    /// model. Until then the assistant shows its settings, and nothing is sent.
+    pub fn ready(&self) -> bool {
+        let set_up = match self.provider {
+            Provider::Compatible => !self.base_url.trim().is_empty(),
+            _ => !self.key().trim().is_empty(),
+        };
+        set_up && !self.model().trim().is_empty()
+    }
+
+    /// The key sent to the service asked: a compatible service's only to the host it was saved
+    /// for.
+    fn key_to_send(&self) -> &str {
+        let host = (self.provider == Provider::Compatible).then(|| pdfcraft_ai::service_host(&self.base_url));
+        match host {
+            Some(host) if host.as_deref() != Some(self.key_host.as_str()) => "",
+            _ => self.key(),
+        }
+    }
+
+    /// Open the settings: the drafts start from what is saved.
+    fn open_settings(&mut self) {
+        self.settings_open = true;
+        self.key_drafts = self.keys.clone();
+        self.provider_draft = self.provider;
+    }
+
+    /// Save the settings: the service chosen, and the keys typed (a key pasted from a mail or a
+    /// PDF may carry line breaks or spaces: a key has none). A compatible service's key is for
+    /// the host it was typed with.
+    fn save_settings(&mut self) {
+        for (key, draft) in self.keys.iter_mut().zip(&self.key_drafts) {
+            *key = draft.split_whitespace().collect();
+        }
+        self.provider = self.provider_draft;
+        let compatible = self.keys.get(Provider::Compatible.index()).is_some_and(|k| !k.is_empty());
+        self.key_host = if compatible { pdfcraft_ai::service_host(&self.base_url).unwrap_or_default() } else { String::new() };
+        self.settings_open = false;
+    }
+
     /// Whether the settings show (rather than the conversation) because they were opened.
     pub(crate) fn settings_open(&self) -> bool {
         self.settings_open
@@ -217,11 +301,33 @@ fn reply_language() -> String {
     crate::i18n::current().name().to_owned()
 }
 
-/// What to tell the user when a question got no answer.
-fn error_text(e: &AiError) -> String {
+/// A service's name, as the interface shows it: its maker's, or a compatible service's host.
+fn service_name(provider: Provider, base_url: &str) -> String {
+    if provider != Provider::Compatible {
+        return provider.name().to_owned();
+    }
+    match pdfcraft_ai::service_host(base_url) {
+        Some(host) => host.chars().take(80).collect(),
+        None => tl!("Another service (OpenAI-compatible)").to_owned(),
+    }
+}
+
+/// What to tell the user when a question to `service` got no answer.
+fn error_text(e: &AiError, service: &str) -> String {
     use crate::i18n::fmt;
     match e {
-        AiError::NoKey => tl!("Add your Anthropic API key to use the assistant.").to_owned(),
+        AiError::NoKey => fmt(tl!("Add your API key for {service} in the assistant's settings."), &[("service", service)]),
+        AiError::NoModel => tl!("Choose the model to ask in the assistant's settings.").to_owned(),
+        AiError::BadAddress => {
+            tl!("The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).").to_owned()
+        }
+        AiError::NoText => {
+            tl!("This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.").to_owned()
+        }
+        AiError::TooMuchText { chars, max } => fmt(
+            tl!("This document's text is too long for the assistant ({chars} characters, at most {max})."),
+            &[("chars", &chars.to_string()), ("max", &max.to_string())],
+        ),
         AiError::BadKey => tl!("The API key isn't valid: paste it again in the assistant's settings.").to_owned(),
         AiError::InvalidKey => tl!("The API key was refused. Check it in the assistant's settings.").to_owned(),
         AiError::TooManyPages { pages, max } => fmt(
@@ -237,7 +343,9 @@ fn error_text(e: &AiError) -> String {
         AiError::Empty => tl!("This document has no pages.").to_owned(),
         AiError::NoQuestion => tl!("Ask about this document").to_owned(),
         AiError::NoAnswer => tl!("The assistant gave no answer. Try asking differently.").to_owned(),
-        AiError::NotAllowed(m) => fmt(tl!("Your Anthropic account can't use this model, or has no credit left: {error}"), &[("error", m)]),
+        AiError::NotAllowed(m) => {
+            fmt(tl!("Your {service} account can't use this model, or has no credit left: {error}"), &[("service", service), ("error", m)])
+        }
         AiError::Api(m) | AiError::Parse(m) => fmt(tl!("The AI service answered: {error}"), &[("error", m)]),
         AiError::Network(m) => fmt(tl!("Couldn't reach the AI service: {error}"), &[("error", m)]),
     }
@@ -251,27 +359,52 @@ impl PdfCraftApp {
             return;
         }
         let Some(doc) = self.session.get(id) else { return };
+        // Sending a document to a service copies its content: not one that forbids copying.
+        if !doc.allows_copying() {
+            let error = tl!("This document doesn't allow copying its content, so it isn't sent to the assistant.").to_owned();
+            self.ai.fail(id, shown, error);
+            return;
+        }
         // The working file as it is now, edits included. It stays the same object until the
         // document changes, so later questions send the very same bytes and read them back
         // from the cache; nothing is written for it.
         let pdf = doc.bytes.clone();
-        let model = self.ai.model;
+        let (provider, model, base_url, reads_pdfs) = (self.ai.provider, self.ai.model().to_owned(), self.ai.base_url.clone(), self.ai.reads_pdfs);
         let (key, max_pages, pages, title, language) =
-            (self.ai.key.clone(), self.ai.max_pages, doc.info.pages.len(), doc.display_name(), reply_language());
+            (self.ai.key_to_send().to_owned(), self.ai.max_pages, doc.info.pages.len(), doc.display_name(), reply_language());
+        // A compatible service that doesn't read PDF files gets the document's text, made on the
+        // worker thread (and only for a document within the page limit: the request refuses the
+        // others before anything is sent).
+        let source =
+            (provider == Provider::Compatible && !reads_pdfs && pages <= max_pages.clamp(1, pdfcraft_ai::API_MAX_PAGES)).then(|| doc.export_source());
         // Changes are offered only where the user could make them by hand.
         let edits = doc.allows_modification();
         let chat = self.ai.chats.entry(id).or_default();
-        chat.prepare(About { generation: doc.edit_generation(), model, title: title.clone(), language: language.clone(), edits });
+        chat.prepare(About {
+            generation: doc.edit_generation(),
+            provider,
+            model: model.clone(),
+            base_url: base_url.clone(),
+            reads_pdfs,
+            title: title.clone(),
+            language: language.clone(),
+            edits,
+        });
         let history = chat.history();
         let prompt = task.prompt();
         let (tx, rx) = channel();
         let ctx = self.ctx.clone();
+        let asked = model.clone();
         let spawned = std::thread::Builder::new().name("pdfcraft-ai".into()).spawn(move || {
+            let text = source.map(|s| document_text(s, pages));
             let request = pdfcraft_ai::Request {
+                provider,
                 key: &key,
-                model,
+                model: &model,
+                base_url: &base_url,
                 title: &title,
                 pdf: &pdf,
+                text: text.as_deref(),
                 pages,
                 max_pages,
                 language: &language,
@@ -286,7 +419,7 @@ impl PdfCraftApp {
             }
         });
         match spawned {
-            Ok(_) => self.ai.pending = Some(Pending { doc: id, shown, prompt, model, rx }),
+            Ok(_) => self.ai.pending = Some(Pending { doc: id, shown, prompt, provider, model: asked, rx }),
             Err(e) => self.ai.fail(id, shown, e.to_string()),
         }
     }
@@ -305,7 +438,7 @@ impl PdfCraftApp {
             // The worker stopped without an answer (it can't panic, but a lost answer is still an answer).
             Err(TryRecvError::Disconnected) => Err(AiError::Network("no answer".into())),
         };
-        let Some(Pending { doc, shown, prompt, model, .. }) = self.ai.pending.take() else { return };
+        let Some(Pending { doc, shown, prompt, provider, model, .. }) = self.ai.pending.take() else { return };
         if self.session.get(doc).is_none() {
             // Closed while the question was on its way.
             return;
@@ -315,7 +448,7 @@ impl PdfCraftApp {
                 let edits = reply.edits.iter().map(|e| (e.clone(), Fate::Proposed)).collect();
                 Entry::Answered { shown, prompt, reply, model, edits }
             }
-            Err(e) => Entry::Failed { shown, error: error_text(&e) },
+            Err(e) => Entry::Failed { shown, error: error_text(&e, &service_name(provider, &self.ai.base_url)) },
         };
         self.ai.chats.entry(doc).or_default().entries.push(entry);
     }
@@ -359,6 +492,25 @@ impl PdfCraftApp {
 /// becomes of each. A passage must read exactly once on its page, and not overlap another change;
 /// every passage found becomes part of its paragraph's rewrite (in the paragraph's own font, size
 /// and colour, rewrapped in its box), one rewrite per paragraph.
+/// The document's text for a service that doesn't read PDF files: its first `pages` pages, each
+/// after a "[Page N]" line, as the system prompt says. Empty when no page has any text (a scan),
+/// which the request refuses with the way out; it stops once past what a request may carry.
+fn document_text(source: pdfcraft_engine::export::ExportSource, pages: usize) -> String {
+    let mut exporter = pdfcraft_engine::export::Exporter::from_source(source);
+    let (mut out, mut any) = (String::new(), false);
+    for page in 0..pages {
+        let text = exporter.text(page).unwrap_or_default();
+        let text = text.trim();
+        any |= !text.is_empty();
+        out.push_str(&format!("[Page {}]\n{text}\n\n", page.saturating_add(1)));
+        // Bytes are at least characters: past this, the request refuses it anyway.
+        if out.len() > pdfcraft_ai::MAX_TEXT_CHARS.saturating_mul(4) {
+            break;
+        }
+    }
+    if any { out } else { String::new() }
+}
+
 fn text_changes(doc: &pdfcraft_engine::Document, proposed: &[(usize, ProposedEdit)]) -> (Vec<Edit>, Vec<(usize, Fate)>) {
     use std::collections::BTreeMap;
     let pages = doc.info.pages.len();
@@ -462,7 +614,12 @@ fn find_loosely(hay: &str, needle: &str, limit: usize) -> Vec<std::ops::Range<us
 pub(crate) fn page(app: &mut PdfCraftApp, ui: &mut egui::Ui, screen: Rect) -> bool {
     let t = Tokens::get(ui.ctx());
     let Some((_, doc)) = app.active_ids() else { return true };
-    let settings = app.ai.settings_open || app.ai.key.trim().is_empty();
+    // Not set up: the settings, which stay until Save or Back (a compatible service's address
+    // and model apply as they are typed, and the form mustn't close under the finger).
+    if !app.ai.ready() && !app.ai.settings_open {
+        app.ai.open_settings();
+    }
+    let settings = app.ai.settings_open;
     let mut back = false;
     let mut toggle_settings = false;
     let mut clear = false;
@@ -483,8 +640,11 @@ pub(crate) fn page(app: &mut PdfCraftApp, ui: &mut egui::Ui, screen: Rect) -> bo
         app.ai.chats.remove(&doc);
     }
     if toggle_settings {
-        app.ai.settings_open = !app.ai.settings_open;
-        app.ai.key_draft = app.ai.key.clone();
+        if app.ai.settings_open {
+            app.ai.settings_open = false;
+        } else {
+            app.ai.open_settings();
+        }
     }
     let rest = Rect::from_min_max(egui::pos2(screen.left(), top.bottom()), screen.max);
     ui.scope_builder(egui::UiBuilder::new().max_rect(rest), |ui| {
@@ -508,9 +668,7 @@ pub(crate) fn settings_page(app: &mut PdfCraftApp, ui: &mut egui::Ui, screen: Re
     let back = crate::phone::top_bar_titled(ui, screen, tl!("AI assistant"));
     let rest = Rect::from_min_max(egui::pos2(screen.left(), screen.top() + crate::phone::TOP_BAR), screen.max);
     if !app.ai.settings_open {
-        // Opening: the draft starts from the saved key.
-        app.ai.settings_open = true;
-        app.ai.key_draft = app.ai.key.clone();
+        app.ai.open_settings();
     }
     ui.scope_builder(egui::UiBuilder::new().max_rect(rest), |ui| {
         ui.set_clip_rect(rest);
@@ -528,47 +686,123 @@ pub(crate) fn settings_page(app: &mut PdfCraftApp, ui: &mut egui::Ui, screen: Re
 }
 
 fn settings_form(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
+    let heading = |ui: &mut egui::Ui, text: &str| {
+        ui.add_space(4.0);
+        ui.label(egui::RichText::new(text).font(theme::semibold(14.0)));
+    };
     egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
         egui::Frame::NONE.inner_margin(egui::Margin::symmetric(16, 14)).show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.spacing_mut().item_spacing.y = 8.0;
             ui.label(
                 egui::RichText::new(tl!(
-                    "Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account."
+                    "Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service."
                 ))
                 .color(t.text_muted),
             );
-            ui.add_space(4.0);
-            ui.label(egui::RichText::new(tl!("Anthropic API key")).font(theme::semibold(14.0)));
-            ui.add(widgets::line(&mut app.ai.key_draft).password(true).hint_text("sk-ant-…").desired_width(f32::INFINITY).char_limit(512));
-            ui.add_space(4.0);
-            ui.label(egui::RichText::new(tl!("Model")).font(theme::semibold(14.0)));
-            for m in Model::ALL {
-                let p = price_line(m);
-                widgets::radio_value(ui, &mut app.ai.model, m, format!("{}  ·  {p}", m.name()));
+            heading(ui, tl!("Service"));
+            for p in Provider::ALL {
+                let name = if p == Provider::Compatible { tl!("Another service (OpenAI-compatible)") } else { p.name() };
+                widgets::radio_value(ui, &mut app.ai.provider_draft, p, name);
             }
-            ui.add_space(4.0);
-            ui.label(egui::RichText::new(tl!("Most pages sent per question")).font(theme::semibold(14.0)));
+            let provider = app.ai.provider_draft;
+            let index = provider.index();
+            if provider == Provider::Compatible {
+                compatible_settings(app, ui, t);
+            } else {
+                heading(ui, tl!("API key"));
+                let hint = match provider {
+                    Provider::OpenAi => "sk-…",
+                    Provider::Gemini => "AIza…",
+                    _ => "sk-ant-…",
+                };
+                if let Some(draft) = app.ai.key_drafts.get_mut(index) {
+                    ui.add(widgets::line(draft).password(true).hint_text(hint).desired_width(f32::INFINITY).char_limit(512));
+                }
+                heading(ui, tl!("Model"));
+                for m in provider.models() {
+                    if let Some(model) = app.ai.models.get_mut(index)
+                        && ui.add(widgets::radio(model.as_str() == m.id, format!("{}  ·  {}", m.name, price_line(m)))).clicked()
+                    {
+                        *model = m.id.to_owned();
+                    }
+                }
+                if provider == Provider::Gemini {
+                    ui.label(
+                        egui::RichText::new(tl!("On Google's free tier, what you send may be used to improve Google's products.")).small().color(t.text_muted),
+                    );
+                }
+            }
+            heading(ui, tl!("Most pages sent per question"));
             ui.spacing_mut().slider_width = (ui.available_width() - 90.0).max(80.0);
             ui.add(egui::Slider::new(&mut app.ai.max_pages, 1..=pdfcraft_ai::API_MAX_PAGES).logarithmic(true));
             ui.add_space(10.0);
             ui.horizontal_wrapped(|ui| {
                 if pill(ui, tl!("Save"), true, t).clicked() {
-                    // A key pasted from a mail or a PDF may carry line breaks or spaces: a key has none.
-                    app.ai.key = app.ai.key_draft.split_whitespace().collect();
-                    app.ai.settings_open = false;
+                    app.ai.save_settings();
                 }
-                if !app.ai.key.is_empty() && pill(ui, tl!("Remove"), false, t).clicked() {
-                    app.ai.key.clear();
-                    app.ai.key_draft.clear();
+                let saved = app.ai.keys.get(index).is_some_and(|k| !k.is_empty());
+                if saved && pill(ui, tl!("Remove"), false, t).clicked() {
+                    for keys in [&mut app.ai.keys, &mut app.ai.key_drafts] {
+                        if let Some(k) = keys.get_mut(index) {
+                            k.clear();
+                        }
+                    }
                 }
             });
         });
     });
 }
 
+/// A compatible service's settings: a service to fill in for, its address, the model it names,
+/// its key if it takes one, and whether it reads PDF files.
+fn compatible_settings(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
+    // (name, address, a model it names, or none to name)
+    const SERVICES: [(&str, &str, &str); 5] = [
+        ("OpenRouter", "https://openrouter.ai/api/v1", ""),
+        ("Mistral", "https://api.mistral.ai/v1", "mistral-small-latest"),
+        ("DeepSeek", "https://api.deepseek.com", "deepseek-flash"),
+        ("Groq", "https://api.groq.com/openai/v1", ""),
+        ("Ollama", "http://localhost:11434/v1", ""),
+    ];
+    let index = Provider::Compatible.index();
+    ui.add_space(4.0);
+    ui.label(egui::RichText::new(tl!("Fill in for")).small().color(t.text_muted));
+    ui.horizontal_wrapped(|ui| {
+        for (name, address, model) in SERVICES {
+            if pill(ui, name, false, t).clicked() {
+                app.ai.base_url = address.to_owned();
+                if let Some(m) = app.ai.models.get_mut(index) {
+                    *m = model.to_owned();
+                }
+                // Another service: the key typed for the last one isn't its.
+                if let Some(draft) = app.ai.key_drafts.get_mut(index) {
+                    draft.clear();
+                }
+            }
+        }
+    });
+    let field = |ui: &mut egui::Ui, title: &str, value: &mut String, hint: &str, password: bool, limit: usize| {
+        ui.add_space(4.0);
+        ui.label(egui::RichText::new(title).font(theme::semibold(14.0)));
+        ui.add(widgets::line(value).password(password).hint_text(hint).desired_width(f32::INFINITY).char_limit(limit));
+    };
+    field(ui, tl!("Service address"), &mut app.ai.base_url, "https://…/v1", false, 2048);
+    if let Some(model) = app.ai.models.get_mut(index) {
+        field(ui, tl!("Model"), model, "", false, 200);
+    }
+    if let Some(draft) = app.ai.key_drafts.get_mut(index) {
+        field(ui, tl!("API key (if the service asks for one)"), draft, "", true, 512);
+    }
+    ui.add_space(4.0);
+    ui.add(widgets::checkbox(&mut app.ai.reads_pdfs, tl!("The service reads PDF files")));
+    ui.label(
+        egui::RichText::new(tl!("Otherwise the document's text is sent, page by page (not its pictures or scans).")).small().color(t.text_muted),
+    );
+}
+
 /// "4 $ / 20 $" for a million tokens read / written, as the radio buttons show it.
-fn price_line(m: Model) -> String {
+fn price_line(m: &pdfcraft_ai::Known) -> String {
     let (input, output) = m.list_prices();
     format!("{} $ / {} $", trim_price(input), trim_price(output))
 }
@@ -641,7 +875,7 @@ fn chat(app: &mut PdfCraftApp, doc: DocId, ui: &mut egui::Ui, t: &Tokens) {
                         match entry {
                             Entry::Answered { shown, reply, model, edits, .. } => {
                                 bubble(ui, shown, t);
-                                answer(ui, &reply.text, t, Some((reply, *model)));
+                                answer(ui, &reply.text, t, Some((reply, model.as_str())));
                                 if let Some(apply) = proposals(ui, edits, t) {
                                     decide = Some((index, apply));
                                 }
@@ -760,26 +994,25 @@ fn bubble(ui: &mut egui::Ui, text: &str, t: &Tokens) {
 
 /// "≈ 0.012 $ · 3456 tokens", priced as the model that answered, and named when it isn't the
 /// one asked (a declined request answered by another model).
-fn cost_line(reply: &Reply, asked: Model) -> String {
+fn cost_line(reply: &Reply, asked: &str) -> String {
     use crate::i18n::fmt;
     let tokens = reply.usage.total().to_string();
     let mut line = match reply.cost_usd() {
         Some(cost) => fmt(tl!("≈ {cost} $ · {tokens} tokens"), &[("cost", &format!("{cost:.3}")), ("tokens", &tokens)]),
         None => fmt(tl!("{tokens} tokens"), &[("tokens", &tokens)]),
     };
-    // A dated id ("…-20261001") is still the model asked.
-    if (reply.fell_back || !reply.model.starts_with(asked.id())) && !reply.model.is_empty() {
+    // A dated id ("…-20261001") is still the model asked; a compatible service may name its
+    // model its own way.
+    let other = reply.provider != Provider::Compatible && !reply.model.starts_with(asked.trim());
+    if (reply.fell_back || other) && !reply.model.is_empty() {
         line.push_str(" · ");
-        match Model::from_id(&reply.model) {
-            Some(m) => line.push_str(m.name()),
-            None => line.push_str(&reply.model),
-        }
+        line.push_str(pdfcraft_ai::known(reply.provider, &reply.model).map_or(reply.model.as_str(), |m| m.name));
     }
     line
 }
 
 /// An answer (or why there is none), with what it cost and a Copy button.
-fn answer(ui: &mut egui::Ui, text: &str, t: &Tokens, reply: Option<(&Reply, Model)>) {
+fn answer(ui: &mut egui::Ui, text: &str, t: &Tokens, reply: Option<(&Reply, &str)>) {
     egui::Frame::NONE
         .fill(t.card)
         .stroke(Stroke::new(1.0, t.divider))
@@ -897,6 +1130,7 @@ mod tests {
             ProposedEdit { id: "t2".into(), page: 1, find: "nowhere".into(), replace: "x".into() },
         ];
         let reply = Reply {
+            provider: Provider::Anthropic,
             text: "One typo.".into(),
             content: serde_json::json!([]),
             usage: pdfcraft_ai::Usage::default(),
@@ -909,7 +1143,7 @@ mod tests {
             shown: "Fix it".into(),
             prompt: "Fix it".into(),
             reply,
-            model: Model::Opus,
+            model: "claude-opus-5-5".into(),
             edits: edits.into_iter().map(|e| (e, Fate::Proposed)).collect(),
         }
     }
@@ -944,7 +1178,16 @@ mod tests {
     /// about something else starts afresh.
     #[test]
     fn asking_again_settles_waiting_proposals_and_a_changed_document_starts_over() {
-        let about = |generation| About { generation, model: Model::Opus, title: "a.pdf".into(), language: "English".into(), edits: true };
+        let about = |generation| About {
+            generation,
+            provider: Provider::Anthropic,
+            model: "claude-opus-5-5".into(),
+            base_url: String::new(),
+            reads_pdfs: false,
+            title: "a.pdf".into(),
+            language: "English".into(),
+            edits: true,
+        };
         let mut chat = Chat::default();
         chat.prepare(about(1));
         chat.entries.push(answer_with_changes());
@@ -968,6 +1211,138 @@ mod tests {
         other.language = "French".into();
         chat.prepare(other);
         assert!(chat.history().is_empty());
+        // Another service, or another model: an answer only goes back to the one that gave it.
+        let changes: [fn(&mut About); 4] = [
+            |a: &mut About| a.provider = Provider::Gemini,
+            |a: &mut About| a.model = "claude-haiku-5-5".into(),
+            |a: &mut About| a.base_url = "https://openrouter.ai/api/v1".into(),
+            |a: &mut About| a.reads_pdfs = true,
+        ];
+        for change in changes {
+            chat.prepare(about(2));
+            chat.entries.push(answer_with_changes());
+            assert_eq!(chat.history().len(), 1);
+            let mut other = about(2);
+            change(&mut other);
+            chat.prepare(other);
+            assert!(chat.history().is_empty(), "{:?}", chat.about);
+        }
+    }
+
+    /// The service chosen in the settings is asked once saved (Back leaves the one that works),
+    /// and a compatible service's key goes only to the host it was saved for.
+    #[test]
+    fn a_service_is_asked_once_saved_and_its_key_goes_nowhere_else() {
+        let mut ai = AiState::default();
+        ai.set_key("sk-ant-a");
+        ai.open_settings();
+        ai.provider_draft = Provider::Gemini;
+        ai.settings_open = false;
+        assert_eq!(ai.provider, Provider::Anthropic, "Back: Claude, still set up");
+        ai.open_settings();
+        ai.provider_draft = Provider::Compatible;
+        ai.base_url = "https://openrouter.ai/api/v1".into();
+        ai.models[Provider::Compatible.index()] = "openai/gpt-6.1-sol".into();
+        ai.key_drafts[Provider::Compatible.index()] = "sk-or-b".into();
+        ai.save_settings();
+        assert_eq!((ai.provider, ai.key_host.as_str(), ai.key_to_send()), (Provider::Compatible, "openrouter.ai", "sk-or-b"));
+        // Another address, the key unsaved for it: none goes.
+        ai.base_url = "https://api.mistral.ai/v1".into();
+        assert_eq!(ai.key_to_send(), "");
+        ai.base_url = "https://openrouter.ai/api/v2".into();
+        assert_eq!(ai.key_to_send(), "sk-or-b", "the same host");
+        ai.provider = Provider::Anthropic;
+        assert_eq!(ai.key_to_send(), "sk-ant-a");
+    }
+
+    #[test]
+    fn the_assistant_is_ready_once_its_service_is_set_up() {
+        let mut ai = AiState::default();
+        assert!(!ai.ready(), "no key");
+        ai.set_key(
+            " sk-ant-
+abc ",
+        );
+        assert_eq!(ai.key(), "sk-ant-abc", "one line");
+        assert!(ai.ready());
+        // Each service has its own key and model.
+        ai.provider = Provider::Gemini;
+        assert_eq!((ai.key(), ai.model()), ("", "gemini-3.8-flash"));
+        assert!(!ai.ready());
+        // A compatible service: an address and a model, a key only if it takes one.
+        ai.provider = Provider::Compatible;
+        assert!(!ai.ready());
+        ai.models[Provider::Compatible.index()] = "llama3.2".into();
+        assert!(!ai.ready(), "a model, but no address");
+        ai.base_url = "http://localhost:11434/v1".into();
+        assert!(ai.ready());
+        ai.models[Provider::Compatible.index()] = " ".into();
+        assert!(!ai.ready(), "an address, but no model named");
+        ai.models[Provider::Compatible.index()] = "llama3.2".into();
+        assert_eq!(service_name(Provider::Compatible, &ai.base_url), "localhost");
+        assert_eq!(service_name(Provider::Compatible, ""), "Another service (OpenAI-compatible)");
+        assert_eq!(service_name(Provider::OpenAi, "https://ignored"), "ChatGPT (OpenAI)");
+    }
+
+    /// A service that doesn't read PDF files gets each page's text after its "[Page N]" line;
+    /// a document with no text at all (a scan) gets nothing, which the request refuses.
+    #[test]
+    fn the_text_a_compatible_service_gets() {
+        let mut session = pdfcraft_engine::Session::new();
+        let id = session.open("three.pdf", None, std::sync::Arc::new(three_paragraphs()), None).unwrap();
+        let text = document_text(session.get(id).unwrap().export_source(), 1);
+        assert!(
+            text.starts_with(
+                "[Page 1]
+"
+            ),
+            "{text:?}"
+        );
+        assert!(text.contains("Second paragraph, teh typo."), "{text:?}");
+        let blank = b"%PDF-1.7
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >> endobj
+trailer << /Root 1 0 R >>
+%%EOF";
+        let id = session.open("blank.pdf", None, std::sync::Arc::new(blank.to_vec()), None).unwrap();
+        assert_eq!(document_text(session.get(id).unwrap().export_source(), 1), "");
+    }
+
+    /// Every service's key and model are kept; a key saved before there were several services is
+    /// Claude's; what isn't plain, or isn't offered, is dropped.
+    #[test]
+    fn the_assistants_settings_are_kept_and_read_back_carefully() {
+        let mut app = PdfCraftApp::new();
+        app.ai.provider = Provider::Compatible;
+        app.ai.keys = ["sk-ant-a".into(), "sk-b".into(), "AIza-c".into(), String::new()];
+        app.ai.models[Provider::OpenAi.index()] = "gpt-6-luna".into();
+        app.ai.models[Provider::Compatible.index()] = "llama3.2".into();
+        app.ai.base_url = "http://localhost:11434/v1".into();
+        app.ai.reads_pdfs = true;
+        let mut back = PdfCraftApp::new();
+        back.restore(&app.persist());
+        assert_eq!(back.ai.provider, Provider::Compatible);
+        assert_eq!(back.ai.keys, app.ai.keys);
+        assert_eq!(back.ai.models, app.ai.models);
+        assert_eq!((back.ai.base_url.as_str(), back.ai.reads_pdfs), ("http://localhost:11434/v1", true));
+        app.ai.key_host = "localhost".into();
+        back.restore(&app.persist());
+        assert_eq!(back.ai.key_host, "localhost");
+        // From before: one key and model, Anthropic's.
+        let mut old = PdfCraftApp::new();
+        old.restore(r#"{"ai_key":"sk-ant-old","ai_model":"claude-haiku-5-5"}"#);
+        assert_eq!((old.ai.provider, old.ai.key(), old.ai.model()), (Provider::Anthropic, "sk-ant-old", "claude-haiku-5-5"));
+        // Untrusted: an unknown service, a key on two lines, a model the service doesn't offer.
+        let mut bad = PdfCraftApp::new();
+        bad.restore(
+            r#"{"ai_provider":"skynet","ai_keys":{"openai":"sk-\nx"},"ai_models":{"openai":"gpt-9","gemini":"gemini-3.5-flash-lite"},"ai_url":"http://a b"}"#,
+        );
+        assert_eq!(bad.ai.provider, Provider::Anthropic);
+        assert_eq!(bad.ai.keys[Provider::OpenAi.index()], "");
+        assert_eq!(bad.ai.models[Provider::OpenAi.index()], "gpt-6.1-sol");
+        assert_eq!(bad.ai.models[Provider::Gemini.index()], "gemini-3.5-flash-lite");
+        assert_eq!(bad.ai.base_url, "");
     }
 
     #[test]

@@ -67,6 +67,14 @@ pub fn run(android: AndroidApp) {
         app.clipboard_text = Some(Box::new(move || jvm::clipboard_text(&clipboard)));
         let printing = android.clone();
         app.host_print = Some(Box::new(move |name, bytes| jvm::print_with_app(&printing, name, &bytes, pdfcraft_ui_egui::i18n::t("Print"))));
+        // The system's animation setting (asked again every few seconds) and font size.
+        let motion = android.clone();
+        app.motion.source = Some(Box::new(move || jvm::animations_off(&motion)));
+        if let Some(scale) = jvm::font_scale(&android) {
+            app.system_text_scale = scale;
+        }
+        let back = android.clone();
+        app.to_background = Some(Box::new(move || jvm::move_task_to_back(&back)));
         if let Some(dir) = &data {
             app.enable_recovery(RecoveryStore::new(dir.join("recovery")));
             install_models(&android, dir.join("models"));

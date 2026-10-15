@@ -2137,11 +2137,13 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     let notice = if phone {
         // Over the pages, like the bars, so showing or hiding them never moves the pages.
         let at = ui.available_rect_before_wrap();
+        let fade = ui.opacity();
         egui::Area::new(egui::Id::new("phone-notices"))
             .order(egui::Order::Middle)
             .fixed_pos(at.min + vec2(0.0, notice_top))
             .constrain(false)
             .show(ui.ctx(), |ui| {
+                crate::transition::follow_screen(ui, fade);
                 ui.set_width(at.width());
                 notices(view, doc, secured, repaired, banner, ui, &t)
             })

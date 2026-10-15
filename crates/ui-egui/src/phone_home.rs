@@ -60,6 +60,16 @@ pub enum HomeTab {
 }
 
 impl HomeTab {
+    /// Its place along the tab bar, from the left.
+    fn place(self) -> i32 {
+        match self {
+            Self::Home => 0,
+            Self::Files => 1,
+            Self::Create => 2,
+            Self::Tools => 3,
+        }
+    }
+
     /// `home`, `files`, `create` or `tools`.
     pub fn parse(value: &str) -> Option<Self> {
         match value.trim().to_ascii_lowercase().as_str() {
@@ -352,15 +362,23 @@ pub(crate) fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui, screen: Rect, t: &T
     let nav = Rect::from_min_max(pos2(screen.left(), screen.bottom() - NAV), screen.max);
     let body = Rect::from_min_max(screen.min, pos2(screen.right(), nav.top()));
     ui.painter().rect_filled(body, CornerRadius::ZERO, look(t).ground);
-    if app.phone.home.tab == HomeTab::Home {
-        glow(ui.painter(), body, t);
-    }
-    match app.phone.home.tab {
-        HomeTab::Home => home_tab(app, ui, body, t),
-        HomeTab::Files => files_tab(app, ui, body, t),
-        HomeTab::Create => create_tab(app, ui, body, t),
-        HomeTab::Tools => tools_tab(app, ui, body, t),
-    }
+    // Another tab slides in from its side of the tab bar and fades in; the bar stays.
+    let tab = app.phone.home.tab;
+    let arriving = crate::transition::change(ui.ctx(), "phone-home-tab", tab.place(), tab.place());
+    ui.scope(|ui| {
+        ui.set_clip_rect(body.intersect(ui.clip_rect()));
+        ui.multiply_opacity(arriving.opacity());
+        if tab == HomeTab::Home {
+            glow(ui.painter(), body, t);
+        }
+        let body = body.translate(vec2(arriving.offset(crate::transition::SLIDE), 0.0));
+        match tab {
+            HomeTab::Home => home_tab(app, ui, body, t),
+            HomeTab::Files => files_tab(app, ui, body, t),
+            HomeTab::Create => create_tab(app, ui, body, t),
+            HomeTab::Tools => tools_tab(app, ui, body, t),
+        }
+    });
     tab_bar(app, ui, nav, t);
     if matches!(app.phone.home.tab, HomeTab::Home | HomeTab::Files) {
         fab(app, ui, body, t);
@@ -520,7 +538,9 @@ fn header(app: &mut PdfCraftApp, ui: &mut egui::Ui, rect: Rect, t: &Tokens) {
     let photo = photo_texture(app, ui.ctx());
     let initials = initials(app.profile_name());
     let searching = app.phone.home.search.is_some();
+    let fade = ui.opacity();
     egui::Area::new(egui::Id::new("phone-home-bar")).order(egui::Order::Middle).fixed_pos(rect.min).constrain(false).show(ui.ctx(), |ui| {
+        crate::transition::follow_screen(ui, fade);
         let (r, _) = ui.allocate_exact_size(rect.size(), Sense::hover());
         let inner = r.shrink2(vec2(8.0, 0.0));
         ui.scope_builder(egui::UiBuilder::new().max_rect(inner).layout(egui::Layout::left_to_right(egui::Align::Center)), |ui| {
@@ -787,13 +807,13 @@ fn tips(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
     // (id, icon, colour, title, text, action)
     let mut cards: Vec<(&'static str, &str, Color32, &str, &str, &str)> = Vec::new();
     #[cfg(not(target_arch = "wasm32"))]
-    if app.ai.key.trim().is_empty() {
+    if !app.ai.ready() {
         cards.push((
             "ai",
             "sparkles",
             phone::tool_color("ai"),
             tl!("Your AI assistant"),
-            tl!("Summarize, question and correct your PDFs with Claude, with your own key."),
+            tl!("Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key."),
             tl!("Set up"),
         ));
     }
@@ -1007,7 +1027,7 @@ fn quick_actions(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
         ui.horizontal(|ui| {
             ui.add_space(10.0);
             ui.spacing_mut().item_spacing.x = 4.0;
-            for (id, then) in actions {
+            for (k, (id, then)) in actions.into_iter().enumerate() {
                 // The assistant isn't a tool group of the catalog's that ships (it is its own screen).
                 let Some(g) = catalog::group(id).filter(|g| id == "ai" || phone::ready_tools(g)) else { continue };
                 let label = match id {
@@ -1017,7 +1037,7 @@ fn quick_actions(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
                     _ => tl!(g.label),
                 };
                 let icon = if id == "ai" { "sparkles" } else { g.icon };
-                if quick_tile(ui, icon, phone::tool_color(id), label, t).clicked() {
+                if quick_tile(ui, icon, phone::tool_color(id), label, crate::transition::tile_entrance(ui.ctx(), k), t).clicked() {
                     chosen = Some((id, then));
                 }
             }
@@ -1034,17 +1054,25 @@ fn quick_actions(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
     }
 }
 
-/// One quick action: a 68-point tile in its colour, its name in two lines under it.
-fn quick_tile(ui: &mut egui::Ui, icon: &str, hue: Color32, label: &str, t: &Tokens) -> egui::Response {
+/// One quick action: a 68-point tile in its colour, its name in two lines under it. `entrance`
+/// is how far below its place it is drawn and its opacity, as it comes in.
+fn quick_tile(ui: &mut egui::Ui, icon: &str, hue: Color32, label: &str, entrance: (f32, f32), t: &Tokens) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(vec2(86.0, 118.0), Sense::click());
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label));
     let press = theme::Press::track(ui, &resp);
+    let (rise, opacity) = entrance;
+    let mut painter = ui.painter().clone();
+    painter.multiply_opacity(opacity);
+    let rect = rect.translate(vec2(0.0, rise));
     let tile = Rect::from_center_size(rect.center_top() + vec2(0.0, 38.0), Vec2::splat(68.0)).translate(press.offset());
     // The tool's colour at full strength, glowing a little on the ground; deeper while pressed.
     let glow = egui::Shadow { offset: [0, 5], blur: 18, spread: 1, color: hue.gamma_multiply(if t.dark() { 0.7 } else { 0.42 }) };
-    ui.painter().add(glow.as_shape(tile, CornerRadius::same(20)));
-    phone::vivid_tile(ui.painter(), tile, 20.0, press.fill(hue, hue.lerp_to_gamma(Color32::BLACK, 0.08), hue.lerp_to_gamma(Color32::BLACK, 0.18)));
-    phone::tile_glyph(ui, tile, icon, 32.0);
+    painter.add(glow.as_shape(tile, CornerRadius::same(20)));
+    phone::vivid_tile(&painter, tile, 20.0, press.fill(hue, hue.lerp_to_gamma(Color32::BLACK, 0.08), hue.lerp_to_gamma(Color32::BLACK, 0.18)));
+    // A child that takes no room of the row's: only its opacity differs.
+    let mut glyph = ui.new_child(egui::UiBuilder::new().max_rect(tile));
+    glyph.multiply_opacity(opacity);
+    phone::tile_glyph(&glyph, tile, icon, 32.0);
     // Smaller type, rather than a word cut in two ("Commentaires").
     let widest = label
         .split_whitespace()
@@ -1054,8 +1082,8 @@ fn quick_tile(ui: &mut egui::Ui, icon: &str, hue: Color32, label: &str, t: &Toke
     let mut job = egui::text::LayoutJob::simple(label.to_owned(), theme::regular(size), t.text, 80.0);
     job.wrap.max_rows = 2;
     job.halign = egui::Align::Center;
-    let galley = ui.painter().layout_job(job);
-    ui.painter().galley(pos2(rect.center().x, tile.bottom() + 8.0), galley, t.text);
+    let galley = painter.layout_job(job);
+    painter.galley(pos2(rect.center().x, tile.bottom() + 8.0), galley, t.text);
     theme::hand(resp)
 }
 
@@ -1431,7 +1459,9 @@ fn fab(app: &mut PdfCraftApp, ui: &mut egui::Ui, body: Rect, t: &Tokens) {
     let fab = Rect::from_min_size(body.right_bottom() - vec2(FAB + 18.0, FAB + 18.0), Vec2::splat(FAB));
     let label = phone::command_label(app, "file.open");
     let mut tapped = false;
+    let fade = ui.opacity();
     egui::Area::new(egui::Id::new("phone-fab")).order(egui::Order::Middle).fixed_pos(fab.min).constrain(false).show(ui.ctx(), |ui| {
+        crate::transition::follow_screen(ui, fade);
         let (r, resp) = ui.allocate_exact_size(fab.size(), Sense::click());
         resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &label));
         let press = theme::Press::track(ui, &resp);

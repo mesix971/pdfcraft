@@ -2462,3 +2462,21 @@ decimal separator	.	,
 	Tap text or a picture to change it	Koppints egy szövegre vagy képre a módosításhoz
 	Tap where the text goes	Koppints oda, ahová a szöveg kerül
 	White	Fehér
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	A kérdésed és a megnyitott dokumentum a választott szolgáltatáshoz kerül, a saját API-kulcsoddal, csak amikor kéred. A kéréseket a szolgáltatásnál lévő fiókodra számlázzák.
+	Service	Szolgáltatás
+	Another service (OpenAI-compatible)	Más szolgáltatás (OpenAI-kompatibilis)
+	API key	API-kulcs
+	On Google's free tier, what you send may be used to improve Google's products.	A Google ingyenes szintjén az elküldött tartalmat a Google a termékei fejlesztésére használhatja.
+	Fill in for	Kitöltés ehhez:
+	Service address	A szolgáltatás címe
+	API key (if the service asks for one)	API-kulcs (ha a szolgáltatás kér)
+	The service reads PDF files	A szolgáltatás olvassa a PDF-fájlokat
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	Különben a dokumentum szövege megy el, oldalanként (képek és szkennelt részek nélkül).
+	Add your API key for {service} in the assistant's settings.	Add meg a(z) {service} API-kulcsodat az asszisztens beállításaiban.
+	Your {service} account can't use this model, or has no credit left: {error}	A(z) {service}-fiókod nem használhatja ezt a modellt, vagy elfogyott a kreditje: {error}
+	Choose the model to ask in the assistant's settings.	Válaszd ki a kérdezendő modellt az asszisztens beállításaiban.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	Ebben a dokumentumban nincs elküldhető szöveg (szkennelt?). Válassz PDF-fájlokat olvasó szolgáltatást, vagy előbb ismertesd fel a szövegét.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	A dokumentum szövege túl hosszú az asszisztensnek ({chars} karakter, legfeljebb {max}).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Foglald össze, kérdezd ki és javítsd a PDF-jeidet a Claude-dal, a ChatGPT-vel vagy a Geminivel, a saját kulcsoddal.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	A szolgáltatás címe érvénytelen: https:// előtaggal kezdődik (http:// csak ehhez az eszközhöz vagy a helyi hálózathoz).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	Ez a dokumentum nem engedi a tartalma másolását, ezért nem kerül az asszisztenshez.

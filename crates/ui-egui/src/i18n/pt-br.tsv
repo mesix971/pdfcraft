@@ -2478,3 +2478,21 @@ decimal separator	.	,
 	Tap text or a picture to change it	Toque em um texto ou imagem para alterá-lo
 	Tap where the text goes	Toque onde o texto vai ficar
 	White	Branco
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	Sua pergunta e o documento aberto são enviados ao serviço que você escolher, com sua própria chave de API, só quando você pede. As solicitações são cobradas na sua conta desse serviço.
+	Service	Serviço
+	Another service (OpenAI-compatible)	Outro serviço (compatível com a OpenAI)
+	API key	Chave de API
+	On Google's free tier, what you send may be used to improve Google's products.	No nível gratuito do Google, o que você envia pode ser usado para melhorar os produtos do Google.
+	Fill in for	Preencher para
+	Service address	Endereço do serviço
+	API key (if the service asks for one)	Chave de API (se o serviço pedir)
+	The service reads PDF files	O serviço lê arquivos PDF
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	Caso contrário, o texto do documento é enviado, página por página (sem as imagens nem as digitalizações).
+	Add your API key for {service} in the assistant's settings.	Adicione sua chave de API do {service} nas configurações do assistente.
+	Your {service} account can't use this model, or has no credit left: {error}	Sua conta do {service} não pode usar este modelo ou está sem crédito: {error}
+	Choose the model to ask in the assistant's settings.	Escolha o modelo a perguntar nas configurações do assistente.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	Este documento não tem texto para enviar (é uma digitalização?). Escolha um serviço que leia arquivos PDF ou reconheça o texto dele primeiro.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	O texto deste documento é longo demais para o assistente ({chars} caracteres, no máximo {max}).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Resuma, pergunte e corrija seus PDFs com o Claude, o ChatGPT ou o Gemini, usando sua própria chave.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	O endereço do serviço não é válido: ele começa com https:// (http:// só para este dispositivo ou a rede local).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	Este documento não permite copiar o conteúdo, então ele não é enviado ao assistente.

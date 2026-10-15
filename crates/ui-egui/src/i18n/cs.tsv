@@ -2537,3 +2537,21 @@ decimal separator	.	,
 	Tap text or a picture to change it	Klepnutím na text nebo obrázek je změníte
 	Tap where the text goes	Klepněte, kam má text přijít
 	White	Bílá
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	Vaše otázka a otevřený dokument se odesílají službě, kterou si zvolíte, s vaším vlastním klíčem API, a jen když o to požádáte. Požadavky se účtují na váš účet u této služby.
+	Service	Služba
+	Another service (OpenAI-compatible)	Jiná služba (kompatibilní s OpenAI)
+	API key	Klíč API
+	On Google's free tier, what you send may be used to improve Google's products.	V bezplatné úrovni Googlu může být to, co odešlete, použito ke zlepšení produktů Googlu.
+	Fill in for	Vyplnit pro
+	Service address	Adresa služby
+	API key (if the service asks for one)	Klíč API (pokud ho služba vyžaduje)
+	The service reads PDF files	Služba čte soubory PDF
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	Jinak se odešle text dokumentu, stránku po stránce (bez obrázků a skenů).
+	Add your API key for {service} in the assistant's settings.	Přidejte svůj klíč API pro {service} v nastavení asistenta.
+	Your {service} account can't use this model, or has no credit left: {error}	Váš účet {service} nemůže tento model používat, nebo už nemá žádný kredit: {error}
+	Choose the model to ask in the assistant's settings.	Zvolte model, kterého se ptát, v nastavení asistenta.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	Tento dokument nemá žádný text k odeslání (je to sken?). Zvolte službu, která čte soubory PDF, nebo nejprve rozpoznejte jeho text.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	Text tohoto dokumentu je pro asistenta příliš dlouhý ({chars} znaků, nejvýše {max}).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Shrnujte, ptejte se a opravujte své PDF s Claudem, ChatGPT nebo Gemini, s vlastním klíčem.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	Adresa služby není platná: začíná na https:// (http:// jen pro toto zařízení nebo místní síť).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	Tento dokument nedovoluje kopírovat svůj obsah, proto se asistentovi neodesílá.

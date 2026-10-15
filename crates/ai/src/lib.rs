@@ -1,57 +1,135 @@
-//! The optional AI assistant: summarize a document, answer questions about it, translate a page.
+//! The optional AI assistant: summarize a document, answer questions about it, translate a page,
+//! propose changes to its text.
 //!
 //! Acrobat's AI Assistant is a cloud service tied to Adobe accounts; PdfCraft's is the user's own:
-//! it talks to Anthropic's Messages API with the user's own API key, and only when the user asks.
-//! Nothing is sent until a key is set and a question is asked, and each request carries the open
-//! document and the question, nothing else.
+//! it talks to the service the user chooses, with the user's own key, and only when the user asks.
+//! Anthropic's Claude ([`anthropic`]), OpenAI's ChatGPT models ([`openai`]) and Google's Gemini
+//! ([`gemini`]) read the PDF itself, its text and its pages (scans included). Any other service
+//! that speaks OpenAI's Chat Completions ([`compatible`]: OpenRouter, Mistral, DeepSeek, Groq, a
+//! local Ollama…) gets the document's text, page by page, unless it reads PDF files too. Nothing
+//! is sent until the service is set up and a question is asked, and each request carries the open
+//! document and the conversation about it, nothing else.
 //!
-//! The document goes as a PDF `document` block, so Claude reads its text and sees its pages
-//! (scans included). The block is marked for prompt caching: a follow-up question about the same
-//! document reads it back from the cache for a fraction of the first request's price.
+//! Each service is asked the same way: one system prompt, the document with the first question,
+//! then every earlier answer exactly as the service gave it (its thinking included, which the
+//! services check), what became of the changes it proposed, and the next question.
 //!
 //! Every call blocks until the answer arrives (seconds to a few minutes): run it on a worker thread.
-//! The web build has no assistant: [`send`] says so (a browser page can't call the API directly).
+//! The web build has no assistant: [`send`] says so (a browser page can't call the APIs directly).
 
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
-use base64::Engine as _;
 use serde_json::{Value, json};
 
-#[cfg(not(target_arch = "wasm32"))]
-const API_URL: &str = "https://api.anthropic.com/v1/messages";
-#[cfg(not(target_arch = "wasm32"))]
-const API_VERSION: &str = "2023-06-01";
-/// Server-side refusal fallbacks in their `"default"` form: a declined request is re-run on the
-/// model Anthropic recommends for that kind of refusal, in the same call.
-#[cfg(not(target_arch = "wasm32"))]
-const FALLBACK_BETA: &str = "server-side-fallback-2026-07-01";
-/// The Messages API takes requests up to 32 MB, and base64 makes a PDF a third larger.
+mod anthropic;
+mod compatible;
+mod gemini;
+mod openai;
+
+/// The largest PDF sent. Anthropic's Messages API takes requests up to 32 MB, and base64 makes a
+/// PDF a third larger; OpenAI and Gemini take PDFs up to 50 MB.
 pub const MAX_PDF_BYTES: usize = 22 * 1024 * 1024;
-/// The most pages the API reads from one PDF on these models.
+/// The most pages a request carries: what Anthropic reads from one PDF (Gemini reads 1000).
 pub const API_MAX_PAGES: usize = 600;
 /// The most earlier exchanges a question carries. Each one is read again by every later question,
 /// so a longer conversation costs more and more: past this, the caller starts a new one.
 pub const MAX_TURNS: usize = 20;
-/// Room for the answer. A request this size stays well inside the HTTP timeout without streaming.
-const MAX_TOKENS: u32 = 16_000;
+/// The most of a document's text sent to a service that doesn't read PDF files, in characters
+/// (about 400,000 tokens).
+pub const MAX_TEXT_CHARS: usize = 1_600_000;
 /// The longest answer read back, in bytes.
 #[cfg(not(target_arch = "wasm32"))]
 const MAX_RESPONSE: u64 = 8 << 20;
 /// How long one request may take: thinking on a long document can take minutes.
 #[cfg(not(target_arch = "wasm32"))]
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
-/// The longest API key accepted (Anthropic's keys are about a hundred characters).
+/// The longest API key accepted (the services' keys are about a hundred characters).
 const MAX_KEY: usize = 512;
-/// The longest refusal category kept (the API's are one word).
+/// The longest model id accepted.
+const MAX_MODEL: usize = 200;
+/// The longest address of a compatible service.
+const MAX_URL: usize = 2048;
+/// The largest request sent (the document and the conversation, as JSON): what the services take,
+/// and what a phone can hold twice.
+#[cfg(not(target_arch = "wasm32"))]
+const MAX_BODY: usize = 48 << 20;
+/// The longest reason for a refusal kept.
 const MAX_CATEGORY: usize = 40;
 
-/// The Claude model that answers. Opus is the default; Sonnet and Haiku cost less per question.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum Model {
+/// The service that answers.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum Provider {
+    /// Anthropic's Claude.
     #[default]
-    Opus,
-    Sonnet,
-    Haiku,
+    Anthropic,
+    /// OpenAI's models (ChatGPT's).
+    OpenAi,
+    /// Google's Gemini.
+    Gemini,
+    /// Any service that speaks OpenAI's Chat Completions, at the address the user gives.
+    Compatible,
+}
+
+impl Provider {
+    pub const ALL: [Self; 4] = [Self::Anthropic, Self::OpenAi, Self::Gemini, Self::Compatible];
+
+    /// Its name in the settings.
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Anthropic => "anthropic",
+            Self::OpenAi => "openai",
+            Self::Gemini => "gemini",
+            Self::Compatible => "compatible",
+        }
+    }
+
+    pub fn from_id(id: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|p| p.id() == id.trim())
+    }
+
+    /// Its place in [`Self::ALL`].
+    pub fn index(self) -> usize {
+        match self {
+            Self::Anthropic => 0,
+            Self::OpenAi => 1,
+            Self::Gemini => 2,
+            Self::Compatible => 3,
+        }
+    }
+
+    /// Its name, as its maker writes it; the compatible services have none of their own (the
+    /// interface names them).
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Anthropic => "Claude (Anthropic)",
+            Self::OpenAi => "ChatGPT (OpenAI)",
+            Self::Gemini => "Gemini (Google)",
+            Self::Compatible => "OpenAI-compatible",
+        }
+    }
+
+    /// The models of its the assistant offers, best first (none for a compatible service: the
+    /// user names one).
+    pub fn models(self) -> impl Iterator<Item = &'static Known> {
+        KNOWN.iter().filter(move |k| k.provider == self && k.listed)
+    }
+
+    /// The model asked until the user picks one.
+    pub fn default_model(self) -> &'static str {
+        match self {
+            Self::Anthropic => "claude-opus-5-5",
+            // OpenAI's own default.
+            Self::OpenAi => "gpt-6.1-sol",
+            // Google's recommendation for new projects, with a free tier.
+            Self::Gemini => "gemini-3.8-flash",
+            Self::Compatible => "",
+        }
+    }
+
+    /// A request needs a key (a compatible service on the device or the local network may not).
+    pub fn needs_key(self) -> bool {
+        self != Self::Compatible
+    }
 }
 
 /// List prices in US dollars per million tokens.
@@ -63,58 +141,135 @@ struct Prices {
     cache_read: f64,
 }
 
-impl Model {
-    pub const ALL: [Self; 3] = [Self::Opus, Self::Sonnet, Self::Haiku];
-
-    /// The model id the API takes.
-    pub fn id(self) -> &'static str {
-        match self {
-            Self::Opus => "claude-opus-5-5",
-            Self::Sonnet => "claude-sonnet-5-5",
-            Self::Haiku => "claude-haiku-5-5",
-        }
-    }
-
-    /// The model a saved [`id`](Self::id) names, or `None`.
-    pub fn from_id(id: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|m| m.id() == id.trim())
-    }
-
-    /// The model's name, as Anthropic writes it.
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Opus => "Claude Opus 5.5",
-            Self::Sonnet => "Claude Sonnet 5.5",
-            Self::Haiku => "Claude Haiku 5.5",
-        }
-    }
-
-    /// Anthropic's list prices (October 2026) for a request whose prompt is `prompt` tokens. A
-    /// five-minute cache write costs 1.25 times the input price; a read is far cheaper. Haiku has
-    /// two rate cards, the dearer one for prompts over 100K tokens.
-    fn prices(self, prompt: u64) -> Prices {
-        match self {
-            Self::Opus => Prices { input: 4.0, output: 20.0, cache_write: 5.0, cache_read: 0.20 },
-            Self::Sonnet => Prices { input: 2.0, output: 10.0, cache_write: 2.5, cache_read: 0.20 },
-            Self::Haiku if prompt > 100_000 => Prices { input: 0.50, output: 2.50, cache_write: 0.625, cache_read: 0.05 },
-            Self::Haiku => Prices { input: 0.10, output: 0.50, cache_write: 0.125, cache_read: 0.01 },
-        }
-    }
-
-    /// The input and output prices per million tokens, in US dollars (Haiku's for prompts up to
-    /// 100K tokens).
-    pub fn list_prices(self) -> (f64, f64) {
-        let p = self.prices(0);
-        (p.input, p.output)
-    }
-
-    /// Whether the server re-runs a declined request on another model. Haiku has no fallback.
-    fn fallbacks(self) -> bool {
-        matches!(self, Self::Opus | Self::Sonnet)
+impl Prices {
+    /// The prices of a service that caches by itself: what it writes to its cache is plain input.
+    const fn cached_by_itself(input: f64, output: f64, cache_read: f64) -> Self {
+        Self { input, output, cache_write: input, cache_read }
     }
 }
 
-/// What one request used, as the API counts it (thinking is part of `output`).
+/// A model the assistant knows: who makes it, the id its API takes, its name and list prices.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Known {
+    pub provider: Provider,
+    pub id: &'static str,
+    pub name: &'static str,
+    prices: Prices,
+    /// The dearer prices of a request whose prompt is longer than this many tokens, for the whole
+    /// request.
+    long: Option<(u64, Prices)>,
+    /// Offered to choose; the others are only priced (a declined request's fallback).
+    listed: bool,
+    /// The service has a free tier for it, on which what is sent may be used to improve it.
+    pub free_tier: bool,
+}
+
+impl Known {
+    fn prices(&self, prompt: u64) -> Prices {
+        match self.long {
+            Some((over, dearer)) if prompt > over => dearer,
+            _ => self.prices,
+        }
+    }
+
+    /// The input and output prices per million tokens, in US dollars (the cheaper card's).
+    pub fn list_prices(&self) -> (f64, f64) {
+        (self.prices.input, self.prices.output)
+    }
+
+    /// The server re-runs a declined request on another model (Anthropic's, but Haiku).
+    fn fallbacks(&self) -> bool {
+        matches!(self.id, "claude-opus-5-5" | "claude-sonnet-5-5")
+    }
+}
+
+/// The models the assistant knows, with their list prices (October 2026):
+///
+/// - Anthropic's (platform.claude.com/docs/en/about-claude/pricing). A five-minute cache write
+///   costs 1.25 times the input price; a read 0.05 times on Opus 5.5 and Sonnet 5.5, 0.1 times on
+///   the others. Haiku's prompts over 100K tokens cost more. Opus 4.8, Opus 5 and Sonnet 5 are a
+///   declined request's fallbacks.
+/// - OpenAI's Standard prices (developers.openai.com/api/docs/pricing). A prompt over 272K tokens
+///   costs twice the input and cache prices and 1.5 times the output price, for the whole request.
+/// - Google's paid tier, Standard (ai.google.dev/gemini-api/docs/pricing), at the regular prices:
+///   Gemini 4 Argon costs half until 30 November 2026, Gemini 3.8 Flash until 31 December 2026.
+///   Gemini caches by itself; output includes thinking.
+const KNOWN: [Known; 12] = [
+    claude("claude-opus-5-5", "Claude Opus 5.5", Prices { input: 4.0, output: 20.0, cache_write: 5.0, cache_read: 0.20 }, None, true),
+    claude("claude-sonnet-5-5", "Claude Sonnet 5.5", Prices { input: 2.0, output: 10.0, cache_write: 2.5, cache_read: 0.10 }, None, true),
+    claude(
+        "claude-haiku-5-5",
+        "Claude Haiku 5.5",
+        Prices { input: 0.10, output: 0.50, cache_write: 0.125, cache_read: 0.01 },
+        Some((100_000, Prices { input: 0.50, output: 2.50, cache_write: 0.625, cache_read: 0.05 })),
+        true,
+    ),
+    claude("claude-opus-4-8", "Claude Opus 4.8", Prices { input: 5.0, output: 25.0, cache_write: 6.25, cache_read: 0.50 }, None, false),
+    claude("claude-opus-5", "Claude Opus 5", Prices { input: 5.0, output: 25.0, cache_write: 6.25, cache_read: 0.50 }, None, false),
+    // Sonnet 5.5's fallback, at Sonnet 5.5's prices.
+    claude("claude-sonnet-5", "Claude Sonnet 5", Prices { input: 2.0, output: 10.0, cache_write: 2.5, cache_read: 0.10 }, None, false),
+    openai(
+        "gpt-6-astra",
+        "GPT-6 Astra",
+        Prices { input: 10.0, output: 50.0, cache_write: 12.5, cache_read: 1.0 },
+        Prices { input: 20.0, output: 75.0, cache_write: 25.0, cache_read: 2.0 },
+    ),
+    openai(
+        "gpt-6.1-sol",
+        "GPT-6.1 Sol",
+        Prices { input: 2.0, output: 10.0, cache_write: 2.5, cache_read: 0.10 },
+        Prices { input: 4.0, output: 15.0, cache_write: 5.0, cache_read: 0.20 },
+    ),
+    openai(
+        "gpt-6-luna",
+        "GPT-6 Luna",
+        Prices { input: 0.10, output: 0.50, cache_write: 0.125, cache_read: 0.01 },
+        Prices { input: 0.20, output: 0.75, cache_write: 0.25, cache_read: 0.02 },
+    ),
+    gemini("gemini-4-argon", "Gemini 4 Argon", Prices::cached_by_itself(4.0, 20.0, 0.20), false),
+    gemini("gemini-3.8-flash", "Gemini 3.8 Flash", Prices::cached_by_itself(1.50, 7.50, 0.15), true),
+    gemini("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite", Prices::cached_by_itself(0.30, 2.50, 0.03), true),
+];
+
+const fn claude(id: &'static str, name: &'static str, prices: Prices, long: Option<(u64, Prices)>, listed: bool) -> Known {
+    Known { provider: Provider::Anthropic, id, name, prices, long, listed, free_tier: false }
+}
+
+const fn openai(id: &'static str, name: &'static str, prices: Prices, long: Prices) -> Known {
+    Known { provider: Provider::OpenAi, id, name, prices, long: Some((272_000, long)), listed: true, free_tier: false }
+}
+
+const fn gemini(id: &'static str, name: &'static str, prices: Prices, free_tier: bool) -> Known {
+    Known { provider: Provider::Gemini, id, name, prices, long: None, listed: true, free_tier }
+}
+
+/// The model of `provider` an API names `id`, or `None` (a compatible service's are never
+/// known). A dated id ("…-20261001", "…-2026-10-01") names the same model.
+pub fn known(provider: Provider, id: &str) -> Option<&'static Known> {
+    let id = id.trim();
+    KNOWN
+        .iter()
+        .filter(|k| k.provider == provider && provider != Provider::Compatible)
+        .filter(|k| {
+            id == k.id
+                || id.strip_prefix(k.id).and_then(|rest| rest.strip_prefix('-')).is_some_and(|date| {
+                    !date.is_empty() && date.bytes().all(|b| b.is_ascii_digit() || b == b'-') && date.bytes().filter(u8::is_ascii_digit).count() == 8
+                })
+        })
+        // "claude-opus-5-5-…" is Opus 5.5, not Opus 5.
+        .max_by_key(|k| k.id.len())
+}
+
+/// The host of a compatible service's address, in lower case ("api.mistral.ai"); `None` for an
+/// address that isn't one.
+pub fn service_host(base_url: &str) -> Option<String> {
+    compatible::endpoint(base_url).ok()?;
+    let rest = base_url.trim().split_once("://").map(|(_, rest)| rest)?;
+    Some(compatible::host_of(rest).to_ascii_lowercase()).filter(|h| !h.is_empty())
+}
+
+/// What one request used, as the service counts it (thinking is part of `output`). `input` is the
+/// prompt's tokens that were neither read from nor written to a cache.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Usage {
     pub input: u64,
@@ -124,14 +279,14 @@ pub struct Usage {
 }
 
 impl Usage {
-    /// Roughly what the request cost on `model`, in US dollars, at list prices.
-    pub fn cost_usd(&self, model: Model) -> f64 {
-        self.cost_at(model.prices(self.prompt()))
-    }
-
     fn cost_at(&self, p: Prices) -> f64 {
         let per = |tokens: u64, price: f64| tokens as f64 * price / 1_000_000.0;
         per(self.input, p.input) + per(self.output, p.output) + per(self.cache_write, p.cache_write) + per(self.cache_read, p.cache_read)
+    }
+
+    /// Roughly what the request cost on `model`, in US dollars, at list prices.
+    pub fn cost_usd(&self, model: &Known) -> f64 {
+        self.cost_at(model.prices(self.prompt()))
     }
 
     /// The prompt's tokens, cached or not.
@@ -142,27 +297,6 @@ impl Usage {
     /// All the tokens read and written.
     pub fn total(&self) -> u64 {
         self.prompt().saturating_add(self.output)
-    }
-}
-
-/// The list prices of the model the API names `id`: the assistant's own models, and the ones a
-/// declined request may fall back to (Claude Opus 4.8 and Claude Opus 5, $5 / $25, reads at a
-/// tenth of the input price). `None` for any other.
-fn prices_of(id: &str, prompt: u64) -> Option<Prices> {
-    // A dated id ("…-20261001") names the same model.
-    let id = id.trim();
-    let id = match id.rsplit_once('-') {
-        Some((base, date)) if date.len() == 8 && date.bytes().all(|b| b.is_ascii_digit()) => base,
-        _ => id,
-    };
-    if let Some(model) = Model::from_id(id) {
-        return Some(model.prices(prompt));
-    }
-    match id {
-        "claude-opus-4-8" | "claude-opus-5" => Some(Prices { input: 5.0, output: 25.0, cache_write: 6.25, cache_read: 0.50 }),
-        // Sonnet 5.5's fallback, at Sonnet 5.5's prices.
-        "claude-sonnet-5" => Some(Model::Sonnet.prices(prompt)),
-        _ => None,
     }
 }
 
@@ -195,8 +329,9 @@ impl Task {
     }
 }
 
-/// One earlier question and its answer, as the API returned it (kept whole so the conversation
-/// can continue exactly as the model left it).
+/// One earlier question and its answer, as the service returned it (kept whole so the
+/// conversation can continue exactly as the model left it). An answer only goes back to the
+/// service that gave it: a conversation starts again with another service or model.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Turn {
     pub prompt: String,
@@ -204,6 +339,13 @@ pub struct Turn {
     /// What became of the changes the answer proposed: (the proposal's id, what happened), sent
     /// back with the next question. A proposal left out is reported as not applied.
     pub results: Vec<(String, String)>,
+}
+
+impl Turn {
+    /// What became of proposal `id`, as the next question tells it.
+    fn result(&self, id: &str) -> &str {
+        self.results.iter().find(|(r, _)| r == id).map_or(NOT_APPLIED, |(_, text)| text.as_str())
+    }
 }
 
 /// The most changes one answer may propose; past this they are reported as not applied.
@@ -217,7 +359,7 @@ const NOT_APPLIED: &str = "Not applied: the user didn't apply this change.";
 /// reads in the document, becomes `replace`. Nothing changes until the user applies it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProposedEdit {
-    /// The API's id for the proposal, to report what became of it.
+    /// The service's id for the proposal, to report what became of it.
     pub id: String,
     pub page: usize,
     pub find: String,
@@ -225,33 +367,46 @@ pub struct ProposedEdit {
 }
 
 /// The tool the model proposes changes with. Its name and wording stay the same for every
-/// question, so the cached prefix stays valid.
-fn edit_tool() -> Value {
+/// question, so a cached prefix stays valid.
+const EDIT_TOOL: &str = "edit_text";
+const EDIT_DESCRIPTION: &str = "Propose a change to the text of the open PDF, keeping its layout: on page `page`, the passage `find` becomes `replace`. \
+    Quote `find` exactly as it reads in the document, within one paragraph; the paragraph keeps its font, size, colour and box and is rewrapped. \
+    Use one call per passage, and keep a replacement about as long as what it replaces so it fits. \
+    The user sees every proposal and decides whether to apply them; use this only when asked to change the document itself.";
+
+/// The tool's parameters, a JSON schema. `minimum` is left out where a service reads only part of
+/// JSON Schema (Gemini); proposals are checked here anyway.
+fn edit_schema(minimum: bool) -> Value {
+    let mut page = json!({"type": "integer", "description": "The page number, from 1."});
+    if minimum && let Some(map) = page.as_object_mut() {
+        map.insert("minimum".into(), json!(1));
+    }
     json!({
-        "name": "edit_text",
-        "description": "Propose a change to the text of the open PDF, keeping its layout: on page `page`, the passage `find` becomes `replace`. \
-            Quote `find` exactly as it reads in the document, within one paragraph; the paragraph keeps its font, size, colour and box and is rewrapped. \
-            Use one call per passage, and keep a replacement about as long as what it replaces so it fits. \
-            The user sees every proposal and decides whether to apply them; use this only when asked to change the document itself.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "page": {"type": "integer", "minimum": 1, "description": "The page number, from 1."},
-                "find": {"type": "string", "description": "The passage to change, exactly as it reads in the document."},
-                "replace": {"type": "string", "description": "The new text for that passage."},
-            },
-            "required": ["page", "find", "replace"],
+        "type": "object",
+        "properties": {
+            "page": page,
+            "find": {"type": "string", "description": "The passage to change, exactly as it reads in the document."},
+            "replace": {"type": "string", "description": "The new text for that passage."},
         },
+        "required": ["page", "find", "replace"],
     })
 }
 
-/// A request: the document, the conversation so far, and the new task.
+/// A request: the service, the document, the conversation so far, and the new task.
 pub struct Request<'a> {
+    pub provider: Provider,
     pub key: &'a str,
-    pub model: Model,
+    /// The model's id, as the service names it.
+    pub model: &'a str,
+    /// A compatible service's address, up to its version ("https://openrouter.ai/api/v1"); the
+    /// others have their own.
+    pub base_url: &'a str,
     /// The document's file name, shown to the model as its title.
     pub title: &'a str,
     pub pdf: &'a [u8],
+    /// For a compatible service that doesn't read PDF files: the document's text, page by page,
+    /// sent instead of the PDF. `None` sends the PDF; the other services always get the PDF.
+    pub text: Option<&'a str>,
     pub pages: usize,
     /// The most pages a request may send (a cost guard the user sets); at most [`API_MAX_PAGES`].
     pub max_pages: usize,
@@ -264,12 +419,37 @@ pub struct Request<'a> {
     pub edits: bool,
 }
 
+impl Request<'_> {
+    /// The text sent instead of the PDF (a compatible service's, when it has one).
+    fn text(&self) -> Option<&str> {
+        self.text.filter(|_| self.provider == Provider::Compatible)
+    }
+
+    /// The prompts in order: the earlier ones, then the task's.
+    fn prompts(&self) -> impl Iterator<Item = String> + '_ {
+        self.history.iter().map(|t| t.prompt.clone()).chain(std::iter::once(self.task.prompt()))
+    }
+
+    /// The tool is defined: changes may be proposed, or the conversation already used it (every
+    /// proposal in its history then has its tool beside it, and a cached prefix stays the same).
+    fn tool(&self) -> bool {
+        self.edits || self.history.iter().any(|t| !calls(self.provider, &t.answer).is_empty())
+    }
+
+    /// The system prompt. It stays the same for every question about a document, so a cached
+    /// prefix stays valid.
+    fn system(&self) -> String {
+        system_prompt(self.language, self.edits, self.text().is_some())
+    }
+}
+
 /// An answer.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Reply {
+    pub provider: Provider,
     /// The answer's text.
     pub text: String,
-    /// The answer as the API returned it, for the next turn of the conversation.
+    /// The answer as the service returned it, for the next turn of the conversation.
     pub content: Value,
     pub usage: Usage,
     /// The answer stopped at the length limit.
@@ -284,21 +464,27 @@ pub struct Reply {
 
 impl Reply {
     /// Roughly what the answer cost, in US dollars, at the list prices of the model that gave it;
-    /// `None` when that model's prices aren't known here. When another model answered, the
-    /// attempt that declined isn't counted.
+    /// `None` when that model's prices aren't known here (a compatible service's never are). When
+    /// another model answered, the attempt that declined isn't counted.
     pub fn cost_usd(&self) -> Option<f64> {
-        prices_of(&self.model, self.usage.prompt()).map(|p| self.usage.cost_at(p))
+        known(self.provider, &self.model).map(|k| self.usage.cost_usd(k))
     }
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum AiError {
-    #[error("no API key: add your Anthropic API key first")]
+    #[error("no API key: add your key for the service first")]
     NoKey,
     #[error("the API key isn't usable: it must be one line of plain characters")]
     BadKey,
+    #[error("no model: name the model to ask first")]
+    NoModel,
+    #[error("the service's address isn't usable: it starts with https:// or http://")]
+    BadAddress,
     #[error("the document has no pages to send")]
     Empty,
+    #[error("the document has no text to send")]
+    NoText,
     #[error("the question is empty")]
     NoQuestion,
     #[error("the model gave no answer")]
@@ -307,6 +493,8 @@ pub enum AiError {
     TooManyPages { pages: usize, max: usize },
     #[error("the document is {mb} MB, more than the {max_mb} MB the assistant may read")]
     TooLarge { mb: usize, max_mb: usize },
+    #[error("the document's text is {chars} characters, more than the {max} the assistant may send")]
+    TooMuchText { chars: usize, max: usize },
     #[error("the API key was refused")]
     InvalidKey,
     #[error("the account can't use this model, or has no credit left: {0}")]
@@ -325,14 +513,21 @@ pub enum AiError {
     Parse(String),
 }
 
-/// The request body for `req`, after its size checks.
-pub fn request_body(req: &Request) -> Result<Value, AiError> {
+/// `req`'s checks, made before anything is sent.
+fn check(req: &Request) -> Result<(), AiError> {
     let key = req.key.trim();
-    if key.is_empty() {
+    if key.is_empty() && req.provider.needs_key() {
         return Err(AiError::NoKey);
     }
     if key.len() > MAX_KEY || !key.bytes().all(|b| b.is_ascii_graphic()) {
         return Err(AiError::BadKey);
+    }
+    let model = req.model.trim();
+    if model.is_empty() || model.len() > MAX_MODEL || !model.bytes().all(|b| b.is_ascii_graphic()) {
+        return Err(AiError::NoModel);
+    }
+    if req.provider == Provider::Compatible {
+        compatible::endpoint(req.base_url)?;
     }
     if req.pdf.is_empty() || req.pages == 0 {
         return Err(AiError::Empty);
@@ -344,74 +539,35 @@ pub fn request_body(req: &Request) -> Result<Value, AiError> {
     if req.pages > max {
         return Err(AiError::TooManyPages { pages: req.pages, max });
     }
-    if req.pdf.len() > MAX_PDF_BYTES {
-        return Err(AiError::TooLarge { mb: req.pdf.len().div_ceil(1 << 20), max_mb: MAX_PDF_BYTES >> 20 });
-    }
-    let document = json!({
-        "type": "document",
-        "source": {"type": "base64", "media_type": "application/pdf", "data": base64::engine::general_purpose::STANDARD.encode(req.pdf)},
-        "title": req.title,
-        // The prefix up to here (system prompt and document) is read back from the cache by
-        // every later question about this document.
-        "cache_control": {"type": "ephemeral"},
-    });
-    // The first question rides with the document; later ones follow the answers.
-    let mut prompts = req.history.iter().map(|t| t.prompt.clone()).chain(std::iter::once(req.task.prompt()));
-    let first = prompts.next().unwrap_or_default();
-    let mut messages = vec![json!({"role": "user", "content": [document, {"type": "text", "text": first}]})];
-    for (turn, prompt) in req.history.iter().zip(prompts) {
-        messages.push(json!({"role": "assistant", "content": turn.answer}));
-        // What became of the answer's proposals comes first, one result for each, then the question.
-        let mut content = tool_results(turn);
-        content.push(json!({"type": "text", "text": prompt}));
-        messages.push(json!({"role": "user", "content": content}));
-    }
-    // The conversation so far is cached too, so the next question reads it back instead of
-    // paying for it again (the marker on the newest question; earlier ones stay read points).
-    if let Some(block) = messages.last_mut().and_then(|m| m["content"].as_array_mut()).and_then(|c| c.last_mut()).and_then(Value::as_object_mut)
-        && block.get("type").and_then(Value::as_str) == Some("text")
-    {
-        block.insert("cache_control".into(), json!({"type": "ephemeral"}));
-    }
-    let mut body = json!({
-        "model": req.model.id(),
-        "max_tokens": MAX_TOKENS,
-        "output_config": {"effort": "medium"},
-        "system": system_prompt(req.language, req.edits),
-        "messages": messages,
-    });
-    // A conversation that has used the tool keeps it defined, so every proposal in its history
-    // has its tool beside it (and the prefix stays the same).
-    let tool_used = req.history.iter().any(|t| t.answer.as_array().is_some_and(|b| b.iter().any(|b| b["type"] == "tool_use")));
-    if let Some(map) = body.as_object_mut() {
-        if req.edits || tool_used {
-            map.insert("tools".into(), json!([edit_tool()]));
+    match req.text() {
+        Some(text) if text.trim().is_empty() => return Err(AiError::NoText),
+        Some(text) => {
+            let chars = text.chars().count();
+            if chars > MAX_TEXT_CHARS {
+                return Err(AiError::TooMuchText { chars, max: MAX_TEXT_CHARS });
+            }
         }
-        if req.model.fallbacks() {
-            map.insert("fallbacks".into(), json!("default"));
+        None if req.pdf.len() > MAX_PDF_BYTES => {
+            return Err(AiError::TooLarge { mb: req.pdf.len().div_ceil(1 << 20), max_mb: MAX_PDF_BYTES >> 20 });
         }
+        None => {}
     }
-    Ok(body)
+    Ok(())
 }
 
-/// The results the next question carries for `turn`'s proposals: one for every `tool_use` in its
-/// answer (the API refuses a conversation that leaves one out), in the answer's order.
-fn tool_results(turn: &Turn) -> Vec<Value> {
-    let Some(blocks) = turn.answer.as_array() else { return Vec::new() };
-    blocks
-        .iter()
-        .filter(|b| b["type"] == "tool_use")
-        .filter_map(|b| b["id"].as_str())
-        .map(|id| {
-            let result = turn.results.iter().find(|(r, _)| r == id).map_or(NOT_APPLIED, |(_, text)| text.as_str());
-            json!({"type": "tool_result", "tool_use_id": id, "content": result})
-        })
-        .collect()
+/// The request body for `req`, after its checks.
+pub fn request_body(req: &Request) -> Result<Value, AiError> {
+    check(req)?;
+    Ok(match req.provider {
+        Provider::Anthropic => anthropic::body(req),
+        Provider::OpenAi => openai::body(req),
+        Provider::Gemini => gemini::body(req),
+        Provider::Compatible => compatible::body(req),
+    })
 }
 
-/// The system prompt. It stays the same for every question about a document, so the cached
-/// prefix stays valid.
-fn system_prompt(language: &str, edits: bool) -> String {
+/// The system prompt. `text_only`: the document comes as its text, not as the PDF.
+fn system_prompt(language: &str, edits: bool, text_only: bool) -> String {
     let edits = if edits {
         " When the user asks you to change the document itself (correct, reword, shorten or translate its text in place), propose the changes \
          with the edit_text tool, then say in a sentence or two what you changed; the user reviews them and applies them or not. \
@@ -419,12 +575,96 @@ fn system_prompt(language: &str, edits: bool) -> String {
     } else {
         " The document can't be changed here: if the user asks for changes, say so, and give the new text in your answer instead."
     };
+    let document = if text_only {
+        "The user has a PDF open and asks about it; its text comes with the first question, page by page, each page after a \"[Page N]\" line \
+         (pictures, scans and layout aren't included)."
+    } else {
+        "The user has the attached PDF open and asks about it."
+    };
     format!(
-        "You are the assistant built into PdfCraft, a PDF application. The user has the attached PDF open and asks about it. \
+        "You are the assistant built into PdfCraft, a PDF application. {document} \
          Work from what the document says; when it doesn't say something, say so rather than guessing. Refer to pages as (p. N). \
          The answer is read on a phone: write plain text in short paragraphs, with simple \"- \" lists when a list helps, \
          and no tables, headings or other Markdown.{edits} Reply in {language}."
     )
+}
+
+/// One call of a tool in an answer.
+#[derive(Clone, Debug, PartialEq)]
+struct Call {
+    id: String,
+    name: String,
+    args: Value,
+}
+
+/// The tool calls in an answer `provider` gave, in order.
+fn calls(provider: Provider, answer: &Value) -> Vec<Call> {
+    match provider {
+        Provider::Anthropic => anthropic::calls(answer),
+        Provider::OpenAi => openai::calls(answer),
+        Provider::Gemini => gemini::calls(answer),
+        Provider::Compatible => compatible::calls(answer),
+    }
+}
+
+/// The well-formed `edit_text` proposals among `calls`, at most [`MAX_EDITS`]. One that is
+/// malformed is left out (its result then says it wasn't applied), and so is the last call of an
+/// answer cut off at its length limit: its replacement may stop mid-way.
+fn proposals(mut calls: Vec<Call>, truncated: bool) -> Vec<ProposedEdit> {
+    if truncated {
+        calls.pop();
+    }
+    calls
+        .into_iter()
+        .filter(|c| c.name == EDIT_TOOL && !c.id.is_empty())
+        .filter_map(|c| {
+            let page = usize::try_from(c.args["page"].as_u64()?).ok().filter(|p| *p >= 1)?;
+            let find = c.args["find"].as_str().filter(|f| !f.trim().is_empty() && f.chars().count() <= MAX_EDIT_TEXT)?;
+            let replace = c.args["replace"].as_str().filter(|r| r.chars().count() <= MAX_EDIT_TEXT)?;
+            Some(ProposedEdit { id: c.id, page, find: find.to_owned(), replace: replace.to_owned() })
+        })
+        .take(MAX_EDITS)
+        .collect()
+}
+
+/// Arguments a service gave as a JSON string (OpenAI's) or as an object; anything else is none.
+fn arguments(v: &Value) -> Value {
+    match v {
+        Value::String(s) => serde_json::from_str(s).unwrap_or(Value::Null),
+        Value::Object(_) => v.clone(),
+        _ => Value::Null,
+    }
+}
+
+/// An error answer's message (a proxy's page isn't JSON: then nothing), at most 400 characters.
+fn error_message(v: &Value) -> String {
+    let message = v["error"]["message"].as_str().or_else(|| v["error"].as_str()).or_else(|| v["message"].as_str()).unwrap_or_default();
+    message.chars().take(400).collect()
+}
+
+/// An error status's meaning, whatever the service: what its body adds is read by its own module.
+fn error_for(status: u16, message: String) -> AiError {
+    match status {
+        401 => AiError::InvalidKey,
+        402 | 403 => AiError::NotAllowed(message),
+        429 => AiError::RateLimited,
+        503 | 529 => AiError::Overloaded,
+        _ if message.is_empty() => AiError::Api(format!("HTTP {status}")),
+        _ => AiError::Api(message),
+    }
+}
+
+/// `pdf` as base64.
+fn base64(pdf: &[u8]) -> String {
+    use base64::Engine as _;
+    base64::engine::general_purpose::STANDARD.encode(pdf)
+}
+
+/// A file name for the PDF, from the document's title.
+fn file_name(title: &str) -> String {
+    let title = title.trim();
+    let title = if title.is_empty() { "document" } else { title };
+    if title.to_ascii_lowercase().ends_with(".pdf") { title.to_owned() } else { format!("{title}.pdf") }
 }
 
 /// The web build: no assistant.
@@ -434,104 +674,115 @@ pub fn send(req: &Request) -> Result<Reply, AiError> {
     Err(AiError::Network("the assistant isn't available in the web version".into()))
 }
 
-/// Send `req` and wait for the answer.
+/// Send `req` and wait for the answer. A compatible service whose model takes no tools is asked
+/// again without the one that proposes changes (Ollama's smaller models): the answer is then
+/// words only. The key never shows in an error.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn send(req: &Request) -> Result<Reply, AiError> {
+    let first = send_once(req);
+    let without_tools = Request { edits: false, task: req.task.clone(), ..*req };
+    let reply = match first {
+        Err(AiError::Api(m))
+            if req.provider == Provider::Compatible && req.tool() && !without_tools.tool() && m.to_ascii_lowercase().contains("tool") =>
+        {
+            send_once(&without_tools)
+        }
+        other => other,
+    };
+    reply.map_err(|e| hide_key(e, req.key.trim()))
+}
+
+/// `e` with `key` taken out of its message (a service may quote what it was sent).
+fn hide_key(e: AiError, key: &str) -> AiError {
+    if key.len() < 8 {
+        return e;
+    }
+    let hide = |m: String| m.replace(key, "…");
+    match e {
+        AiError::Api(m) => AiError::Api(hide(m)),
+        AiError::NotAllowed(m) => AiError::NotAllowed(hide(m)),
+        AiError::Refused(m) => AiError::Refused(hide(m)),
+        AiError::Network(m) => AiError::Network(hide(m)),
+        AiError::Parse(m) => AiError::Parse(hide(m)),
+        other => other,
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn send_once(req: &Request) -> Result<Reply, AiError> {
     let body = request_body(req)?.to_string();
+    if body.len() > MAX_BODY {
+        return Err(AiError::TooLarge { mb: body.len().div_ceil(1 << 20), max_mb: MAX_BODY >> 20 });
+    }
     let agent = ureq::Agent::config_builder()
         .timeout_global(Some(TIMEOUT))
-        // Error statuses carry the API's explanation in their body.
+        // Error statuses carry the service's explanation in their body.
         .http_status_as_error(false)
+        // Never somewhere else: a redirect would take the key along (or drop the request's body).
+        .max_redirects(0)
         .tls_config(ureq::tls::TlsConfig::builder().root_certs(roots()?).build())
         .build()
         .new_agent();
-    let mut request =
-        agent.post(API_URL).header("x-api-key", req.key.trim()).header("anthropic-version", API_VERSION).content_type("application/json");
-    if req.model.fallbacks() {
-        request = request.header("anthropic-beta", FALLBACK_BETA);
-    }
-    let mut response = request.send(body.as_bytes()).map_err(|e| AiError::Network(e.to_string()))?;
+    let key = req.key.trim();
+    let request = match req.provider {
+        Provider::Anthropic => anthropic::post(&agent, req),
+        Provider::OpenAi => agent.post(openai::URL).header("authorization", format!("Bearer {key}")),
+        Provider::Gemini => agent.post(gemini::URL).header("x-goog-api-key", key),
+        Provider::Compatible => {
+            let post = agent.post(compatible::endpoint(req.base_url)?);
+            // A service on the device or the local network may take no key.
+            if key.is_empty() { post } else { post.header("authorization", format!("Bearer {key}")) }
+        }
+    };
+    let mut response = request.content_type("application/json").send(body.as_bytes()).map_err(|e| AiError::Network(e.to_string()))?;
     let status = response.status().as_u16();
     let text = response.body_mut().with_config().limit(MAX_RESPONSE).read_to_string().map_err(|e| AiError::Network(e.to_string()))?;
-    parse_response(status, &text)
+    parse_response(req.provider, req.model, status, &text)
 }
 
-/// Read the API's answer (`status` and body).
-pub fn parse_response(status: u16, body: &str) -> Result<Reply, AiError> {
-    if !(200..300).contains(&status) {
-        // An error page from a proxy or a captive portal isn't JSON: the status says enough.
-        let v: Value = serde_json::from_str(body).unwrap_or(Value::Null);
-        let message = v["error"]["message"].as_str().unwrap_or_default().chars().take(400).collect::<String>();
-        return Err(match (status, v["error"]["type"].as_str().unwrap_or_default()) {
-            (401, _) | (_, "authentication_error") => AiError::InvalidKey,
-            (403, _) | (_, "permission_error") | (402, _) | (_, "billing_error") => AiError::NotAllowed(message),
-            (429, _) | (_, "rate_limit_error") => AiError::RateLimited,
-            (529, _) | (_, "overloaded_error") => AiError::Overloaded,
-            _ if message.is_empty() => AiError::Api(format!("HTTP {status}")),
-            _ => AiError::Api(message),
-        });
-    }
-    let v: Value = serde_json::from_str(body).map_err(|e| AiError::Parse(e.to_string()))?;
-    // Check the stop reason before the content: a declined request has nothing to read.
-    let stop = v["stop_reason"].as_str().unwrap_or_default();
-    if stop == "refusal" {
-        let category = v["stop_details"]["category"].as_str().unwrap_or("policy").chars().take(MAX_CATEGORY).collect();
-        return Err(AiError::Refused(category));
-    }
-    let content = v.get("content").filter(|c| c.is_array()).cloned().ok_or_else(|| AiError::Parse("no content".into()))?;
-    let text = content
-        .as_array()
-        .map(|blocks| blocks.iter().filter(|b| b["type"] == "text").filter_map(|b| b["text"].as_str()).collect::<Vec<_>>().join("\n\n"))
-        .unwrap_or_default();
-    let truncated = matches!(stop, "max_tokens" | "model_context_window_exceeded");
-    let edits = proposed_edits(&content, truncated);
+/// Read `provider`'s answer (`status` and body) to a question to `model`.
+pub fn parse_response(provider: Provider, model: &str, status: u16, body: &str) -> Result<Reply, AiError> {
+    let reply = match provider {
+        Provider::Anthropic => anthropic::parse(status, body),
+        Provider::OpenAi => openai::parse(status, body),
+        Provider::Gemini => gemini::parse(status, body),
+        Provider::Compatible => compatible::parse(status, body),
+    }?;
     // An answer with no text and nothing proposed (all of it spent thinking) can't be shown, and
     // mustn't become part of the conversation.
-    let text = text.trim();
-    if text.is_empty() && edits.is_empty() {
+    if reply.text.is_empty() && reply.edits.is_empty() {
         return Err(AiError::NoAnswer);
     }
-    let n = |field: &str| v["usage"][field].as_u64().unwrap_or(0);
-    let usage = Usage {
-        input: n("input_tokens"),
-        output: n("output_tokens"),
-        cache_write: n("cache_creation_input_tokens"),
-        cache_read: n("cache_read_input_tokens"),
-    };
-    // The served-by signal: a fallback model's attempt in the per-attempt usage.
-    let fell_back = v["usage"]["iterations"].as_array().is_some_and(|i| i.iter().any(|e| e["type"] == "fallback_message"));
-    Ok(Reply {
-        text: text.to_owned(),
-        content,
-        usage,
-        truncated,
-        model: v["model"].as_str().unwrap_or_default().chars().take(MAX_CATEGORY * 2).collect(),
-        fell_back,
-        edits,
-    })
+    // A service that doesn't say which model answered: the one asked.
+    let model = if reply.model.is_empty() { model.trim().chars().take(MAX_MODEL).collect() } else { reply.model };
+    Ok(Reply { provider, model, ..reply })
 }
 
-/// The well-formed `edit_text` proposals in an answer's content, at most [`MAX_EDITS`]. One that
-/// is malformed is left out (its result then says it wasn't applied), and so is the last one of
-/// an answer cut off at its length limit: its replacement may stop mid-way.
-fn proposed_edits(content: &Value, truncated: bool) -> Vec<ProposedEdit> {
-    let Some(blocks) = content.as_array() else { return Vec::new() };
-    let cut = if truncated { blocks.iter().rposition(|b| b["type"] == "tool_use") } else { None };
-    blocks
-        .iter()
-        .enumerate()
-        .filter(|(i, _)| Some(*i) != cut)
-        .map(|(_, b)| b)
-        .filter(|b| b["type"] == "tool_use" && b["name"] == "edit_text")
-        .filter_map(|b| {
-            let input = &b["input"];
-            let page = usize::try_from(input["page"].as_u64()?).ok().filter(|p| *p >= 1)?;
-            let find = input["find"].as_str().filter(|f| !f.trim().is_empty() && f.chars().count() <= MAX_EDIT_TEXT)?;
-            let replace = input["replace"].as_str().filter(|r| r.chars().count() <= MAX_EDIT_TEXT)?;
-            Some(ProposedEdit { id: b["id"].as_str()?.to_owned(), page, find: find.to_owned(), replace: replace.to_owned() })
-        })
-        .take(MAX_EDITS)
-        .collect()
+/// The answer's parts every module reads the same way.
+struct Parsed {
+    text: String,
+    content: Value,
+    usage: Usage,
+    truncated: bool,
+    model: String,
+    fell_back: bool,
+    calls: Vec<Call>,
+}
+
+impl Parsed {
+    fn reply(self, provider: Provider) -> Reply {
+        let edits = proposals(self.calls, self.truncated);
+        Reply {
+            provider,
+            text: self.text.trim().to_owned(),
+            content: self.content,
+            usage: self.usage,
+            truncated: self.truncated,
+            model: self.model.chars().take(MAX_MODEL).collect(),
+            fell_back: self.fell_back,
+            edits,
+        }
+    }
 }
 
 /// The certificate authorities the device trusts.
@@ -579,254 +830,4 @@ fn pem_certificates(bytes: &[u8]) -> Vec<ureq::tls::Certificate<'static>> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn request<'a>(pdf: &'a [u8], history: &'a [Turn], task: Task) -> Request<'a> {
-        Request {
-            key: "sk-ant-test",
-            model: Model::Opus,
-            title: "report.pdf",
-            pdf,
-            pages: 3,
-            max_pages: 100,
-            language: "French",
-            history,
-            task,
-            edits: false,
-        }
-    }
-
-    #[test]
-    fn the_first_question_sends_the_document_cached() {
-        let body = request_body(&request(b"%PDF-1.7 tiny", &[], Task::Summarize)).unwrap();
-        assert_eq!(body["model"], "claude-opus-5-5");
-        assert_eq!(body["fallbacks"], "default", "a declined request falls back server-side");
-        assert_eq!(body["output_config"]["effort"], "medium");
-        assert!(body["system"].as_str().unwrap().ends_with("Reply in French."));
-        let messages = body["messages"].as_array().unwrap();
-        assert_eq!(messages.len(), 1);
-        let content = messages[0]["content"].as_array().unwrap();
-        assert_eq!(content[0]["type"], "document");
-        assert_eq!(content[0]["source"]["media_type"], "application/pdf");
-        assert_eq!(content[0]["source"]["data"], "JVBERi0xLjcgdGlueQ==");
-        assert_eq!(content[0]["title"], "report.pdf");
-        assert_eq!(content[0]["cache_control"]["type"], "ephemeral");
-        assert!(content[1]["text"].as_str().unwrap().starts_with("Summarize this document"));
-        // Short, for a phone (a long summary also takes long to write).
-        assert!(content[1]["text"].as_str().unwrap().contains("under 120 words"));
-        // Thinking is left to the model (it can't be turned off on Opus 5.5), and nothing is prefilled.
-        assert!(body.get("thinking").is_none());
-    }
-
-    #[test]
-    fn follow_up_questions_keep_the_conversation_and_its_cached_start() {
-        let first = request_body(&request(b"%PDF", &[], Task::Ask("Who signs it?".into()))).unwrap();
-        let answer = json!([{"type": "thinking", "thinking": "", "signature": "sig"}, {"type": "text", "text": "Ms Durand (p. 2)."}]);
-        let history = [Turn { prompt: "Who signs it?".into(), answer: answer.clone(), results: vec![] }];
-        let next = request_body(&request(b"%PDF", &history, Task::Ask("When?".into()))).unwrap();
-        let messages = next["messages"].as_array().unwrap();
-        assert_eq!(messages.len(), 3);
-        assert_eq!(messages[0]["content"][0], first["messages"][0]["content"][0], "the cached document is byte for byte the same");
-        assert_eq!(messages[0]["content"][1]["text"], first["messages"][0]["content"][1]["text"]);
-        assert_eq!(next["system"], first["system"]);
-        assert_eq!(messages[1]["role"], "assistant");
-        assert_eq!(messages[1]["content"], answer, "the answer goes back exactly as it came, thinking included");
-        assert_eq!(messages[2]["content"][0]["text"], "When?");
-        // The conversation is cached at its newest question, and only there.
-        assert_eq!(first["messages"][0]["content"][1]["cache_control"]["type"], "ephemeral");
-        assert_eq!(messages[2]["content"][0]["cache_control"]["type"], "ephemeral");
-        assert!(messages[0]["content"][1].get("cache_control").is_none());
-    }
-
-    #[test]
-    fn changes_are_offered_only_for_a_document_that_can_change() {
-        let plain = request_body(&request(b"%PDF", &[], Task::Summarize)).unwrap();
-        assert!(plain.get("tools").is_none());
-        assert!(plain["system"].as_str().unwrap().contains("can't be changed here"));
-        let mut req = request(b"%PDF", &[], Task::Ask("Fix the typos".into()));
-        req.edits = true;
-        let body = request_body(&req).unwrap();
-        assert_eq!(body["tools"][0]["name"], "edit_text");
-        assert_eq!(body["tools"][0]["input_schema"]["required"], json!(["page", "find", "replace"]));
-        assert!(body["system"].as_str().unwrap().contains("edit_text tool"));
-        assert!(body["system"].as_str().unwrap().ends_with("Reply in French."));
-    }
-
-    #[test]
-    fn proposed_changes_are_read_and_their_fate_goes_back_with_the_next_question() {
-        let answer = r#"{"model":"claude-opus-5-5","stop_reason":"tool_use","content":[
-            {"type":"text","text":"Two typos."},
-            {"type":"tool_use","id":"toolu_1","name":"edit_text","input":{"page":2,"find":"teh cat","replace":"the cat"}},
-            {"type":"tool_use","id":"toolu_2","name":"edit_text","input":{"page":0,"find":"bad page","replace":"x"}},
-            {"type":"tool_use","id":"toolu_3","name":"edit_text","input":{"page":1,"find":"recieve","replace":"receive"}}],
-            "usage":{"input_tokens":1,"output_tokens":1}}"#;
-        let r = parse_response(200, answer).unwrap();
-        assert_eq!(
-            r.edits,
-            vec![
-                ProposedEdit { id: "toolu_1".into(), page: 2, find: "teh cat".into(), replace: "the cat".into() },
-                ProposedEdit { id: "toolu_3".into(), page: 1, find: "recieve".into(), replace: "receive".into() },
-            ],
-            "page 0 doesn't exist: left out"
-        );
-        // Only proposals, no words: still an answer.
-        let only = answer.replace(r#"{"type":"text","text":"Two typos."},"#, "");
-        assert_eq!(parse_response(200, &only).unwrap().edits.len(), 2);
-        // Cut off at the length limit: the last proposal may stop mid-way, so it isn't offered.
-        let cut = answer.replace("\"tool_use\",\"content\"", "\"max_tokens\",\"content\"");
-        let r_cut = parse_response(200, &cut).unwrap();
-        assert!(r_cut.truncated);
-        assert_eq!(r_cut.edits.iter().map(|e| e.id.as_str()).collect::<Vec<_>>(), ["toolu_1"]);
-        // The next question reports each proposal, in order; the malformed one as not applied.
-        let history = [Turn { prompt: "Fix the typos".into(), answer: r.content.clone(), results: vec![("toolu_3".into(), "Applied.".into())] }];
-        let mut req = request(b"%PDF", &history, Task::Ask("Thanks".into()));
-        req.edits = true;
-        let body = request_body(&req).unwrap();
-        let next = body["messages"][2]["content"].as_array().unwrap();
-        assert_eq!(next.len(), 4);
-        assert_eq!(next[0], json!({"type": "tool_result", "tool_use_id": "toolu_1", "content": NOT_APPLIED}));
-        assert_eq!(next[1]["tool_use_id"], "toolu_2");
-        assert_eq!(next[2], json!({"type": "tool_result", "tool_use_id": "toolu_3", "content": "Applied."}));
-        assert_eq!(next[3]["text"], "Thanks");
-        assert_eq!(next[3]["cache_control"]["type"], "ephemeral");
-        // The tool stays defined for a conversation that used it.
-        req.edits = false;
-        assert_eq!(request_body(&req).unwrap()["tools"][0]["name"], "edit_text");
-    }
-
-    #[test]
-    fn an_empty_question_is_never_sent() {
-        assert_eq!(request_body(&request(b"%PDF", &[], Task::Ask(" \n ".into()))), Err(AiError::NoQuestion));
-        let history = [Turn { prompt: String::new(), answer: json!([]), results: vec![] }];
-        assert_eq!(request_body(&request(b"%PDF", &history, Task::Summarize)), Err(AiError::NoQuestion));
-    }
-
-    #[test]
-    fn haiku_has_no_fallback_and_translation_names_the_page() {
-        let mut req = request(b"%PDF", &[], Task::Translate { page: 2, language: "German".into() });
-        req.model = Model::Haiku;
-        let body = request_body(&req).unwrap();
-        assert!(body.get("fallbacks").is_none());
-        assert!(body["messages"][0]["content"][1]["text"].as_str().unwrap().starts_with("Translate page 2 of this document into German."));
-    }
-
-    #[test]
-    fn requests_are_refused_before_anything_is_sent() {
-        let mut req = request(b"%PDF", &[], Task::Summarize);
-        req.key = "  ";
-        assert_eq!(request_body(&req), Err(AiError::NoKey));
-        req.key = "sk-ant-\nInjected: header";
-        assert_eq!(request_body(&req), Err(AiError::BadKey));
-        req.key = "sk-ant-ok";
-        req.pages = 101;
-        assert_eq!(request_body(&req), Err(AiError::TooManyPages { pages: 101, max: 100 }));
-        req.max_pages = 10_000;
-        req.pages = 601;
-        assert_eq!(request_body(&req), Err(AiError::TooManyPages { pages: 601, max: API_MAX_PAGES }), "never past the API's own limit");
-        req.pages = 1;
-        req.pdf = &[];
-        assert_eq!(request_body(&req), Err(AiError::Empty));
-        let big = vec![0u8; MAX_PDF_BYTES + 1];
-        req.pdf = &big;
-        assert!(matches!(request_body(&req), Err(AiError::TooLarge { .. })));
-    }
-
-    #[test]
-    fn answers_are_read_after_their_stop_reason() {
-        let ok = r#"{"model":"claude-opus-5-5","stop_reason":"end_turn","content":[{"type":"thinking","thinking":"","signature":"s"},{"type":"text","text":"Two points."}],"usage":{"input_tokens":12,"output_tokens":40,"cache_creation_input_tokens":3000,"cache_read_input_tokens":0}}"#;
-        let r = parse_response(200, ok).unwrap();
-        assert_eq!(r.text, "Two points.");
-        assert_eq!(r.content.as_array().map(Vec::len), Some(2), "kept whole for the next turn");
-        assert_eq!(r.usage, Usage { input: 12, output: 40, cache_write: 3000, cache_read: 0 });
-        assert!(!r.truncated);
-        assert!(!r.fell_back);
-        let cut = ok.replace("end_turn", "max_tokens");
-        assert!(parse_response(200, &cut).unwrap().truncated);
-        let full = ok.replace("end_turn", "model_context_window_exceeded");
-        assert!(parse_response(200, &full).unwrap().truncated);
-        let declined = r#"{"stop_reason":"refusal","stop_details":{"type":"refusal","category":"cyber"},"content":[]}"#;
-        assert_eq!(parse_response(200, declined), Err(AiError::Refused("cyber".into())));
-        let long = declined.replace("cyber", &"x".repeat(5000));
-        assert!(matches!(parse_response(200, &long), Err(AiError::Refused(c)) if c.len() == MAX_CATEGORY));
-    }
-
-    #[test]
-    fn an_answer_without_text_is_no_answer() {
-        let thought_only = r#"{"model":"claude-opus-5-5","stop_reason":"max_tokens","content":[{"type":"thinking","thinking":"","signature":"s"}],"usage":{"input_tokens":1,"output_tokens":16000}}"#;
-        assert_eq!(parse_response(200, thought_only), Err(AiError::NoAnswer));
-        let blank = r#"{"model":"claude-opus-5-5","stop_reason":"end_turn","content":[{"type":"text","text":"  \n "}],"usage":{}}"#;
-        assert_eq!(parse_response(200, blank), Err(AiError::NoAnswer));
-    }
-
-    #[test]
-    fn a_fallback_answer_is_priced_as_the_model_that_gave_it() {
-        let body = r#"{"model":"claude-opus-4-8","stop_reason":"end_turn","content":[{"type":"fallback","from":{"model":"claude-opus-5-5"},"to":{"model":"claude-opus-4-8"}},{"type":"text","text":"Here."}],"usage":{"input_tokens":1000000,"output_tokens":1000000,"iterations":[{"type":"message"},{"type":"fallback_message"}]}}"#;
-        let r = parse_response(200, body).unwrap();
-        assert!(r.fell_back);
-        assert_eq!(r.text, "Here.");
-        assert!((r.cost_usd().unwrap() - 30.0).abs() < 1e-9, "Opus 4.8's $5 / $25, not Opus 5.5's $4 / $20");
-        let unknown = body.replace("claude-opus-4-8\",\"stop", "claude-somethingelse\",\"stop");
-        assert_eq!(parse_response(200, &unknown).unwrap().cost_usd(), None, "no made-up price");
-        let dated = body.replace("claude-opus-4-8\",\"stop", "claude-opus-5-5-20261001\",\"stop");
-        assert!((parse_response(200, &dated).unwrap().cost_usd().unwrap() - 24.0).abs() < 1e-9);
-    }
-
-    #[test]
-    fn api_errors_say_what_to_do() {
-        let error = |kind: &str, message: &str| format!(r#"{{"type":"error","error":{{"type":"{kind}","message":"{message}"}}}}"#);
-        assert_eq!(parse_response(401, &error("authentication_error", "invalid x-api-key")), Err(AiError::InvalidKey));
-        assert_eq!(parse_response(429, &error("rate_limit_error", "slow down")), Err(AiError::RateLimited));
-        assert_eq!(parse_response(529, &error("overloaded_error", "busy")), Err(AiError::Overloaded));
-        assert_eq!(parse_response(400, &error("invalid_request_error", "prompt is too long")), Err(AiError::Api("prompt is too long".into())));
-        assert!(matches!(parse_response(403, &error("permission_error", "no access")), Err(AiError::NotAllowed(_))));
-        assert_eq!(
-            parse_response(400, &error("billing_error", "credit balance is too low")),
-            Err(AiError::NotAllowed("credit balance is too low".into()))
-        );
-        assert_eq!(parse_response(502, "<html>bad gateway</html>"), Err(AiError::Api("HTTP 502".into())), "a proxy's page is not a parse error");
-        assert_eq!(parse_response(407, ""), Err(AiError::Api("HTTP 407".into())));
-        assert!(matches!(parse_response(200, "<html>portal</html>"), Err(AiError::Parse(_))));
-    }
-
-    #[test]
-    fn costs_follow_the_list_prices() {
-        let usage = Usage { input: 1_000_000, output: 1_000_000, cache_write: 0, cache_read: 0 };
-        assert!((usage.cost_usd(Model::Opus) - 24.0).abs() < 1e-9);
-        assert!((usage.cost_usd(Model::Sonnet) - 12.0).abs() < 1e-9);
-        let cached = Usage { input: 0, output: 0, cache_write: 0, cache_read: 1_000_000 };
-        assert!((cached.cost_usd(Model::Opus) - 0.20).abs() < 1e-9);
-        // Haiku's dearer rate card starts past 100K prompt tokens.
-        let short = Usage { input: 100_000, output: 0, cache_write: 0, cache_read: 0 };
-        assert!((short.cost_usd(Model::Haiku) - 0.01).abs() < 1e-9);
-        let long = Usage { input: 50_000, output: 1_000_000, cache_write: 0, cache_read: 60_000 };
-        assert!((long.cost_usd(Model::Haiku) - (0.025 + 2.5 + 0.003)).abs() < 1e-9);
-        for m in Model::ALL {
-            assert_eq!(Model::from_id(m.id()), Some(m));
-        }
-        assert_eq!(Model::from_id("claude-unknown"), None);
-    }
-
-    #[test]
-    #[cfg(not(target_arch = "wasm32"))]
-    fn pem_files_give_their_certificates_and_nothing_else() {
-        assert!(pem_certificates(b"not a certificate").is_empty());
-        let pem = b"Certificate:\n    Data: text Android adds\n-----BEGIN CERTIFICATE-----\nMAA=\n-----END CERTIFICATE-----\n";
-        assert_eq!(pem_certificates(pem).len(), 1);
-    }
-
-    /// Live: one real question (`ANTHROPIC_API_KEY=… cargo test -p pdfcraft-ai -- --ignored`).
-    /// It costs a fraction of a cent.
-    #[test]
-    #[ignore = "needs network access and an API key"]
-    fn a_real_question_gets_an_answer() {
-        let key = std::env::var("ANTHROPIC_API_KEY").unwrap_or_default();
-        let pdf = b"%PDF-1.7\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF";
-        let mut req = request(pdf, &[], Task::Ask("How many pages does this document have? Answer with a number.".into()));
-        req.key = &key;
-        req.model = Model::Haiku;
-        req.pages = 1;
-        let reply = send(&req).unwrap();
-        assert!(reply.text.contains('1'), "{reply:?}");
-    }
-}
+mod tests;

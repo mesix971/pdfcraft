@@ -285,7 +285,8 @@ pub(crate) fn preferences_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tok
         use crate::ui_scale;
         // Auto shows the size it draws at: the display's scale times the system's text scale.
         let native = ui.ctx().native_pixels_per_point().unwrap_or(1.0);
-        let auto_percent = ui_scale::percent(ui_scale::drawn(None, app.auto_text_scale(), native));
+        let width = ui.ctx().input(|i| i.viewport_rect().width()) * ui.ctx().zoom_factor();
+        let auto_percent = ui_scale::percent(ui_scale::drawn(None, app.auto_text_scale(width), native));
         let auto = crate::i18n::fmt(tl!("Auto ({percent}%)"), &[("percent", &auto_percent.to_string())]);
         let selected = app.ui_scale.map_or_else(|| auto.clone(), |f| format!("{}%", ui_scale::percent(f)));
         crate::widgets::combo("interface-size").selected_text(selected).show_ui(ui, |ui| {

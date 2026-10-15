@@ -143,6 +143,7 @@ mod system_fonts;
 mod tab_context;
 pub mod theme;
 pub mod touch;
+mod transition;
 pub mod ui_scale;
 pub mod updates;
 mod wheel_pager;
@@ -715,6 +716,9 @@ pub struct PdfCraftApp {
     /// Prints through other apps where there is no spooler (Android sets it): the Print dialog
     /// lists "Another app" first and hands it the print-ready PDF.
     pub host_print: Option<HostPrintFn>,
+    /// Sends the app to the back, where the system has one (Android sets it): Back on Home's
+    /// first screen, as the system's own apps do. PdfCraft keeps running where it was.
+    pub to_background: Option<Box<dyn Fn()>>,
     /// Attach file: the file to attach instead of asking (tests, automation).
     pub attach_override: Option<(String, Vec<u8>)>,
     /// Duplicate Field: which field and onto which pages.
@@ -1003,6 +1007,7 @@ impl PdfCraftApp {
             system_clipboard: true,
             clipboard_text: None,
             host_print: None,
+            to_background: None,
             attach_override: None,
             duplicate_draft: None,
             form_preview: false,
@@ -1951,12 +1956,20 @@ impl PdfCraftApp {
             let photo = self.profile_photo.as_ref().map(|png| base64::engine::general_purpose::STANDARD.encode(png.as_slice()));
             map.insert("profile_photo".into(), serde_json::json!(photo));
         }
-        // The AI assistant: the user's own key, kept with the other settings (app-private storage on
-        // Android, the user's settings file elsewhere).
+        // The AI assistant: the service asked, and each one's key (the user's own) and model, kept
+        // with the other settings (app-private storage on Android, the user's settings file
+        // elsewhere).
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(map) = settings.as_object_mut() {
-            map.insert("ai_key".into(), self.ai.key.clone().into());
-            map.insert("ai_model".into(), self.ai.model.id().into());
+            let by_service = |values: &[String; 4]| {
+                serde_json::Value::Object(pdfcraft_ai::Provider::ALL.iter().zip(values).map(|(p, v)| (p.id().to_owned(), v.clone().into())).collect())
+            };
+            map.insert("ai_provider".into(), self.ai.provider.id().into());
+            map.insert("ai_keys".into(), by_service(&self.ai.keys));
+            map.insert("ai_models".into(), by_service(&self.ai.models));
+            map.insert("ai_url".into(), self.ai.base_url.clone().into());
+            map.insert("ai_key_host".into(), self.ai.key_host.clone().into());
+            map.insert("ai_reads_pdfs".into(), self.ai.reads_pdfs.into());
             map.insert("ai_max_pages".into(), self.ai.max_pages.into());
         }
         settings.to_string()
@@ -2018,15 +2031,44 @@ impl PdfCraftApp {
         if let Some(on) = v["highlight_fields"].as_bool() {
             self.view_defaults.highlight_fields = on;
         }
-        // Settings are untrusted: a key that isn't one line of plain characters is dropped, and the
-        // page limit is kept within what the API reads.
+        // Settings are untrusted: a key, a model or an address that isn't one line of plain
+        // characters is dropped, a known service's model must be one it offers, and the page limit
+        // is kept within what the services read.
         #[cfg(not(target_arch = "wasm32"))]
         {
-            if let Some(key) = v["ai_key"].as_str().map(str::trim).filter(|k| k.len() <= 512 && k.bytes().all(|b| b.is_ascii_graphic())) {
-                self.ai.key = key.to_owned();
+            use pdfcraft_ai::Provider;
+            let plain = |v: &serde_json::Value, max: usize| {
+                v.as_str().map(str::trim).filter(|s| s.len() <= max && s.bytes().all(|b| b.is_ascii_graphic())).map(str::to_owned)
+            };
+            if let Some(provider) = v["ai_provider"].as_str().and_then(Provider::from_id) {
+                self.ai.provider = provider;
             }
-            if let Some(model) = v["ai_model"].as_str().and_then(pdfcraft_ai::Model::from_id) {
-                self.ai.model = model;
+            for p in Provider::ALL {
+                // Before there were several services, the one key and model were Anthropic's.
+                let (key, model) = if p == Provider::Anthropic && v.get("ai_keys").is_none() {
+                    (&v["ai_key"], &v["ai_model"])
+                } else {
+                    (&v["ai_keys"][p.id()], &v["ai_models"][p.id()])
+                };
+                if let Some(key) = plain(key, 512)
+                    && let Some(slot) = self.ai.keys.get_mut(p.index())
+                {
+                    *slot = key;
+                }
+                if let Some(model) = plain(model, 200).filter(|m| p == Provider::Compatible || p.models().any(|k| k.id == m))
+                    && let Some(slot) = self.ai.models.get_mut(p.index())
+                {
+                    *slot = model;
+                }
+            }
+            if let Some(url) = plain(&v["ai_url"], 2048) {
+                self.ai.base_url = url;
+            }
+            if let Some(host) = plain(&v["ai_key_host"], 2048) {
+                self.ai.key_host = host;
+            }
+            if let Some(on) = v["ai_reads_pdfs"].as_bool() {
+                self.ai.reads_pdfs = on;
             }
             if let Some(pages) = v["ai_max_pages"].as_u64().and_then(|p| usize::try_from(p).ok()) {
                 self.ai.max_pages = pages.clamp(1, pdfcraft_ai::API_MAX_PAGES);
@@ -2638,7 +2680,8 @@ impl eframe::App for PdfCraftApp {
             self.apply_theme(ctx);
         }
         let native = ctx.native_pixels_per_point().unwrap_or(1.0);
-        ui_scale::sync(ctx, ui_scale::zoom(self.ui_scale, self.auto_text_scale(), native), &mut self.ui_scale_applied);
+        let width = ctx.input(|i| i.viewport_rect().width()) * ctx.zoom_factor();
+        ui_scale::sync(ctx, ui_scale::zoom(self.ui_scale, self.auto_text_scale(width), native), &mut self.ui_scale_applied);
         // The phone layout shows dialogs as screens of their own.
         widgets::set_phone_dialogs(ctx, self.phone_layout());
         // Remember user work even if its tab is subsequently closed or Home is selected.
@@ -2799,6 +2842,8 @@ impl eframe::App for PdfCraftApp {
             self.finish_render_frame(&ctx);
             return;
         }
+        // A phone screen's slide, cut short by a switch to the desktop layout, ends here.
+        ctx.set_transform_layer(ui.layer_id(), egui::emath::TSTransform::IDENTITY);
         if self.full_screen && self.active.is_some() {
             // Full screen: the page, nothing else (Esc or ⌘L to leave).
             let t = theme::Tokens::get(&ctx);

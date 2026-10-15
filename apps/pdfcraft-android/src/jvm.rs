@@ -318,6 +318,52 @@ pub fn read(address: Address) -> Result<Incoming, String> {
     .map_err(|e| e.to_string())
 }
 
+/// Whether the system asks for no animations: Settings ▸ Accessibility ▸ Remove animations (or
+/// the developer options' animator scale at off) sets `Settings.Global.ANIMATOR_DURATION_SCALE`
+/// to 0. `None` when it can't be read.
+pub fn animations_off(app: &AndroidApp) -> Option<bool> {
+    with_activity(app, |env, activity| {
+        let resolver = env.call_method(activity, jni_str!("getContentResolver"), jni_sig!("()Landroid/content/ContentResolver;"), &[])?.l()?;
+        let name = env.new_string("animator_duration_scale")?;
+        let scale = env
+            .call_static_method(
+                jni_str!("android/provider/Settings$Global"),
+                jni_str!("getFloat"),
+                jni_sig!("(Landroid/content/ContentResolver;Ljava/lang/String;F)F"),
+                &[JValue::Object(&resolver), JValue::Object(&name), JValue::Float(1.0)],
+            )?
+            .f()?;
+        Ok(scale == 0.0)
+    })
+    .map_err(|e| log::debug!("system animations: {e}"))
+    .ok()
+}
+
+/// The system's font size (Settings ▸ Display ▸ Font size) as a factor of the default
+/// (`Configuration.fontScale`); `None` when it can't be read.
+pub fn font_scale(app: &AndroidApp) -> Option<f32> {
+    with_activity(app, |env, activity| {
+        let resources = env.call_method(activity, jni_str!("getResources"), jni_sig!("()Landroid/content/res/Resources;"), &[])?.l()?;
+        let config = env.call_method(&resources, jni_str!("getConfiguration"), jni_sig!("()Landroid/content/res/Configuration;"), &[])?.l()?;
+        Ok(env.get_field(&config, jni_str!("fontScale"), jni_sig!("F"))?.f()?)
+    })
+    .map_err(|e| log::debug!("system font size: {e}"))
+    .ok()
+    .filter(|s| s.is_finite() && *s > 0.0)
+}
+
+/// Send the app's task to the back, as Android's own apps do with Back on their first screen
+/// (`Activity.moveTaskToBack`): it keeps running where it was.
+pub fn move_task_to_back(app: &AndroidApp) {
+    let result = with_activity(app, |env, activity| {
+        env.call_method(activity, jni_str!("moveTaskToBack"), jni_sig!("(Z)Z"), &[JValue::Bool(true)])?;
+        Ok(())
+    });
+    if let Err(e) = result {
+        log::warn!("sending PdfCraft to the back: {e}");
+    }
+}
+
 /// The task `app`'s Activity runs in (`Activity.getTaskId`).
 pub fn task_id(app: &AndroidApp) -> Option<i32> {
     with_activity(app, |env, activity| Ok(env.call_method(activity, jni_str!("getTaskId"), jni_sig!("()I"), &[])?.i()?))

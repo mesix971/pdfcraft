@@ -2485,3 +2485,21 @@ decimal separator	.	.
 	Tap text or a picture to change it	انقر على نص أو صورة لتغييرها
 	Tap where the text goes	انقر حيث تريد وضع النص
 	White	أبيض
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	يُرسَل سؤالك والمستند المفتوح إلى الخدمة التي تختارها، بمفتاح API الخاص بك، فقط عندما تطلب ذلك. تُحتسب الطلبات على حسابك لدى تلك الخدمة.
+	Service	الخدمة
+	Another service (OpenAI-compatible)	خدمة أخرى (متوافقة مع OpenAI)
+	API key	مفتاح API
+	On Google's free tier, what you send may be used to improve Google's products.	في الفئة المجانية من Google، قد يُستخدم ما ترسله لتحسين منتجات Google.
+	Fill in for	تعبئة لـ
+	Service address	عنوان الخدمة
+	API key (if the service asks for one)	مفتاح API (إن طلبته الخدمة)
+	The service reads PDF files	الخدمة تقرأ ملفات PDF
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	وإلا يُرسَل نص المستند صفحةً صفحة (من دون صوره أو مسحه الضوئي).
+	Add your API key for {service} in the assistant's settings.	أضف مفتاح API الخاص بـ {service} في إعدادات المساعد.
+	Your {service} account can't use this model, or has no credit left: {error}	لا يمكن لحسابك في {service} استخدام هذا النموذج، أو لم يعد فيه رصيد: {error}
+	Choose the model to ask in the assistant's settings.	اختر النموذج الذي تسأله في إعدادات المساعد.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	لا يحتوي هذا المستند على نص لإرساله (هل هو مسح ضوئي؟). اختر خدمة تقرأ ملفات PDF، أو تعرّف على نصه أولًا.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	نص هذا المستند طويل جدًا على المساعد ({chars} حرفًا، {max} على الأكثر).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	لخّص ملفات PDF واسألها وصحّحها مع Claude أو ChatGPT أو Gemini، بمفتاحك الخاص.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	عنوان الخدمة غير صالح: يبدأ بـ https://‏ (و http://‏ لهذا الجهاز أو للشبكة المحلية فقط).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	لا يسمح هذا المستند بنسخ محتواه، لذا لا يُرسَل إلى المساعد.

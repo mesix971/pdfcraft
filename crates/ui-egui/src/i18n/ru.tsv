@@ -2377,3 +2377,21 @@ decimal separator	.	,
 	Tap text or a picture to change it	Коснитесь текста или изображения, чтобы изменить его
 	Tap where the text goes	Коснитесь места для текста
 	White	Белый
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	Ваш вопрос и открытый документ отправляются в выбранный вами сервис с вашим собственным API-ключом и только по вашему запросу. Запросы оплачиваются с вашего аккаунта в этом сервисе.
+	Service	Сервис
+	Another service (OpenAI-compatible)	Другой сервис (совместимый с OpenAI)
+	API key	API-ключ
+	On Google's free tier, what you send may be used to improve Google's products.	На бесплатном тарифе Google отправленные вами данные могут использоваться для улучшения продуктов Google.
+	Fill in for	Заполнить для
+	Service address	Адрес сервиса
+	API key (if the service asks for one)	API-ключ (если сервис его просит)
+	The service reads PDF files	Сервис читает PDF-файлы
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	Иначе отправляется текст документа, страница за страницей (без изображений и сканов).
+	Add your API key for {service} in the assistant's settings.	Добавьте свой API-ключ {service} в настройках ассистента.
+	Your {service} account can't use this model, or has no credit left: {error}	Ваш аккаунт {service} не может использовать эту модель или на нём закончились средства: {error}
+	Choose the model to ask in the assistant's settings.	Выберите модель для вопросов в настройках ассистента.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	В этом документе нет текста для отправки (это скан?). Выберите сервис, который читает PDF-файлы, или сначала распознайте его текст.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	Текст этого документа слишком длинный для ассистента ({chars} знаков, не более {max}).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Кратко излагайте, расспрашивайте и исправляйте свои PDF с Claude, ChatGPT или Gemini, используя свой ключ.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	Неверный адрес сервиса: он начинается с https:// (http:// только для этого устройства или локальной сети).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	Этот документ не разрешает копировать своё содержимое, поэтому он не отправляется ассистенту.

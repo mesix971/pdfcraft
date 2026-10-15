@@ -2376,3 +2376,21 @@ decimal separator	.	.
 	Tap text or a picture to change it	మార్చడానికి వచనం లేదా చిత్రాన్ని నొక్కండి
 	Tap where the text goes	వచనం ఉండాల్సిన చోట నొక్కండి
 	White	తెలుపు
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	మీరు అడిగినప్పుడు మాత్రమే, మీ ప్రశ్న మరియు తెరిచిన పత్రం మీ స్వంత API కీతో మీరు ఎంచుకున్న సేవకు పంపబడతాయి. అభ్యర్థనలు ఆ సేవలోని మీ ఖాతాకు బిల్ చేయబడతాయి.
+	Service	సేవ
+	Another service (OpenAI-compatible)	మరో సేవ (OpenAI అనుకూలమైనది)
+	API key	API కీ
+	On Google's free tier, what you send may be used to improve Google's products.	Google ఉచిత శ్రేణిలో, మీరు పంపేది Google ఉత్పత్తులను మెరుగుపరచడానికి ఉపయోగించబడవచ్చు.
+	Fill in for	దీని కోసం నింపు:
+	Service address	సేవ చిరునామా
+	API key (if the service asks for one)	API కీ (సేవ అడిగితే)
+	The service reads PDF files	సేవ PDF ఫైల్‌లను చదువుతుంది
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	లేకపోతే పత్రం వచనం పేజీ పేజీగా పంపబడుతుంది (దాని చిత్రాలు లేదా స్కాన్‌లు కాదు).
+	Add your API key for {service} in the assistant's settings.	సహాయకుడి సెట్టింగ్‌లలో {service} కోసం మీ API కీని జోడించండి.
+	Your {service} account can't use this model, or has no credit left: {error}	మీ {service} ఖాతా ఈ మోడల్‌ను ఉపయోగించలేదు, లేదా దానిలో క్రెడిట్ మిగల్లేదు: {error}
+	Choose the model to ask in the assistant's settings.	సహాయకుడి సెట్టింగ్‌లలో అడగాల్సిన మోడల్‌ను ఎంచుకోండి.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	ఈ పత్రంలో పంపడానికి వచనం లేదు (ఇది స్కాన్ చేసినదా?). PDF ఫైల్‌లను చదివే సేవను ఎంచుకోండి, లేదా ముందుగా దాని వచనాన్ని గుర్తించండి.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	ఈ పత్రం వచనం సహాయకుడికి చాలా పొడవుగా ఉంది ({chars} అక్షరాలు, గరిష్ఠంగా {max}).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	మీ స్వంత కీతో Claude, ChatGPT లేదా Gemini సహాయంతో మీ PDFలను సంగ్రహించండి, ప్రశ్నించండి మరియు సరిదిద్దండి.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	సేవ చిరునామా చెల్లదు: అది https:// తో మొదలవుతుంది (http:// ఈ పరికరం లేదా స్థానిక నెట్‌వర్క్‌కు మాత్రమే).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	ఈ పత్రం దాని విషయాన్ని కాపీ చేయడానికి అనుమతించదు, కాబట్టి ఇది సహాయకుడికి పంపబడదు.

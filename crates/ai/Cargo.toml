@@ -1,6 +1,6 @@
 [package]
 name = "pdfcraft-ai"
-description = "The optional AI assistant: summarize, ask about and translate a document with the user's own Anthropic API key (off until a key is set)"
+description = "The optional AI assistant: summarize, ask about, translate and correct a document with the service the user chooses (Claude, ChatGPT, Gemini or any OpenAI-compatible one) and the user's own key, off until it is set up"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

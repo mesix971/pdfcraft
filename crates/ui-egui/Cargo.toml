@@ -43,7 +43,8 @@ rfd = { workspace = true }
 getrandom = "0.4"
 # Checks that an installed fallback font parses and has the glyphs; the same skrifa egui uses.
 skrifa = "0.44"
-# The optional AI assistant (the user's own Anthropic API key; off until one is set). The web
+# The optional AI assistant (the service the user chooses, with the user's own key; off until it
+# is set up). The web
 # build has no HTTPS client of its own.
 pdfcraft-ai.workspace = true
 

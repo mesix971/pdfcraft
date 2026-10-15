@@ -579,9 +579,10 @@ fn the_assistant_asks_for_a_key_and_says_why_it_cant_answer() {
     click(&mut h, "AI assistant");
     h.get_by_label("Save");
     assert!(shows(&h, "with your own API key"), "it says what is sent, and to whom, before any key");
-    h.state_mut().ai.key = "sk-ant-test".into();
+    h.state_mut().ai.set_key("sk-ant-test");
     h.state_mut().ai.max_pages = 1;
-    h.run_steps(2);
+    // Set up: Back leaves the settings for the conversation.
+    click(&mut h, "Back");
     click(&mut h, "Summarize");
     for _ in 0..200 {
         h.run_steps(1);
@@ -836,7 +837,7 @@ fn a_tip_card_is_tapped_anywhere() {
     // With a key, the assistant's tip is gone and this one comes first.
     let mut h = harness_with(None, |app| {
         app.comment_prefs.author = "Guest".into();
-        app.ai.key = "sk-ant-test".into();
+        app.ai.set_key("sk-ant-test");
     });
     // On its words, away from its link and its ✕.
     let words = h.get_by_role_and_label(Role::Label, "Make PdfCraft yours").rect().center();
@@ -877,7 +878,7 @@ fn a_quick_action_is_tapped_with_a_finger() {
 
 #[test]
 fn back_from_the_assistants_settings_shows_what_was_under_them() {
-    let mut h = harness_with(Some(FIXTURE), |app| app.ai.key = "sk-ant-test".into());
+    let mut h = harness_with(Some(FIXTURE), |app| app.ai.set_key("sk-ant-test"));
     click(&mut h, "Back");
     // From the profile: Back shows the profile again, then Home.
     click(&mut h, "Profile");
@@ -1554,4 +1555,222 @@ fn a_dialogs_lists_open_on_finger_sized_rows() {
     h.run_steps(6);
     let desktop = row(&mut h);
     assert!(desktop > 0.0 && desktop < 30.0, "the desktop's row: {desktop}");
+}
+
+/// How far egui draws a layer from its place (`None`: in place, egui's transform gone).
+fn layer_offset(h: &Harness<'static, PdfCraftApp>, layer: egui::LayerId) -> Option<egui::Vec2> {
+    h.ctx.layer_transform_to_global(layer).map(|t| t.translation)
+}
+
+/// kittest turns egui's animations off (for steady pictures); these tests are about them: back
+/// on, at egui's own time, as on a phone.
+fn animations_on(h: &Harness<'static, PdfCraftApp>) {
+    h.ctx.all_styles_mut(|s| s.animation_time = 1.0 / 12.0);
+}
+
+/// The shell's screen: the layer of the window's root.
+fn screen_offset(h: &Harness<'static, PdfCraftApp>) -> Option<egui::Vec2> {
+    layer_offset(h, egui::LayerId::background())
+}
+
+/// A screen arrives from the side it leads to (back Home from the left, into a document from the
+/// right), its bars with it, and settles in place.
+#[test]
+fn a_screen_slides_in_from_the_side_it_leads_to() {
+    let mut h = harness(true);
+    animations_on(&h);
+    assert_eq!(screen_offset(&h), None, "in place");
+    h.get_by_label("Back").click();
+    h.run_steps(2);
+    let x = screen_offset(&h).expect("Home arriving").x;
+    assert!(x < 0.0, "back out: from the left ({x})");
+    let header = egui::LayerId::new(egui::Order::Middle, egui::Id::new("phone-home-bar"));
+    assert_eq!(layer_offset(&h, header).map(|v| v.x), Some(x), "Home's header with it");
+    h.run_steps(6);
+    assert_eq!(screen_offset(&h), None, "in place");
+    h.get_by_label("text.pdf").click();
+    h.run_steps(2);
+    let x = screen_offset(&h).expect("the document arriving").x;
+    assert!(x > 0.0, "further in: from the right ({x})");
+    let top_bar = egui::LayerId::new(egui::Order::Middle, egui::Id::new("phone-top-bar"));
+    assert_eq!(layer_offset(&h, top_bar).map(|v| v.x), Some(x), "its bar with it");
+    h.run_steps(6);
+    assert_eq!(screen_offset(&h), None);
+    assert_eq!(layer_offset(&h, top_bar), None);
+    // A switch to the desktop layout in the middle of a slide ends it there.
+    h.get_by_label("Back").click();
+    h.run_steps(2);
+    assert!(screen_offset(&h).is_some());
+    h.state_mut().set_option("shell", "auto").unwrap();
+    h.run_steps(2);
+    assert_eq!(screen_offset(&h), None, "the desktop drawn in place");
+}
+
+/// Another Home tab slides in from its side of the tab bar (Tools from the right of Create,
+/// Create from the left of Tools), and the tab bar stays put.
+#[test]
+fn a_home_tab_slides_in_from_its_side_of_the_tab_bar() {
+    let mut h = harness(false);
+    animations_on(&h);
+    let left = |h: &Harness<'static, PdfCraftApp>, label: &str| h.get_by_label(label).rect().left();
+    click(&mut h, "Create");
+    h.run_steps(6);
+    let create = left(&h, "Combine files");
+    click(&mut h, "Tools");
+    h.run_steps(6);
+    let tools = left(&h, "Edit a PDF");
+    let bar = h.get_by_label("Create").rect();
+    h.get_by_label("Create").click();
+    h.run_steps(2);
+    assert!(left(&h, "Combine files") < create - 10.0, "from the left: {} against {create}", left(&h, "Combine files"));
+    assert_eq!(h.get_by_label("Create").rect(), bar, "the tab bar stays put");
+    h.run_steps(6);
+    assert_eq!(left(&h, "Combine files"), create, "in place");
+    h.get_by_label("Tools").click();
+    h.run_steps(2);
+    assert!(left(&h, "Edit a PDF") > tools + 10.0, "from the right: {} against {tools}", left(&h, "Edit a PDF"));
+    h.run_steps(6);
+    assert_eq!(left(&h, "Edit a PDF"), tools);
+}
+
+/// A sheet rises from the bottom as it opens, and settles in place.
+#[test]
+fn a_sheet_rises_from_the_bottom() {
+    let mut h = harness(false);
+    animations_on(&h);
+    let sheet = egui::LayerId::new(egui::Order::Foreground, egui::Id::new(("phone-sheet", "new")));
+    h.get_by_label("Open…").click();
+    h.run_steps(3);
+    assert_eq!(h.state().phone_sheet(), Some(Sheet::New));
+    let y = layer_offset(&h, sheet).map(|v| v.y);
+    assert!(y.is_some_and(|y| y > 20.0), "below its place: {y:?}");
+    h.run_steps(6);
+    assert_eq!(layer_offset(&h, sheet), None, "in place");
+}
+
+/// A tap slides the reader's bars away off the top (seen on their way), and another slides them
+/// back.
+#[test]
+fn the_readers_bars_slide_away_and_back() {
+    let mut h = harness(true);
+    animations_on(&h);
+    let top = |h: &Harness<'static, PdfCraftApp>| h.query_by_label("Menu").map(|n| n.rect().top());
+    let rest = top(&h).expect("the bars shown");
+    let p = at(&h, 0, 150.0, 120.0);
+    let tap_frames = |h: &mut Harness<'static, PdfCraftApp>| {
+        h.hover_at(p);
+        h.run_steps(1);
+        press(h, p, true);
+        h.run_steps(1);
+        press(h, p, false);
+        (0..20)
+            .map(|_| {
+                h.run_steps(1);
+                top(h)
+            })
+            .collect::<Vec<_>>()
+    };
+    let away = tap_frames(&mut h);
+    assert!(away.iter().any(|y| y.is_some_and(|y| y < rest - 1.0 && y > rest - 56.0)), "on their way up: {away:?}");
+    assert_eq!(away.last(), Some(&None), "then gone");
+    let back = tap_frames(&mut h);
+    assert!(back.iter().any(|y| y.is_some_and(|y| y < rest - 1.0)), "on their way down: {back:?}");
+    assert_eq!(back.last(), Some(&Some(rest)), "then in place");
+}
+
+/// With animation effects off, a screen, a tab, a sheet and the bars are in place at once.
+#[test]
+fn with_animation_effects_off_nothing_slides() {
+    let mut h = harness_with(Some(FIXTURE), |app| app.animation_effects = pdfcraft_ui_egui::motion::AnimationEffects::Off);
+    // egui's animations on, so it is the setting that stops them.
+    animations_on(&h);
+    h.run_steps(2);
+    h.get_by_label("Back").click();
+    h.run_steps(2);
+    assert_eq!(screen_offset(&h), None, "Home at once");
+    click(&mut h, "Tools");
+    h.run_steps(4);
+    let tools = h.get_by_label("Edit a PDF").rect().left();
+    click(&mut h, "Home");
+    h.get_by_label("Tools").click();
+    h.run_steps(2);
+    assert_eq!(h.get_by_label("Edit a PDF").rect().left(), tools, "a tab at once");
+    h.get_by_label("Home").click();
+    h.run_steps(2);
+    h.get_by_label("Open…").click();
+    h.run_steps(3);
+    let sheet = egui::LayerId::new(egui::Order::Foreground, egui::Id::new(("phone-sheet", "new")));
+    assert_eq!(layer_offset(&h, sheet), None, "a sheet at once");
+    back(&mut h);
+    h.get_by_label("text.pdf").click();
+    h.run_steps(4);
+    let p = at(&h, 0, 150.0, 120.0);
+    h.hover_at(p);
+    h.run_steps(1);
+    press(&h, p, true);
+    h.run_steps(1);
+    press(&h, p, false);
+    // The bars go when the tap is known not to start a double tap, all at once.
+    let mut frames = Vec::new();
+    for _ in 0..14 {
+        h.run_steps(1);
+        frames.push(h.query_by_label("Menu").map(|n| n.rect().top()));
+    }
+    let rest = frames.first().copied().flatten().expect("shown at first");
+    assert!(frames.iter().all(|y| y.is_none() || *y == Some(rest)), "never in between: {frames:?}");
+    assert_eq!(frames.last(), Some(&None));
+}
+
+/// The assistant's settings offer every service: each shows its own key and models; a compatible
+/// service is filled in for a known one (its address and a model it names) and is ready without
+/// a key.
+#[test]
+fn the_assistants_settings_offer_every_service() {
+    let mut h = harness(true);
+    click(&mut h, "AI assistant");
+    let starts = |h: &Harness<'static, PdfCraftApp>, part: &str| h.query_all_by(|n| n.label().is_some_and(|l| l.starts_with(part))).next().is_some();
+    assert!(starts(&h, "Claude Opus 5.5"), "Claude's models first");
+    click(&mut h, "ChatGPT (OpenAI)");
+    assert!(starts(&h, "GPT-6.1 Sol") && !starts(&h, "Claude Opus 5.5"), "its own models");
+    assert_eq!(h.state().ai.provider.id(), "anthropic", "asked once saved");
+    click(&mut h, "Gemini (Google)");
+    assert!(starts(&h, "Gemini 3.8 Flash"));
+    assert!(shows(&h, "free tier"), "what Google's free tier means");
+    click(&mut h, "Another service (OpenAI-compatible)");
+    assert!(h.query_by_role_and_label(Role::TextInput, "Service address").is_some() || shows(&h, "Service address"));
+    assert!(!h.state().ai.ready(), "no address yet: the settings stay");
+    h.get_by_label("Mistral").scroll_to_me();
+    h.run_steps(2);
+    click(&mut h, "Mistral");
+    assert_eq!(h.state().ai.base_url, "https://api.mistral.ai/v1");
+    h.get_by_label("Save").scroll_to_me();
+    h.run_steps(2);
+    click(&mut h, "Save");
+    assert_eq!(h.state().ai.provider.id(), "compatible");
+    assert_eq!(h.state().ai.model(), "mistral-small-latest");
+    assert!(h.state().ai.ready(), "ready without a key");
+    assert!(h.query_by_label("Summarize").is_some(), "the conversation, with the service set up");
+}
+
+/// Bars hidden in a document come back with it when it is opened again, as it arrives: they
+/// don't slide in a second time after it.
+#[test]
+fn a_document_opened_again_brings_its_bars_with_it() {
+    let mut h = harness(true);
+    animations_on(&h);
+    let p = at(&h, 0, 150.0, 120.0);
+    tap(&mut h, p);
+    assert!(!h.state().phone_bars_shown());
+    back(&mut h);
+    h.run_steps(8);
+    assert_eq!(h.state().active, None, "Home");
+    h.get_by_label("text.pdf").click();
+    let tops: Vec<Option<f32>> = (0..10)
+        .map(|_| {
+            h.run_steps(1);
+            h.query_by_label("Menu").map(|n| n.rect().top())
+        })
+        .collect();
+    let rest = tops.last().copied().flatten().expect("the bars shown");
+    assert!(tops.iter().all(|t| t.is_none_or(|t| t == rest)), "never sliding: {tops:?}");
 }

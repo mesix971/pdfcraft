@@ -22,6 +22,10 @@ use crate::{PdfCraftApp, QuickTool, RightPanel, icons, widgets};
 /// Material's smallest touch target.
 pub(crate) const TARGET: f32 = 48.0;
 pub(crate) const TOP_BAR: f32 = 56.0;
+/// The narrowest screen the phone shell is laid out for, in points.
+const PHONE_MIN_WIDTH: f32 = 360.0;
+/// The most a larger system font size grows the phone shell.
+const PHONE_MAX_SCALE: f32 = 1.3;
 const BOTTOM_BAR: f32 = 64.0;
 /// Room above the first page and below the last, so the bars floating there don't cover them.
 pub(crate) const PAGE_PAD: (f32, f32) = (TOP_BAR, BOTTOM_BAR);
@@ -232,10 +236,17 @@ impl PdfCraftApp {
         self.quick_tool = QuickTool::Select;
     }
 
-    /// The interface size `Auto` draws at: the system's text scale, except in the phone shell,
-    /// which is laid out in a phone's own points.
-    pub(crate) fn auto_text_scale(&self) -> f32 {
-        if self.phone_layout() { 1.0 } else { self.system_text_scale }
+    /// The interface size `Auto` draws at: the system's text scale. The phone shell is laid out
+    /// in a phone's own points for screens 360 points wide: a larger font size (Android's) grows
+    /// it up to [`PHONE_MAX_SCALE`], and only as far as the screen, `width` points wide at the
+    /// system's own size, keeps those 360 points.
+    pub(crate) fn auto_text_scale(&self, width: f32) -> f32 {
+        if !self.phone_layout() {
+            return self.system_text_scale;
+        }
+        let room = if width.is_finite() && width > 0.0 { (width / PHONE_MIN_WIDTH).max(1.0) } else { 1.0 };
+        let wanted = if self.system_text_scale.is_finite() { self.system_text_scale.clamp(1.0, PHONE_MAX_SCALE) } else { 1.0 };
+        wanted.min(room)
     }
 
     /// The phone shell's tool mode (tests and automation).
@@ -309,7 +320,8 @@ impl PdfCraftApp {
     }
 
     /// The reader's Back: close what is open over the page, one thing at a time, then go Home.
-    /// Home itself stays (Back never closes PdfCraft). Returns whether it closed something.
+    /// Home's first screen sends the app to the back where the system has one (Android), as its
+    /// own apps do; PdfCraft never closes. Returns whether Back did something.
     fn phone_back(&mut self) -> bool {
         let organizing = self.active.and_then(|i| self.views.get(i)).is_some_and(|v| v.organize);
         if self.phone.sheet.is_some() {
@@ -361,6 +373,8 @@ impl PdfCraftApp {
             }
         } else if self.active.is_some() {
             self.go_home();
+        } else if let Some(to_background) = &self.to_background {
+            to_background();
         } else {
             return false;
         }
@@ -379,7 +393,7 @@ impl PdfCraftApp {
     /// opened over the conversation (with no key, they are all it shows).
     fn phone_ai_back(&mut self) {
         #[cfg(not(target_arch = "wasm32"))]
-        if self.ai.settings_open() && !self.ai.key.trim().is_empty() {
+        if self.ai.settings_open() && self.ai.ready() {
             self.ai.close_settings();
             return;
         }
@@ -478,11 +492,28 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
     if app.phone.sheet.is_some_and(|s| s.on_home() != app.active.is_none()) {
         app.phone.sheet = None;
     }
-    egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.pasteboard)).show(ui, |ui| match app.active {
-        None if app.combine_showing() => crate::combine_ui::phone::page(app, ui, screen),
-        None => crate::phone_home::show(app, ui, screen, &t),
-        Some(index) => reader(app, index, ui, screen, &t),
+    // Another document starts plain, before its screen is named (a panel left open isn't its).
+    if let Some(index) = app.active {
+        adopt_document(app, index);
+    }
+    // A screen arrives from the side it leads to (further in from the right, back out from the
+    // left), sliding a little and fading in over its ground; its bars with it.
+    let (shown, rank) = screen_shown(app);
+    let arriving = crate::transition::screen(&ctx, shown, rank);
+    let dx = arriving.offset(crate::transition::SLIDE);
+    let ground = if app.active.is_some() { t.pasteboard } else { crate::phone_home::look(&t).ground };
+    egui::CentralPanel::default().frame(egui::Frame::NONE.fill(ground)).show(ui, |ui| {
+        crate::transition::place_layer(ui.ctx(), ui.layer_id(), vec2(dx, 0.0));
+        crate::transition::bare_strip(ui, screen, dx, ground);
+        ui.multiply_opacity(arriving.opacity());
+        match app.active {
+            None if app.combine_showing() => crate::combine_ui::phone::page(app, ui, screen),
+            None => crate::phone_home::show(app, ui, screen, &t),
+            Some(index) => reader(app, index, ui, screen, &t),
+        }
     });
+    // A sheet that just closed: its scrim clearing.
+    crate::transition::clearing_scrim(&ctx, screen);
     app.phone.text_focused = ctx.text_edit_focused();
     // The system's bars take the colours of the screen's top and bottom, so they read as part of
     // it: the Android shell gives them to the bars (and their icons a shade that reads on them).
@@ -517,6 +548,26 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
     }
 }
 
+/// The screen the shell shows, and how far in it is ([`crate::transition::change`]): Home 0; a
+/// document, Combine or the profile 1; a panel, the assistant or text being typed over a document,
+/// and the photo grid or the assistant's settings over the profile, 2.
+fn screen_shown(app: &PdfCraftApp) -> ((&'static str, u64, u64), i32) {
+    let doc = app.active.and_then(|i| app.views.get(i)).map_or(0, |v| v.id.0);
+    match app.active {
+        None if app.combine_showing() => (("combine", 0, 0), 1),
+        None if app.phone.home.picking => (("photos", 0, 0), 2),
+        None if app.phone.home.ai_settings => (("assistant settings", 0, 0), 2),
+        None if app.phone.home.profile => (("profile", 0, 0), 1),
+        None => (("home", 0, 0), 0),
+        Some(_) if app.phone.ai_open => (("assistant", doc, 0), 2),
+        Some(_) if app.phone_text_editing() => (("typing", doc, 0), 2),
+        Some(_) => match app.right {
+            Some(panel) => (("panel", doc, egui::Id::new(std::mem::discriminant(&panel)).value()), 2),
+            None => (("document", doc, 0), 1),
+        },
+    }
+}
+
 /// A top bar with Back and a title (Combine files, panels). Returns whether Back was tapped.
 pub(crate) fn top_bar_titled(ui: &mut egui::Ui, screen: Rect, title: &str) -> bool {
     let t = Tokens::get(ui.ctx());
@@ -546,7 +597,9 @@ pub(crate) fn bar_filled(
     top: bool,
     add: impl FnOnce(&mut egui::Ui),
 ) {
+    let fade = ui.opacity();
     egui::Area::new(egui::Id::new(id)).order(egui::Order::Middle).fixed_pos(rect.min).constrain(false).show(ui.ctx(), |ui| {
+        crate::transition::follow_screen(ui, fade);
         let (r, _) = ui.allocate_exact_size(rect.size(), Sense::click());
         ui.painter().rect_filled(r, CornerRadius::ZERO, fill);
         let edge = if top { r.bottom() } else { r.top() };
@@ -832,20 +885,23 @@ pub(crate) fn sheet_row(ui: &mut egui::Ui, icon: &str, label: &str, enabled: boo
 pub(crate) fn sheet(ctx: &egui::Context, id: &str, screen: Rect, title: Option<&str>, add: impl FnOnce(&mut egui::Ui)) -> bool {
     let t = Tokens::get(ctx);
     let mut open = true;
+    // It rises from below the screen as it opens, the scrim darkening behind it.
+    let scrim = crate::transition::sheet_scrim(ctx);
+    let sheet_id = egui::Id::new(("phone-sheet", id));
+    let rising = crate::transition::appearing(ctx, sheet_id);
+    let height = ctx.memory(|m| m.area_rect(sheet_id)).map(|r| r.height()).filter(|h| h.is_finite() && *h > 0.0).unwrap_or(screen.height() / 2.0);
+    crate::transition::place_layer(ctx, egui::LayerId::new(egui::Order::Foreground, sheet_id), vec2(0.0, rising.offset(height)));
     egui::Area::new(egui::Id::new(("phone-scrim", id))).order(egui::Order::Middle).fixed_pos(screen.min).constrain(false).show(ctx, |ui| {
         let (r, resp) = ui.allocate_exact_size(screen.size(), Sense::click());
-        ui.painter().rect_filled(r, CornerRadius::ZERO, Color32::from_black_alpha(110));
+        ui.painter().rect_filled(r, CornerRadius::ZERO, Color32::from_black_alpha(scrim));
         if resp.clicked() {
             open = false;
         }
     });
     let width = screen.width();
-    egui::Area::new(egui::Id::new(("phone-sheet", id)))
-        .order(egui::Order::Foreground)
-        .pivot(Align2::CENTER_BOTTOM)
-        .fixed_pos(screen.center_bottom())
-        .constrain(false)
-        .show(ctx, |ui| {
+    egui::Area::new(sheet_id).order(egui::Order::Foreground).pivot(Align2::CENTER_BOTTOM).fixed_pos(screen.center_bottom()).constrain(false).show(
+        ctx,
+        |ui| {
             egui::Frame::NONE
                 .fill(t.panel)
                 .corner_radius(CornerRadius { nw: 18, ne: 18, sw: 0, se: 0 })
@@ -862,7 +918,8 @@ pub(crate) fn sheet(ctx: &egui::Context, id: &str, screen: Rect, title: Option<&
                     }
                     egui::ScrollArea::vertical().max_height(screen.height() * 0.72).auto_shrink([false, true]).show(ui, add);
                 });
-        });
+        },
+    );
     open
 }
 
@@ -885,8 +942,8 @@ fn command_enabled(app: &PdfCraftApp, id: &str) -> bool {
 // ---------------------------------------------------------------------------------------------
 // Reader
 
-fn reader(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, screen: Rect, t: &Tokens) {
-    // Another document starts plain: bars shown, no panel, search or tool from the last one.
+/// Another document starts plain: bars shown, no panel, search or tool from the last one.
+fn adopt_document(app: &mut PdfCraftApp, index: usize) {
     let id = app.views.get(index).map(|v| v.id);
     if app.phone.doc != id {
         app.phone.doc = id;
@@ -896,6 +953,9 @@ fn reader(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, screen: Rect, 
         app.close_phone_ai();
         app.right = None;
     }
+}
+
+fn reader(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, screen: Rect, t: &Tokens) {
     // The AI assistant takes the whole screen.
     #[cfg(not(target_arch = "wasm32"))]
     if app.phone.ai_open {
@@ -962,11 +1022,14 @@ fn reader(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, screen: Rect, 
     if app.phone.tool.is_some() || app.phone.drawer || app.phone.searching || app.phone.sheet.is_some() || organizing {
         app.phone.bars_hidden = false;
     }
-    if app.phone.bars_hidden {
+    // A tap slides the bars away, off the top and the bottom, and back.
+    let out = crate::transition::bars(&ctx, !app.phone.bars_hidden);
+    if out <= 0.0 {
         return;
     }
-    let top = Rect::from_min_size(screen.min, vec2(screen.width(), TOP_BAR));
-    let bottom = Rect::from_min_size(pos2(screen.left(), screen.bottom() - BOTTOM_BAR), vec2(screen.width(), BOTTOM_BAR));
+    let away = 1.0 - out;
+    let top = Rect::from_min_size(screen.min - vec2(0.0, TOP_BAR * away), vec2(screen.width(), TOP_BAR));
+    let bottom = Rect::from_min_size(pos2(screen.left(), screen.bottom() - BOTTOM_BAR * out), vec2(screen.width(), BOTTOM_BAR));
     if organizing {
         organize_bar(app, index, ui, top, t);
         return;
@@ -1278,7 +1341,9 @@ fn page_pill(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, bottom: Rec
     let w = ui.fonts_mut(|f| f.layout_no_wrap(text.clone(), font.clone(), t.text).size().x) + 28.0;
     let pos = pos2(bottom.left() + 12.0, bottom.top() - 12.0 - 36.0);
     let mut tapped = false;
+    let fade = ui.opacity();
     egui::Area::new(egui::Id::new("phone-page-pill")).order(egui::Order::Middle).fixed_pos(pos).constrain(false).show(ui.ctx(), |ui| {
+        crate::transition::follow_screen(ui, fade);
         // A finger-tall target around the pill.
         let (r, resp) = ui.allocate_exact_size(vec2(w.max(TARGET), 36.0), Sense::click());
         let label = crate::i18n::fmt(tl!("Page {p} of {n}"), &[("p", &view.current.saturating_add(1).to_string()), ("n", &n.to_string())]);
@@ -1557,9 +1622,30 @@ mod tests {
     fn the_phone_shell_draws_at_its_own_points() {
         let mut app = PdfCraftApp::new();
         app.system_text_scale = 0.8;
-        assert_eq!(app.auto_text_scale(), 0.8, "the desktop shell keeps the system's text scale");
+        assert_eq!(app.auto_text_scale(412.0), 0.8, "the desktop shell keeps the system's text scale");
         app.shell = ShellPref::Phone;
-        assert_eq!(app.auto_text_scale(), 1.0);
+        assert_eq!(app.auto_text_scale(412.0), 1.0, "never smaller than its own points");
+        // A larger font size grows it, as far as the screen keeps 360 points.
+        app.system_text_scale = 1.15;
+        assert_eq!(app.auto_text_scale(450.0), 1.15);
+        assert_eq!(app.auto_text_scale(412.0), 412.0 / 360.0);
+        assert_eq!(app.auto_text_scale(360.0), 1.0, "a narrow screen keeps its layout");
+        app.system_text_scale = 2.0;
+        assert_eq!(app.auto_text_scale(800.0), 1.3, "up to 1.3");
+        app.system_text_scale = f32::NAN;
+        assert_eq!(app.auto_text_scale(f32::INFINITY), 1.0);
+    }
+
+    #[test]
+    fn back_on_homes_first_screen_sends_the_app_to_the_back_where_it_can() {
+        let mut app = PdfCraftApp::new();
+        app.shell = ShellPref::Phone;
+        assert!(!app.phone_back(), "nowhere to go: nothing done");
+        let sent = std::rc::Rc::new(std::cell::Cell::new(0));
+        let count = sent.clone();
+        app.to_background = Some(Box::new(move || count.set(count.get() + 1)));
+        assert!(app.phone_back());
+        assert_eq!(sent.get(), 1, "to the back, as Android's apps do");
     }
 
     #[test]

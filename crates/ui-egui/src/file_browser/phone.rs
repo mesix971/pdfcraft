@@ -197,10 +197,21 @@ pub(crate) fn page(app: &mut PdfCraftApp, b: &mut Browser, ctx: &egui::Context) 
     let rows = rows(app, b);
     let host = &app.file_browser_host;
     let screen = ctx.content_rect();
-    egui::Modal::new(egui::Id::new("phone-file-browser")).frame(egui::Frame::NONE).backdrop_color(look.ground).show(ctx, |ui| {
+    // The browser slides in from the right as it opens, and the list from the side a folder leads
+    // to (into one from the right, back out from the left).
+    let id = egui::Id::new("phone-file-browser");
+    let arriving = crate::transition::appearing(ctx, id);
+    let dx = arriving.offset(crate::transition::SLIDE);
+    crate::transition::place_layer(ctx, egui::LayerId::new(egui::Order::Foreground, id), vec2(dx, 0.0));
+    let depth = i32::try_from(b.phone.trail.len()).unwrap_or(i32::MAX);
+    let moving = crate::transition::change(ctx, "phone-file-browser-list", (b.phone.source as u8, &b.dir), depth);
+    // While the browser itself arrives, its list comes with it.
+    let moving = if arriving.done < 1.0 { crate::transition::Arrival::IN_PLACE } else { moving };
+    egui::Modal::new(id).frame(egui::Frame::NONE).backdrop_color(look.ground).show(ctx, |ui| {
         ui.set_min_size(screen.size());
         ui.set_max_size(screen.size());
         let whole = Rect::from_min_size(ui.max_rect().min, screen.size());
+        crate::transition::bare_strip(ui, whole, dx, look.ground);
         ui.painter().rect_filled(whole, CornerRadius::ZERO, look.ground);
         ui.spacing_mut().item_spacing = Vec2::ZERO;
         let band = |top: f32, height: f32| Rect::from_min_size(pos2(whole.left(), top), vec2(whole.width(), height));
@@ -223,7 +234,14 @@ pub(crate) fn page(app: &mut PdfCraftApp, b: &mut Browser, ctx: &egui::Context) 
         }
         let low = bottom_height(b).min((whole.bottom() - y).max(0.0));
         let list_rect = Rect::from_min_max(pos2(whole.left(), y), pos2(whole.right(), (whole.bottom() - low).max(y)));
-        if let Some(chosen) = list(ui, b, &rows, list_rect, scanning, host, now, &t, &look) {
+        let shown = list_rect.translate(vec2(moving.offset(crate::transition::SLIDE), 0.0));
+        let chosen = ui
+            .scope(|ui| {
+                ui.multiply_opacity(moving.opacity());
+                list(ui, b, &rows, shown, scanning, host, now, &t, &look)
+            })
+            .inner;
+        if let Some(chosen) = chosen {
             answer = Some(chosen);
         }
         if low > 0.0
@@ -1006,6 +1024,38 @@ trailer << /Root 1 0 R >>
         escape(&mut h);
         assert!(h.state().file_browser.is_none(), "Back with nowhere to go back to cancels");
         assert!(got.lock().unwrap().is_none(), "and a cancelled pick never answers");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The browser slides in from the right as it opens, and a folder's list from the side it
+    /// leads to: into a folder from the right, back out from the left.
+    #[test]
+    fn the_browser_slides_in_and_a_folders_list_from_its_side() {
+        let root = device("slide");
+        let mut h = harness(&root, "en", false);
+        // kittest turns egui's animations off; back on, as on a phone.
+        h.ctx.all_styles_mut(|s| s.animation_time = 1.0 / 12.0);
+        let layer = egui::LayerId::new(egui::Order::Foreground, egui::Id::new("phone-file-browser"));
+        let into: Got = Arc::default();
+        assert!(h.state_mut().ask_in_app(Kind::File, pdf().set_directory(root.join("Download")), None, move |_, p| *into.lock().unwrap() = Some(p)));
+        h.run_steps(1);
+        let x = h.ctx.layer_transform_to_global(layer).map(|t| t.translation.x);
+        assert!(x.is_some_and(|x| x > 0.0), "from the right: {x:?}");
+        wait_for(&mut h, "Trips");
+        h.run_steps(6);
+        assert_eq!(h.ctx.layer_transform_to_global(layer), None, "in place");
+        let left = |h: &Harness<'static, PdfCraftApp>, name: &str| h.get_by_label(name).rect().left();
+        let rest = left(&h, "Lease.pdf");
+        h.get_by_label("Trips").click();
+        h.run_steps(2);
+        assert!(left(&h, "Rome.pdf") > rest + 10.0, "into a folder: from the right");
+        h.run_steps(6);
+        assert_eq!(left(&h, "Rome.pdf"), rest);
+        h.key_press(egui::Key::Escape);
+        h.run_steps(2);
+        assert!(left(&h, "Lease.pdf") < rest - 10.0, "back out: from the left");
+        h.run_steps(6);
+        assert_eq!(left(&h, "Lease.pdf"), rest);
         let _ = std::fs::remove_dir_all(&root);
     }
 

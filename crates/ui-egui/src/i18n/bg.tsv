@@ -2426,3 +2426,21 @@ decimal separator	.	,
 	Tap text or a picture to change it	Докоснете текст или картина, за да ги промените
 	Tap where the text goes	Докоснете мястото на текста
 	White	Бяло
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	Въпросът ви и отвореният документ се изпращат до избраната от вас услуга, със собствения ви API ключ, само когато поискате. Заявките се таксуват към акаунта ви в тази услуга.
+	Service	Услуга
+	Another service (OpenAI-compatible)	Друга услуга (съвместима с OpenAI)
+	API key	API ключ
+	On Google's free tier, what you send may be used to improve Google's products.	При безплатния план на Google изпратеното от вас може да се използва за подобряване на продуктите на Google.
+	Fill in for	Попълване за
+	Service address	Адрес на услугата
+	API key (if the service asks for one)	API ключ (ако услугата изисква)
+	The service reads PDF files	Услугата чете PDF файлове
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	Иначе се изпраща текстът на документа, страница по страница (без картините и сканираното).
+	Add your API key for {service} in the assistant's settings.	Добавете API ключа си за {service} в настройките на асистента.
+	Your {service} account can't use this model, or has no credit left: {error}	Вашият акаунт в {service} не може да използва този модел или няма оставащ кредит: {error}
+	Choose the model to ask in the assistant's settings.	Изберете модела, който да питате, в настройките на асистента.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	Този документ няма текст за изпращане (сканиран ли е?). Изберете услуга, която чете PDF файлове, или първо разпознайте текста му.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	Текстът на този документ е твърде дълъг за асистента ({chars} знака, най-много {max}).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Обобщавайте, питайте и коригирайте своите PDF файлове с Claude, ChatGPT или Gemini, със собствения си ключ.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	Адресът на услугата не е валиден: той започва с https:// (http:// само за това устройство или локалната мрежа).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	Този документ не позволява копиране на съдържанието му, затова не се изпраща до асистента.
