@@ -588,6 +588,9 @@ pub struct PdfCraftApp {
     /// The latest notice reports this document's edit, undone by the notice's Undo while the
     /// document's edit generation is still this one.
     pub(crate) toast_undo: Option<(DocId, u64)>,
+    /// The latest notice is a step of a job's progress ("page 3 of 10"): the next notice takes
+    /// its place rather than coming under it.
+    pub(crate) toast_progress: bool,
     /// Whether the macOS title bar is drawn by us (traffic lights over our tab strip).
     pub integrated_titlebar: bool,
     pub password_prompt: Option<PasswordPrompt>,
@@ -946,6 +949,7 @@ impl PdfCraftApp {
             toast: None,
             toast_earlier: Vec::new(),
             toast_undo: None,
+            toast_progress: false,
             integrated_titlebar: false,
             password_prompt: None,
             unlock_prompt: None,
@@ -1661,14 +1665,23 @@ impl PdfCraftApp {
 
     pub fn notify(&mut self, msg: impl Into<String>) {
         let msg = msg.into();
-        // The notice showing stays, above the new one, until its time is up.
-        if let Some(earlier) = self.toast.take().filter(|(m, _)| *m != msg) {
+        // The notice showing stays, above the new one, until its time is up (a progress step
+        // goes: what follows says more).
+        let progress = std::mem::take(&mut self.toast_progress);
+        if let Some(earlier) = self.toast.take().filter(|(m, _)| *m != msg && !progress) {
             self.toast_earlier.push(earlier);
             let extra = self.toast_earlier.len().saturating_sub(widgets::EARLIER_TOASTS);
             self.toast_earlier.drain(..extra);
         }
         self.toast_undo = None;
         self.toast = Some((msg, 0.0));
+    }
+
+    /// Say how far a job has got: the next notice, its next step or its outcome, takes this one's
+    /// place rather than stacking under it.
+    pub(crate) fn notify_progress(&mut self, msg: impl Into<String>) {
+        self.notify(msg);
+        self.toast_progress = true;
     }
 
     /// Give the notice just shown an Undo for the edit it reports: the active document's last.

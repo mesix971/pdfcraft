@@ -976,6 +976,22 @@ mod tests {
         ctx.memory(|memory| memory.area_rect(egui::Id::new("toast")).unwrap())
     }
 
+    /// A job's progress steps take each other's place, and its outcome the last step's, while a
+    /// notice from before stays above them.
+    #[test]
+    fn progress_steps_replace_each_other_and_the_outcome_the_last() {
+        let mut app = PdfCraftApp::new();
+        app.notify("Saved");
+        app.notify_progress("Recognizing text… page 1 of 3");
+        app.notify_progress("Recognizing text… page 2 of 3");
+        app.notify("Recognized 3 pages");
+        assert_eq!(app.toast.as_ref().map(|t| t.0.as_str()), Some("Recognized 3 pages"));
+        let earlier: Vec<&str> = app.toast_earlier.iter().map(|t| t.0.as_str()).collect();
+        assert_eq!(earlier, ["Saved"]);
+        app.notify("Copied");
+        assert_eq!(app.toast_earlier.len(), 2, "an outcome stacks like any notice");
+    }
+
     #[test]
     fn toast_width_adapts_to_long_notices_and_narrow_viewports() {
         let ctx = egui::Context::default();

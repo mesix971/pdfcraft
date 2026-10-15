@@ -3808,7 +3808,7 @@ fn find_bar(view: &mut DocView, pages: usize, area: Rect, ui: &mut egui::Ui, t: 
     }
     let mut close = false;
     let mut step: Option<bool> = None;
-    let searched = view.texts.len() + view.text_failed.len();
+    let searched = find.searched.len() + view.text_failed.len();
     egui::Area::new(egui::Id::new("find-bar"))
         .order(egui::Order::Middle)
         .pivot(Align2::RIGHT_TOP)

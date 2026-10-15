@@ -388,7 +388,6 @@ impl eframe::App for Shell {
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         self.app.ui(ui, frame);
         let ctx = ui.ctx().clone();
-        bar_grounds(&ctx, self.app.phone_system_bars());
         let copied: Option<String> = ctx.output(|o| {
             o.commands
                 .iter()
@@ -442,25 +441,5 @@ impl Shell {
         let pixels = *self.window_insets.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let [left, top, right, bottom] = crate::screen::widest(from_content, crate::screen::window_insets(pixels, [w, h], points));
         egui::SafeAreaInsets(egui::epaint::MarginF32 { left, right, top, bottom })
-    }
-}
-
-/// The grounds of the system's bars, in the colours of the screen's top and bottom (`bars`): an
-/// app targeting Android 15 or later is drawn under the bars, which Android no longer paints.
-/// Below everything else, outside the content rectangle; older Androids paint their bars over it.
-fn bar_grounds(ctx: &egui::Context, bars: Option<(egui::Color32, egui::Color32)>) {
-    let Some((top, bottom)) = bars else { return };
-    let (whole, content) = (ctx.viewport_rect(), ctx.content_rect());
-    let painter = ctx.layer_painter(egui::LayerId::background());
-    let strips = [
-        (egui::Rect::from_min_max(whole.min, egui::pos2(whole.max.x, content.min.y)), top),
-        (egui::Rect::from_min_max(egui::pos2(whole.min.x, content.max.y), whole.max), bottom),
-        (egui::Rect::from_min_max(egui::pos2(whole.min.x, content.min.y), egui::pos2(content.min.x, content.max.y)), bottom),
-        (egui::Rect::from_min_max(egui::pos2(content.max.x, content.min.y), egui::pos2(whole.max.x, content.max.y)), bottom),
-    ];
-    for (rect, colour) in strips {
-        if rect.is_positive() {
-            painter.rect_filled(rect, 0.0, colour);
-        }
     }
 }

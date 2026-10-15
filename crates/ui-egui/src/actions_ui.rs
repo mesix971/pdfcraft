@@ -153,7 +153,7 @@ impl PdfCraftApp {
                     &[("d", &(done + 1).min(total.max(1)).to_string()), ("t", &total.max(1).to_string())],
                 );
                 if self.toast.as_ref().is_none_or(|t| t.0 != m) {
-                    self.notify(m);
+                    self.notify_progress(m);
                 }
                 if let Some(ctx) = &self.ctx {
                     ctx.request_repaint_after(std::time::Duration::from_millis(200));

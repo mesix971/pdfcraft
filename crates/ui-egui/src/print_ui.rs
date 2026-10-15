@@ -431,7 +431,7 @@ impl PdfCraftApp {
                 ctx.request_repaint();
             }
         });
-        self.notify(crate::i18n::fmt(tl!("Sending to {printer}…"), &[("printer", &printer)]));
+        self.notify_progress(crate::i18n::fmt(tl!("Sending to {printer}…"), &[("printer", &printer)]));
         self.print_tasks.jobs.push((printer, rx));
         true
     }
@@ -454,7 +454,7 @@ impl PdfCraftApp {
             Ok(job) => {
                 let n = job.total().to_string();
                 self.print_tasks.web_job = Some(job);
-                self.notify_fmt("Preparing {n} sheets for printing…", &[("n", &n)]);
+                self.notify_progress(crate::i18n::fmt(tl!("Preparing {n} sheets for printing…"), &[("n", &n)]));
                 if let Some(ctx) = &self.ctx {
                     ctx.request_repaint();
                 }
@@ -482,7 +482,7 @@ impl PdfCraftApp {
                 return;
             }
             let (done, total) = (job.done().to_string(), job.total().to_string());
-            self.notify_fmt("Preparing sheet {done} of {total} for printing…", &[("done", &done), ("total", &total)]);
+            self.notify_progress(crate::i18n::fmt(tl!("Preparing sheet {done} of {total} for printing…"), &[("done", &done), ("total", &total)]));
             if let Some(ctx) = &self.ctx {
                 ctx.request_repaint();
             }
@@ -493,7 +493,7 @@ impl PdfCraftApp {
         let urls = job.take_urls();
         self.print_tasks.web_last = Some((job.name.clone(), job.pdf.clone()));
         match crate::web_print::print_in_iframe(&html, urls, self.print_tasks.web_failed.clone(), self.ctx.clone()) {
-            Ok(()) => self.notify_tr("Opening the browser's print dialog…"),
+            Ok(()) => self.notify_progress(tl!("Opening the browser's print dialog…")),
             Err(e) => self.web_print_failed(&e),
         }
     }

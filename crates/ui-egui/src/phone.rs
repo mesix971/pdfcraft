@@ -1262,7 +1262,7 @@ fn tool_bottom_bar(app: &mut PdfCraftApp, mode: ToolMode, ui: &mut egui::Ui, rec
 fn search_bar(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, rect: Rect, t: &Tokens) {
     let Some(view) = app.views.get_mut(index) else { return };
     let pages = view.page_count();
-    let searched = view.texts.len() + view.text_failed.len();
+    let searched = view.find.as_ref().map_or(0, |f| f.searched.len()) + view.text_failed.len();
     let mut close = false;
     let mut step: Option<bool> = None;
     let Some(find) = view.find.as_mut() else {

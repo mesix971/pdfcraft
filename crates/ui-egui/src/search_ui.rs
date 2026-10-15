@@ -13,7 +13,7 @@ const CONTEXT: usize = 36;
 
 pub(crate) fn panel(ui: &mut egui::Ui, t: &Tokens, view: &mut DocView, pages: usize) {
     crate::widgets::begin_dialog(ui);
-    let searched = view.texts.len() + view.text_failed.len();
+    let searched = view.find.as_ref().map_or(0, |f| f.searched.len()) + view.text_failed.len();
     let Some(find) = view.find.as_mut() else { return };
     find.in_panel = true;
     let l = ui.label(egui::RichText::new(tl!("What word or phrase would you like to search for?")).color(t.text_muted));
