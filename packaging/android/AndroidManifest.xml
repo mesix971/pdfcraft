@@ -2,9 +2,12 @@
 <!-- PdfCraft for Android. `cargo xtask android` fills in the version and builds the APK
      (apps/pdfcraft-android/README.md). The app is native code in a NativeActivity: no Java.
 
-     The SDK levels come from `cargo xtask android` (minimum 26, Android 8.0; target 34). Target 35
-     would draw the app under the status and navigation bars (Android 15 enforces edge-to-edge),
-     and NativeActivity reports no insets for those. -->
+     The SDK levels come from `cargo xtask android` (minimum 26, Android 8.0; target 36, Android
+     16, as Google Play asks). From Android 15 the app is drawn under the status and navigation
+     bars (edge-to-edge): the shell reads the window's insets and paints the bars' grounds itself
+     (apps/pdfcraft-android/src/shell.rs). From Android 16 the Back key reaches an app only when
+     `enableOnBackInvokedCallback` is false: a NativeActivity can't take the callbacks that replace
+     it, and Back closes what is open in PdfCraft (a menu, a sheet) before it leaves. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="ai.storyteller.pdfcraft"
     android:installLocation="auto">
@@ -19,9 +22,9 @@
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <!-- Bring PdfCraft forward when another app opens a document in it while it runs. -->
     <uses-permission android:name="android.permission.REORDER_TASKS" />
-    <!-- The AI assistant only (crates/ai): with the user's own Anthropic API key, and only when
-         the user asks a question. Without a key PdfCraft sends nothing; everything else works
-         offline. -->
+    <!-- The AI assistant only (crates/ai): the service the user chose, with the user's own API
+         key, and only when the user asks a question. Without a key PdfCraft sends nothing;
+         everything else works offline. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- wgpu draws with Vulkan, or OpenGL ES 3 where Vulkan is missing. -->
@@ -35,6 +38,7 @@
         android:allowBackup="false"
         android:requestLegacyExternalStorage="true"
         android:resizeableActivity="true"
+        android:enableOnBackInvokedCallback="false"
         android:appCategory="productivity">
 
         <!-- standard: a NativeActivity never hears of an intent sent to it while it runs, so a

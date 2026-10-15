@@ -20,6 +20,30 @@ pub fn insets(content: [i32; 4], window: [i32; 2], points: [f32; 2]) -> [f32; 4]
     [left as f32 * sx, top as f32 * sy, (w - right) as f32 * sx, (h - bottom) as f32 * sy]
 }
 
+/// The window's own insets `[left, top, right, bottom]` (pixels: the bars, a cutout, the keyboard)
+/// in points, for a `[w, h]` pixel window drawn as `points`. Negative insets count as none, and
+/// none reaches past the window.
+pub fn window_insets(pixels: [i32; 4], window: [i32; 2], points: [f32; 2]) -> [f32; 4] {
+    let [w, h] = window;
+    let [pw, ph] = points;
+    if w <= 0 || h <= 0 || !(pw.is_finite() && ph.is_finite() && pw > 0.0 && ph > 0.0) {
+        return [0.0; 4];
+    }
+    let [left, top, right, bottom] = pixels;
+    let (sx, sy) = (pw / w as f32, ph / h as f32);
+    [left.clamp(0, w) as f32 * sx, top.clamp(0, h) as f32 * sy, right.clamp(0, w) as f32 * sx, bottom.clamp(0, h) as f32 * sy]
+}
+
+/// Each side's larger inset: what the content rectangle leaves out (older Androids) or what the
+/// window says it covers (Android 15 and later draw the app under the bars).
+pub fn widest(a: [f32; 4], b: [f32; 4]) -> [f32; 4] {
+    let mut out = [0.0; 4];
+    for (o, (x, y)) in out.iter_mut().zip(a.into_iter().zip(b)) {
+        *o = x.max(y);
+    }
+    out
+}
+
 /// Whether white icons would be hard to read on `rgb` (so a system bar in that colour gets dark
 /// ones).
 pub fn is_light([r, g, b]: [u8; 3]) -> bool {
@@ -28,6 +52,22 @@ pub fn is_light([r, g, b]: [u8; 3]) -> bool {
 
 #[cfg(test)]
 mod tests {
+    /// Android 15 and later: the window covers the bars and says so in its insets, which count as
+    /// much as the content rectangle did; a keyboard larger than the window stops at its edge.
+    #[test]
+    fn the_windows_insets_cover_the_bars_and_the_keyboard() {
+        let points = [360.0, 800.0];
+        let window = super::window_insets([0, 66, 0, 132], [1080, 2400], points);
+        assert_eq!(window, [0.0, 22.0, 0.0, 44.0]);
+        assert_eq!(super::window_insets([-5, 0, 0, 9999], [1080, 2400], points), [0.0, 0.0, 0.0, 800.0]);
+        assert_eq!(super::window_insets([10, 10, 10, 10], [0, 2400], points), [0.0; 4]);
+        // Edge-to-edge, the content rectangle is the whole window: the window's insets count.
+        let content = super::insets([0, 0, 1080, 2400], [1080, 2400], points);
+        assert_eq!(super::widest(content, window), [0.0, 22.0, 0.0, 44.0]);
+        // Before, the content rectangle left the bars and the keyboard out.
+        assert_eq!(super::widest(super::insets([0, 66, 1080, 1500], [1080, 2400], points), [0.0; 4]), [0.0, 22.0, 0.0, 300.0]);
+    }
+
     #[test]
     fn a_bar_gets_icons_that_read_on_it() {
         // Home's grounds and the bars' colours, light and dark.

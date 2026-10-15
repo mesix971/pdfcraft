@@ -1,2 +1,17 @@
 [alias]
 xtask = "run -p xtask --"
+
+# Android 15 devices may use 16 KB memory pages, and Google Play asks apps targeting Android 15 or
+# later to load on them: every loadable segment of the native library aligned to 16 KB.
+# `cargo xtask android` checks the library it packs. A RUSTFLAGS variable replaces these.
+[target.aarch64-linux-android]
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
+
+[target.armv7-linux-androideabi]
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
+
+[target.x86_64-linux-android]
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
+
+[target.i686-linux-android]
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]

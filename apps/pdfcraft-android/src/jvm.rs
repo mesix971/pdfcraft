@@ -998,6 +998,60 @@ fn remove_mirror(env: &mut Env, activity: &JObject, edit: &JObject) -> Jni<()> {
     Ok(())
 }
 
+/// The window's insets, `[left, top, right, bottom]` in pixels: the status and navigation bars, a
+/// display cutout and the soft keyboard, from the decor view's root insets. An app targeting
+/// Android 15 or later is drawn under the bars there (edge-to-edge), and the activity's content
+/// rectangle no longer leaves them out. Read on the main thread into `into`; `changed` is called
+/// when they change. Nothing is read before the view is attached.
+pub fn read_window_insets(app: &AndroidApp, into: std::sync::Arc<std::sync::Mutex<[i32; 4]>>, changed: impl Fn() + Send + 'static) {
+    let main = app.clone();
+    app.run_on_java_main_thread(Box::new(move || match with_activity(&main, window_insets) {
+        Ok(Some(insets)) => {
+            let mut held = into.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            if *held != insets {
+                *held = insets;
+                drop(held);
+                changed();
+            }
+        }
+        Ok(None) => {}
+        Err(e) => log::debug!("window insets: {e}"),
+    }));
+}
+
+fn window_insets(env: &mut Env, activity: &JObject) -> Jni<Option<[i32; 4]>> {
+    let window = env.call_method(activity, jni_str!("getWindow"), jni_sig!("()Landroid/view/Window;"), &[])?.l()?;
+    if window.is_null() {
+        return Ok(None);
+    }
+    let decor = env.call_method(&window, jni_str!("getDecorView"), jni_sig!("()Landroid/view/View;"), &[])?.l()?;
+    if decor.is_null() {
+        return Ok(None);
+    }
+    let insets = env.call_method(&decor, jni_str!("getRootWindowInsets"), jni_sig!("()Landroid/view/WindowInsets;"), &[])?.l()?;
+    if insets.is_null() {
+        return Ok(None);
+    }
+    if AndroidApp::sdk_version() < API_R {
+        // The system window insets: the bars, and the keyboard with `adjustResize`.
+        let mut side = |name| -> Jni<i32> { Ok(env.call_method(&insets, name, jni_sig!("()I"), &[])?.i()?) };
+        return Ok(Some([
+            side(jni_str!("getSystemWindowInsetLeft"))?,
+            side(jni_str!("getSystemWindowInsetTop"))?,
+            side(jni_str!("getSystemWindowInsetRight"))?,
+            side(jni_str!("getSystemWindowInsetBottom"))?,
+        ]));
+    }
+    let mut kind = |name| -> Jni<i32> { Ok(env.call_static_method(jni_str!("android/view/WindowInsets$Type"), name, jni_sig!("()I"), &[])?.i()?) };
+    let types = kind(jni_str!("systemBars"))? | kind(jni_str!("displayCutout"))? | kind(jni_str!("ime"))?;
+    let sides = env.call_method(&insets, jni_str!("getInsets"), jni_sig!("(I)Landroid/graphics/Insets;"), &[JValue::Int(types)])?.l()?;
+    if sides.is_null() {
+        return Ok(None);
+    }
+    let mut side = |name| -> Jni<i32> { Ok(env.get_field(&sides, name, jni_sig!("I"))?.i()?) };
+    Ok(Some([side(jni_str!("left"))?, side(jni_str!("top"))?, side(jni_str!("right"))?, side(jni_str!("bottom"))?]))
+}
+
 /// `WindowManager.LayoutParams` flags: the window paints the system bars' backgrounds (in the
 /// colours it sets), and they aren't translucent.
 const FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS: i32 = i32::MIN; // 0x8000_0000

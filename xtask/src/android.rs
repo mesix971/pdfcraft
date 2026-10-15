@@ -32,8 +32,12 @@ use crate::gates::{root, target_dir};
 
 /// The oldest Android the app runs on: 8.0 (API 26).
 pub const MIN_SDK: u32 = 26;
-/// The Android the app is built for (see packaging/android/AndroidManifest.xml on 35).
-pub const TARGET_SDK: u32 = 34;
+/// The Android the app is built for: 16 (API 36), which Google Play asks of new apps and updates
+/// since 31 August 2026 (see packaging/android/AndroidManifest.xml for what it changes).
+pub const TARGET_SDK: u32 = 36;
+/// The memory page size the libraries are aligned to: Android 15 devices may use 16 KB pages, and
+/// Google Play asks it of apps targeting Android 15 or later (`.cargo/config.toml` links them so).
+const PAGE_ALIGN: u64 = 16 << 10;
 /// The name Android loads (`android.app.lib_name` in the manifest).
 const LIB: &str = "libpdfcraft_android.so";
 
@@ -107,7 +111,7 @@ pub fn run(args: &[String]) -> anyhow::Result<()> {
         platform
     } else {
         newest(&sdk.join("platforms"), |n| n.starts_with("android-"))
-            .context("no platform in the Android SDK (sdkmanager \"platforms;android-34\")")?
+            .context("no platform in the Android SDK (sdkmanager \"platforms;android-36\")")?
     };
     let version = crate::version::read(&std::fs::read_to_string(root().join("Cargo.toml"))?).map_err(anyhow::Error::msg)?;
     let apk = package(&options, &clang_dir, &tools, &platform.join("android.jar"), &version)?;
@@ -215,6 +219,32 @@ fn version_code(version: &str) -> anyhow::Result<u32> {
     Ok(major * 1_000_000 + minor * 1_000 + patch)
 }
 
+/// Refuse a library some loadable segment of which isn't aligned to [`PAGE_ALIGN`]: it wouldn't
+/// load on a device with 16 KB pages.
+fn check_page_alignment(readelf: &Path, lib: &Path) -> anyhow::Result<()> {
+    let out = Command::new(readelf).args(["-lW"]).arg(lib).output().with_context(|| format!("{}: failed to spawn", readelf.display()))?;
+    if !out.status.success() {
+        bail!("llvm-readelf {}: exited with {}", lib.display(), out.status);
+    }
+    let aligns = load_alignments(&String::from_utf8_lossy(&out.stdout));
+    if aligns.is_empty() || aligns.iter().any(|a| *a < PAGE_ALIGN) {
+        bail!(
+            "{}: loadable segments aligned to {aligns:?}, not {PAGE_ALIGN} (16 KB pages): link with -z max-page-size=16384 (.cargo/config.toml; a RUSTFLAGS variable replaces it)",
+            lib.display()
+        );
+    }
+    Ok(())
+}
+
+/// The alignment of each `LOAD` segment in `llvm-readelf -lW` output (its last column, in hex).
+fn load_alignments(readelf: &str) -> Vec<u64> {
+    readelf
+        .lines()
+        .filter(|l| l.trim_start().starts_with("LOAD "))
+        .filter_map(|l| l.split_whitespace().last().and_then(|a| u64::from_str_radix(a.trim_start_matches("0x"), 16).ok()))
+        .collect()
+}
+
 fn run_tool(cmd: &mut Command, what: &str) -> anyhow::Result<()> {
     eprintln!("$ {what}");
     let status = cmd.status().with_context(|| format!("{what}: failed to spawn"))?;
@@ -280,11 +310,20 @@ fn package(options: &Options, bin: &Path, tools: &Path, android_jar: &Path, vers
         } else {
             run_tool(Command::new(ndk_tool(bin, "llvm-strip")).arg("--strip-unneeded").arg("-o").arg(&to).arg(&built), "llvm-strip")?;
         }
+        check_page_alignment(&ndk_tool(bin, "llvm-readelf"), &to)?;
         let inside = format!("lib/{}/{LIB}", abi.name);
         run_tool(Command::new(tools.join("aapt")).current_dir(&work).arg("add").arg(&unsigned).arg(&inside), &format!("aapt add {inside}"))?;
     }
     let aligned = work.join("aligned.apk");
-    run_tool(Command::new(tools.join("zipalign")).args(["-p", "-f", "4"]).arg(&unsigned).arg(&aligned), "zipalign")?;
+    // Uncompressed libraries at 16 KB in the APK too (`-P`, build-tools 35 and later).
+    let build_tools = tools.file_name().map(|n| version_key(&n.to_string_lossy())).unwrap_or_default();
+    let pages = if build_tools.first().is_some_and(|v| *v >= 35) {
+        ["-P", "16"].as_slice()
+    } else {
+        eprintln!("android: build-tools before 35 can't align libraries to 16 KB pages in the APK");
+        ["-p"].as_slice()
+    };
+    run_tool(Command::new(tools.join("zipalign")).args(pages).args(["-f", "4"]).arg(&unsigned).arg(&aligned), "zipalign")?;
     let names: Vec<&str> = options.abis.iter().map(|a| a.name).collect();
     let out_dir = root().join("dist/android");
     std::fs::create_dir_all(&out_dir)?;
@@ -359,6 +398,17 @@ mod tests {
         assert!(parse(&args(&["--sign"])).is_err());
     }
 
+    /// The segments' alignments come from the last column of each `LOAD` line, 4 KB ones (the old
+    /// default) are told apart from 16 KB ones.
+    #[test]
+    fn load_segment_alignments_are_read() {
+        let out = "Program Headers:\n  Type Offset VirtAddr PhysAddr FileSiz MemSiz Flg Align\n  PHDR 0x000040 0x40 0x40 0x2a0 0x2a0 R 0x8\n  \
+                   LOAD 0x000000 0x0 0x0 0x1093f0c 0x1093f0c R 0x4000\n  LOAD 0x1094000 0x1095000 0x1095000 0x1db82d0 0x1db82d0 R E 0x1000\n  \
+                   DYNAMIC 0x2fe 0x2fe 0x2fe 0x2 0x2 RW 0x8\n";
+        assert_eq!(load_alignments(out), vec![0x4000, 0x1000]);
+        assert!(load_alignments("no segments").is_empty());
+    }
+
     #[test]
     fn version_codes_grow_with_the_version() {
         assert_eq!(version_code("0.7.1").unwrap(), 7_001);
@@ -399,6 +449,8 @@ mod tests {
         assert!(ai_only.contains("Off until asked"), "the assistant sends nothing until the user asks");
         // A document opened while PdfCraft runs reaches it through a second Activity (shell.rs).
         assert!(manifest.contains("android:launchMode=\"standard\""), "singleTask would drop documents opened while PdfCraft runs");
+        // From Android 16 (the target), Back reaches a NativeActivity only with this opt-out.
+        assert!(TARGET_SDK < 36 || manifest.contains("android:enableOnBackInvokedCallback=\"false\""), "Back would close the app");
         assert!(manifest.contains("android.permission.REORDER_TASKS"));
         // Rotating or folding must not restart the activity: android_main can't run twice.
         for change in ["orientation", "screenSize", "smallestScreenSize", "screenLayout", "keyboardHidden", "uiMode", "density"] {

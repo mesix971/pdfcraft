@@ -88,6 +88,8 @@ pub fn run(android: AndroidApp) {
             bars: None,
             bars_failed: std::sync::Arc::default(),
             bars_tries: 0,
+            window_insets: std::sync::Arc::default(),
+            insets_asked: None,
         }))
     });
     if let Err(e) = eframe::run_native("PdfCraft", options, creator) {
@@ -277,7 +279,14 @@ struct Shell {
     /// A paint of the bars failed: they are painted again, a few times at most.
     bars_failed: std::sync::Arc<std::sync::atomic::AtomicBool>,
     bars_tries: u8,
+    /// The window's insets in pixels ([`jvm::read_window_insets`]), and when they were last asked.
+    window_insets: std::sync::Arc<std::sync::Mutex<[i32; 4]>>,
+    insets_asked: Option<std::time::Instant>,
 }
+
+/// How often the window's insets are asked again (a native app hears nothing when they change:
+/// the keyboard opening, the device turning).
+const INSETS_EVERY: std::time::Duration = std::time::Duration::from_millis(150);
 
 /// The system's text views and the window's keyboard, for [`crate::typing`].
 struct TypingHost<'a>(&'a AndroidApp);
@@ -352,6 +361,11 @@ impl eframe::App for Shell {
             raw.events.push(egui::Event::Paste(system));
         }
         self.typing.queue(raw);
+        if self.insets_asked.is_none_or(|at| at.elapsed() >= INSETS_EVERY) {
+            self.insets_asked = Some(std::time::Instant::now());
+            let window = ctx.clone();
+            jvm::read_window_insets(&self.android, self.window_insets.clone(), move || window.request_repaint());
+        }
         raw.safe_area_insets = Some(self.uncovered(raw));
         raw.system_theme = Some(match self.android.config().ui_mode_night() {
             winit::platform::android::activity::ndk::configuration::UiModeNight::Yes => egui::Theme::Dark,
@@ -374,6 +388,7 @@ impl eframe::App for Shell {
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         self.app.ui(ui, frame);
         let ctx = ui.ctx().clone();
+        bar_grounds(&ctx, self.app.phone_system_bars());
         let copied: Option<String> = ctx.output(|o| {
             o.commands
                 .iter()
@@ -409,8 +424,10 @@ impl eframe::App for Shell {
 
 impl Shell {
     /// How much of the window the system covers (the soft keyboard, the status and navigation
-    /// bars), in points: the window minus the activity's content rectangle. winit doesn't pass
-    /// content-rectangle changes on, so they are read every frame.
+    /// bars, a cutout), in points: the window minus the activity's content rectangle, or the
+    /// window's own insets where they say more (Android 15 and later draw the app under the bars,
+    /// and its content rectangle is then the whole window). winit doesn't pass content-rectangle
+    /// changes on, so they are read every frame.
     fn uncovered(&self, raw: &egui::RawInput) -> egui::SafeAreaInsets {
         let none = egui::SafeAreaInsets::default();
         let Some(window) = self.android.native_window() else { return none };
@@ -420,8 +437,30 @@ impl Shell {
             return none;
         }
         let content = self.android.content_rect();
-        let [left, top, right, bottom] =
-            crate::screen::insets([content.left, content.top, content.right, content.bottom], [w, h], [screen.width(), screen.height()]);
+        let points = [screen.width(), screen.height()];
+        let from_content = crate::screen::insets([content.left, content.top, content.right, content.bottom], [w, h], points);
+        let pixels = *self.window_insets.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let [left, top, right, bottom] = crate::screen::widest(from_content, crate::screen::window_insets(pixels, [w, h], points));
         egui::SafeAreaInsets(egui::epaint::MarginF32 { left, right, top, bottom })
+    }
+}
+
+/// The grounds of the system's bars, in the colours of the screen's top and bottom (`bars`): an
+/// app targeting Android 15 or later is drawn under the bars, which Android no longer paints.
+/// Below everything else, outside the content rectangle; older Androids paint their bars over it.
+fn bar_grounds(ctx: &egui::Context, bars: Option<(egui::Color32, egui::Color32)>) {
+    let Some((top, bottom)) = bars else { return };
+    let (whole, content) = (ctx.viewport_rect(), ctx.content_rect());
+    let painter = ctx.layer_painter(egui::LayerId::background());
+    let strips = [
+        (egui::Rect::from_min_max(whole.min, egui::pos2(whole.max.x, content.min.y)), top),
+        (egui::Rect::from_min_max(egui::pos2(whole.min.x, content.max.y), whole.max), bottom),
+        (egui::Rect::from_min_max(egui::pos2(whole.min.x, content.min.y), egui::pos2(content.min.x, content.max.y)), bottom),
+        (egui::Rect::from_min_max(egui::pos2(content.max.x, content.min.y), egui::pos2(whole.max.x, content.max.y)), bottom),
+    ];
+    for (rect, colour) in strips {
+        if rect.is_positive() {
+            painter.rect_filled(rect, 0.0, colour);
+        }
     }
 }

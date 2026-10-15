@@ -12,12 +12,13 @@ signed APK; it has not yet been run through the test suite on a device, so expec
 
 ## Build
 
-Needs the Rust target, the Android NDK (r26 or later) and the Android SDK (build-tools and a
-platform, API 34), and a JDK (for `apksigner` and `keytool`):
+Needs the Rust target, the Android NDK (r26 or later) and the Android SDK (build-tools 35 or
+later, which align the library to 16 KB pages in the APK, and a platform, API 36), and a JDK (for
+`apksigner` and `keytool`):
 
 ```sh
 rustup target add aarch64-linux-android
-sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;27.2.12479018"
+sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018"
 export ANDROID_HOME=~/Android/Sdk ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018
 cargo xtask models            # optional: the OCR models, so Recognize Text works
 cargo xtask android --test-key  # dist/android/pdfcraft-<version>-arm64-v8a-test.apk
@@ -171,9 +172,14 @@ Android 8.0 (API 26) or later, 64-bit ARM by default.
   selection handles are egui's, not Android's.
 - Images and files can't go to the system clipboard; printing goes through another app rather than
   a printer list; "Reveal in file manager" is unavailable.
-- `targetSdkVersion` is 34: Android 15 makes apps targeting 35 draw under the system bars, and a
-  `NativeActivity` reports no insets for them. Google Play requires 35 for new apps; this APK is for
-  installing directly.
+- `targetSdkVersion` is 36 (Android 16), as Google Play asks of new apps and updates since
+  31 August 2026. From Android 15 the app is drawn under the system bars: the shell reads the
+  window's insets (bars, cutout, keyboard) and paints the bars' grounds in the colours of the
+  screen's top and bottom. Android 16 sends Back to an app only when it opts out of predictive back
+  (`enableOnBackInvokedCallback="false"`), which the manifest does: a `NativeActivity` can't take
+  the callbacks that replace the Back key.
+- The library is linked for 16 KB memory pages (`.cargo/config.toml`), which Android 15 devices may
+  use; `cargo xtask android` refuses a library that isn't.
 
 ## Unsafe code
 
