@@ -691,6 +691,9 @@ impl PoolParser {
     }
 }
 
+/// What a [`RenderPool`] calls when a result is ready.
+pub type Waker = Arc<dyn Fn() + Send + Sync>;
+
 /// Renders pages on worker threads, most urgent request first.
 ///
 /// **Watchdog:** a render running longer than `stuck_after` (default [`STUCK_AFTER`]) is given
@@ -788,6 +791,16 @@ impl RenderPool {
     /// `true` when rendering happens on the caller's thread (no worker threads available).
     pub fn is_inline(&self) -> bool {
         self.inline.is_some()
+    }
+
+    /// Have the pool call `waker` (from a worker) whenever a result is ready, so the consumer
+    /// needn't poll for it. An inline pool renders in [`Self::try_recv`] and never calls it.
+    pub fn set_waker(&self, waker: Waker) {
+        self.shared.queue.set_waker(waker);
+    }
+
+    pub fn has_waker(&self) -> bool {
+        self.shared.queue.has_waker()
     }
 
     /// Snapshot the work counters collected by this pool.
@@ -1399,6 +1412,26 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(5));
         }
         assert_eq!(busy.running(), 0, "and the thread exits when it returns");
+    }
+
+    /// A finished render calls the pool's waker, so the window draws it without polling.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn a_ready_result_wakes_the_consumer() {
+        let pool = RenderPool::new(Arc::new(ONE_PAGE.to_vec()), 1, RenderConfig::default());
+        let woken = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let count = woken.clone();
+        pool.set_waker(Arc::new(move || {
+            count.fetch_add(1, Ordering::SeqCst);
+        }));
+        assert!(pool.has_waker());
+        pool.set_queue(vec![RenderRequest { page: 0, scale: 1.0, ..Default::default() }]);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        while woken.load(Ordering::SeqCst) == 0 && std::time::Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        assert!(woken.load(Ordering::SeqCst) > 0, "woken when the page was ready");
+        assert!(pool.try_recv().is_some(), "and the page is there to take");
     }
 
     #[cfg(not(target_arch = "wasm32"))]

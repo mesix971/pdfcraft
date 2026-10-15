@@ -732,6 +732,9 @@ pub struct PdfCraftApp {
     /// This process's lock in the recovery folder: other PdfCraft windows leave its entries
     /// alone while it runs.
     recovery_lock: Option<std::fs::File>,
+    /// Writes autosaves off the UI thread (started with the first one).
+    #[cfg(not(target_arch = "wasm32"))]
+    autosaver: Option<recovery::Autosaver>,
     recovery_keys: std::collections::HashMap<DocId, String>,
     last_autosave: f64,
     allow_quit: bool,
@@ -1018,6 +1021,8 @@ impl PdfCraftApp {
             recovery: None,
             recoverable: Vec::new(),
             recovery_lock: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            autosaver: None,
             recovery_keys: Default::default(),
             last_autosave: 0.0,
             allow_quit: false,

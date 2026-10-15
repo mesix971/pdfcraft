@@ -42,8 +42,15 @@ pub(crate) const BASE_SIDE: f32 = 2048.0;
 const THUMB_W: f32 = 240.0;
 const THUMB_H: f32 = 320.0;
 const THUMB_BYTES: usize = 24 * 1024 * 1024;
+/// Rendered pages and tiles kept: half as much on a phone, which has less memory to give.
+#[cfg(not(target_os = "android"))]
 const PAGE_BYTES: usize = 128 * 1024 * 1024;
+#[cfg(target_os = "android")]
+const PAGE_BYTES: usize = 64 * 1024 * 1024;
+#[cfg(not(target_os = "android"))]
 const TILE_BYTES: usize = 128 * 1024 * 1024;
+#[cfg(target_os = "android")]
+const TILE_BYTES: usize = 64 * 1024 * 1024;
 const UPLOAD_BYTES_PER_FRAME: usize = 16 * 1024 * 1024;
 const RESULTS_PER_FRAME: usize = 8;
 /// A defensive ceiling for unusually large viewports / n-up previews.
@@ -54,6 +61,19 @@ const MAX_CACHED_PAGES: usize = 24;
 /// Text layers are glyph structs, far smaller than rasters; deliberately independent of
 /// `MAX_CACHED_PAGES` so raster tuning never silently retunes text memory.
 const MAX_CACHED_TEXT_PAGES: usize = 24;
+/// The most bytes the text layers of pages off screen may take (matched pages included: a
+/// search through a long book would otherwise keep every page's glyphs). Less on a phone.
+#[cfg(not(target_os = "android"))]
+const TEXT_BYTES: usize = 64 << 20;
+#[cfg(target_os = "android")]
+const TEXT_BYTES: usize = 24 << 20;
+/// How many pages ahead a search asks text for at once (it moves on as they arrive).
+const SEARCH_AHEAD: usize = 32;
+
+/// About what a page's text layer takes in memory: its glyphs, their text, and their lines.
+fn text_bytes(t: &PageText) -> usize {
+    t.glyphs.len().saturating_mul(std::mem::size_of::<pdfcraft_render::TextGlyph>() + 24)
+}
 
 fn rgba_bytes(width: usize, height: usize) -> usize {
     width.saturating_mul(height).saturating_mul(4)
@@ -224,6 +244,9 @@ pub struct Find {
     pub whole_words: bool,
     /// Shown in the Search panel (Advanced Search) instead of the find bar.
     pub in_panel: bool,
+    /// The pages searched for this query: their text isn't asked for again once it goes from
+    /// the cache (a search through a long book keeps only what fits).
+    pub searched: HashSet<usize>,
 }
 
 /// A text selection on one page.
@@ -837,6 +860,7 @@ impl DocView {
         if let Some(f) = self.find.as_mut() {
             f.matches.clear();
             f.current = None;
+            f.searched.clear();
         }
     }
 
@@ -868,6 +892,10 @@ impl DocView {
         self.texts.remove(&page);
         self.text_failed.remove(&page);
         self.errors.remove(&page);
+        // Its text changed: searched again when it arrives.
+        if let Some(f) = self.find.as_mut() {
+            f.searched.remove(&page);
+        }
         self.last_queue.clear();
         if self.selection.is_some_and(|s| s.page == page) {
             self.selection = None;
@@ -929,6 +957,7 @@ impl DocView {
         f.case_query = f.query.clone();
         f.matches.clear();
         f.current = None;
+        f.searched.clear();
         if f.case_query.trim().is_empty() {
             return;
         }
@@ -937,6 +966,7 @@ impl DocView {
         for &p in &pages {
             if let Some(text) = self.texts.get(&p) {
                 f.matches.extend(text.find_opts(&f.case_query, f.case_sensitive, f.whole_words).into_iter().map(|r| (p, r)));
+                f.searched.insert(p);
             }
         }
         f.matches.sort_by_key(|(p, r)| (*p, r.start));
@@ -956,6 +986,7 @@ impl DocView {
             return;
         }
         let current_key = f.current.and_then(|c| f.matches.get(c).cloned());
+        f.searched.insert(page);
         f.matches.retain(|(p, _)| *p != page);
         f.matches.extend(text.find_opts(&f.case_query, f.case_sensitive, f.whole_words).into_iter().map(|r| (page, r)));
         f.matches.sort_by_key(|(p, r)| (*p, r.start));
@@ -1551,33 +1582,66 @@ impl DocView {
     }
 
     /// Drop text layers nothing can still need. Every visited page's text used to stay
-    /// cached for the session. Keep visible, selected and matched pages plus the nearest
-    /// prefetch window; evicted pages re-extract on revisit. (Count window only: unlike
-    /// rasters there is no byte budget here.) While a search is active keep everything:
-    /// demand still wants every page, so evicting would re-request evicted pages each
-    /// frame and churn the workers. Failures are never evicted either: they cost nothing
-    /// to remember, and evicting one would re-request and re-fail it every frame.
+    /// cached for the session. Kept whatever they cost: the visible pages, the selection's and
+    /// the current match's. Then, within [`TEXT_BYTES`]: matched pages (the Search panel quotes
+    /// them), nearest the current page first, and at most [`MAX_CACHED_TEXT_PAGES`] others,
+    /// nearest first. Evicted pages re-extract on revisit; a search never asks again for a page
+    /// it searched ([`Find::searched`]), so evicting mid-search doesn't churn the workers.
+    /// Failures are never evicted: they cost nothing to remember, and evicting one would
+    /// re-request and re-fail it every frame.
     fn retain_text_layers(&mut self) {
         if self.texts.len() <= MAX_CACHED_TEXT_PAGES {
-            return;
-        }
-        if self.find.as_ref().is_some_and(|f| !f.case_query.trim().is_empty()) {
             return;
         }
         let mut keep: HashSet<usize> = self.frame_visible.clone();
         if let Some(s) = self.selection {
             keep.insert(s.page);
         }
+        let mut matched: HashSet<usize> = HashSet::new();
         if let Some(f) = self.find.as_ref() {
-            keep.extend(f.matches.iter().map(|(p, _)| *p));
+            matched.extend(f.matches.iter().map(|(p, _)| *p));
+            if let Some((p, _)) = f.current.and_then(|c| f.matches.get(c)) {
+                keep.insert(*p);
+            }
         }
+        let mut used: usize = keep.iter().filter_map(|p| self.texts.get(p)).map(|t| text_bytes(t)).fold(0, usize::saturating_add);
         let mut rest: Vec<usize> = self.texts.keys().filter(|p| !keep.contains(*p)).copied().collect();
-        rest.sort_by_key(|p| p.abs_diff(self.current));
-        keep.extend(rest.into_iter().take(MAX_CACHED_TEXT_PAGES));
+        rest.sort_by_key(|p| (!matched.contains(p), p.abs_diff(self.current)));
+        let mut others = 0usize;
+        for p in rest {
+            let is_match = matched.contains(&p);
+            if !is_match && others >= MAX_CACHED_TEXT_PAGES {
+                continue;
+            }
+            let bytes = self.texts.get(&p).map_or(0, |t| text_bytes(t));
+            if used.saturating_add(bytes) > TEXT_BYTES {
+                continue;
+            }
+            used = used.saturating_add(bytes);
+            others += usize::from(!is_match);
+            keep.insert(p);
+        }
         self.texts.retain(|p, _| keep.contains(p));
     }
 
+    /// The pages a search asks text for next: from the current page on, the next ones not
+    /// searched yet and not cached, a few at a time.
+    fn search_demand(&self, pages: usize) -> Vec<usize> {
+        let Some(f) = self.find.as_ref().filter(|f| !f.case_query.trim().is_empty()) else { return Vec::new() };
+        let cur = self.current.min(pages.saturating_sub(1));
+        (0..pages)
+            .map(|k| (cur + k) % pages)
+            .filter(|p| !f.searched.contains(p) && !self.texts.contains_key(p) && !self.text_failed.contains(p))
+            .take(SEARCH_AHEAD)
+            .collect()
+    }
+
     pub(crate) fn finish_render_frame(&mut self, ctx: &egui::Context, info: &DocInfo, pool: &RenderPool) {
+        // The workers wake the window when a page is ready (a new pool comes with every edit).
+        if !pool.is_inline() && !pool.has_waker() {
+            let window = ctx.clone();
+            pool.set_waker(Arc::new(move || window.request_repaint()));
+        }
         let queue = self.prepare_render_queue(info, ctx.pixels_per_point());
         if queue != self.last_queue {
             pool.set_queue(queue.clone());
@@ -1585,7 +1649,10 @@ impl DocView {
         }
         self.receive(ctx, pool);
         if !self.last_queue.is_empty() {
-            ctx.request_repaint_after(std::time::Duration::from_millis(30));
+            // An inline pool renders as it is asked; the others wake the window themselves, and
+            // a slower look keeps their watchdog going for a render that never ends.
+            let wait = if pool.is_inline() { 30 } else { 250 };
+            ctx.request_repaint_after(std::time::Duration::from_millis(wait));
         }
     }
 
@@ -3353,10 +3420,10 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     // Text layers: visible pages for selection, every page while a search is active.
     let need_text = |p: &usize| !view.texts.contains_key(p) && !view.text_failed.contains(p);
     let mut text_pages: Vec<usize> = if hand { Vec::new() } else { visible_now.iter().copied().filter(need_text).collect() };
-    if view.find.as_ref().is_some_and(|f| !f.case_query.trim().is_empty()) {
-        let n = info.pages.len();
-        let rest: Vec<usize> = (0..n).map(|k| (cur + k) % n).filter(need_text).filter(|p| !text_pages.contains(p)).collect();
-        text_pages.extend(rest);
+    for p in view.search_demand(info.pages.len()) {
+        if !text_pages.contains(&p) {
+            text_pages.push(p);
+        }
     }
     queue.extend(text_pages.into_iter().map(|page| RenderRequest {
         page,
@@ -4893,8 +4960,10 @@ trailer << /Root 1 0 R >>
         assert_eq!(v.selected_text().as_deref(), Some("x"), "stale selections still copy");
     }
 
+    /// Mid-search, text layers go like any others (searched pages aren't asked for again), and
+    /// the search asks for the next pages it hasn't searched, a few at a time.
     #[test]
-    fn text_layers_stay_while_a_search_is_active() {
+    fn a_search_keeps_what_fits_and_asks_only_for_pages_it_has_not_searched() {
         let info = thumbnail_info(100);
         let mut v = DocView::new(DocId(1), &info, ViewDefaults::default());
         v.current = 50;
@@ -4902,9 +4971,51 @@ trailer << /Root 1 0 R >>
         for p in 0..100 {
             v.texts.insert(p, Arc::new(PageText::default()));
         }
-        v.find = Some(Find { query: "dup".into(), case_query: "dup".into(), matches: vec![(0, 0..1)], ..Default::default() });
+        v.find = Some(Find {
+            query: "dup".into(),
+            case_query: "dup".into(),
+            matches: vec![(0, 0..1)],
+            searched: (0..100).collect(),
+            ..Default::default()
+        });
         let _ = v.prepare_render_queue(&info, 1.0);
-        assert_eq!(v.texts.len(), 100, "evicting mid-search would churn the workers");
+        assert_eq!(v.texts.len(), 1 + 1 + MAX_CACHED_TEXT_PAGES, "visible, matched and nearest; the rest go");
+        assert!(v.search_demand(100).is_empty(), "every page searched: nothing asked again");
+        // A new query searches again, from the current page on, a few pages at a time.
+        if let Some(f) = v.find.as_mut() {
+            f.searched = (0..60).collect();
+        }
+        let expected: Vec<usize> = (60..100).filter(|p| !v.texts.contains_key(p)).take(SEARCH_AHEAD).collect();
+        assert!(!expected.is_empty());
+        assert_eq!(v.search_demand(100), expected, "not cached, not searched, from the current page on");
+        v.find = None;
+        assert!(v.search_demand(100).is_empty(), "no search, no demand");
+    }
+
+    /// A search through a long book keeps its matched pages' text only as far as the budget
+    /// goes, but always what is on screen.
+    #[test]
+    fn matched_pages_text_keeps_to_a_byte_budget() {
+        let info = thumbnail_info(400);
+        let mut v = DocView::new(DocId(1), &info, ViewDefaults::default());
+        v.current = 0;
+        v.frame_visible = HashSet::from([0]);
+        let glyph = pdfcraft_render::TextGlyph { text: "x".into(), rect: [0.0; 4], quad: [[0.0, 0.0]; 4], direction: [1.0, 0.0] };
+        let page = Arc::new(PageText { glyphs: vec![glyph; 5000], line_of: vec![0; 5000], space_before: vec![false; 5000] });
+        for p in 0..400 {
+            v.texts.insert(p, page.clone());
+        }
+        v.find = Some(Find {
+            query: "x".into(),
+            case_query: "x".into(),
+            matches: (0..400).map(|p| (p, 0..1)).collect(),
+            searched: (0..400).collect(),
+            ..Default::default()
+        });
+        let _ = v.prepare_render_queue(&info, 1.0);
+        let used: usize = v.texts.values().map(|t| text_bytes(t)).sum();
+        assert!(v.texts.contains_key(&0), "on screen");
+        assert!(v.texts.len() < 400 && used <= TEXT_BYTES + text_bytes(&page), "{} pages, {used} bytes", v.texts.len());
     }
 
     fn thumbnail_info(count: usize) -> DocInfo {

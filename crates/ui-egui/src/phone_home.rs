@@ -2110,9 +2110,12 @@ const THUMB_PX: f32 = 180.0;
 /// tall, so most files need one render.
 #[cfg(not(target_arch = "wasm32"))]
 const THUMB_SCALE: f32 = 0.23;
-/// The largest file a thumbnail is made for (a larger one shows the mark).
-#[cfg(not(target_arch = "wasm32"))]
+/// The largest file a thumbnail is made for (a larger one shows the mark): it is read whole,
+/// up to three at once, so less on a phone.
+#[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
 const MAX_THUMB_FILE: u64 = 64 << 20;
+#[cfg(target_os = "android")]
+const MAX_THUMB_FILE: u64 = 16 << 20;
 /// The most thumbnails kept: past it, the ones shown longest ago go.
 #[cfg(not(target_arch = "wasm32"))]
 const MAX_THUMBS: usize = 300;

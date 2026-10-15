@@ -774,8 +774,11 @@ fn display_bytes(editor: Option<&mut Editor>, bytes: &Arc<Vec<u8>>) -> Arc<Vec<u
     write_incremental(&display, &SaveOptions::default()).map(Arc::new).unwrap_or_else(|_| bytes.clone())
 }
 
+/// One render worker per core, but one, up to seven; three on a phone, whose cores also keep
+/// the screen smooth and whose battery pays for every one (the result: 2 to 7, or 1 to 3).
 fn render_threads() -> usize {
-    std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(2, 8) - 1
+    let most = if cfg!(target_os = "android") { 4 } else { 8 };
+    std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(2, most) - 1
 }
 
 /// Render `doc` with the layer visibility in its `info.layers`.

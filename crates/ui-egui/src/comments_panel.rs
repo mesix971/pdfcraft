@@ -154,15 +154,21 @@ pub(crate) fn show(
         return edit;
     }
     let query = view.comments.search.clone().filter(|q| !q.trim().is_empty());
-    let replies_of = |a: &Annotation| -> Vec<&Annotation> {
-        match &a.name {
-            Some(nm) => info.annotations.iter().filter(|r| r.in_reply_to.as_deref() == Some(nm.as_str())).collect(),
-            None => Vec::new(),
+    // Each comment's replies, gathered once (looking them up for every comment, as each frame
+    // draws, was quadratic in the comments): in document order, as the threads show them.
+    let mut replies: std::collections::HashMap<&str, Vec<&Annotation>> = std::collections::HashMap::new();
+    let mut per_page: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+    for a in &info.annotations {
+        match a.in_reply_to.as_deref() {
+            Some(to) => replies.entry(to).or_default().push(a),
+            None => *per_page.entry(a.page).or_default() += 1,
         }
-    };
+    }
+    let replies_of = |a: &Annotation| -> Vec<&Annotation> { a.name.as_deref().and_then(|nm| replies.get(nm)).cloned().unwrap_or_default() };
     let cv = &view.comments;
     let status_of =
         |a: &Annotation| replies_of(a).iter().rev().filter(|r| !r.is_mark()).find_map(|r| r.state.clone()).unwrap_or_else(|| "None".into());
+    // The filters that look at replies run only when they hide something.
     let mut roots: Vec<&Annotation> = info
         .annotations
         .iter()
@@ -170,9 +176,9 @@ pub(crate) fn show(
         .filter(|a| query.as_deref().is_none_or(|q| matches(a, q) || replies_of(a).iter().any(|r| matches(r, q))))
         .filter(|a| !cv.hidden_types.iter().any(|t| t == kind_label(a)))
         .filter(|a| !cv.hidden_authors.contains(&a.author.clone().unwrap_or_default()))
-        .filter(|a| !cv.hidden_statuses.contains(&status_of(a)))
+        .filter(|a| cv.hidden_statuses.is_empty() || !cv.hidden_statuses.contains(&status_of(a)))
         .filter(|a| !cv.hidden_colors.contains(&color_key(a)))
-        .filter(|a| !cv.hidden_checks.contains(&check_label(is_marked(&replies_of(a))).to_string()))
+        .filter(|a| cv.hidden_checks.is_empty() || !cv.hidden_checks.contains(&check_label(is_marked(&replies_of(a))).to_string()))
         .collect();
     let sort = cv.sort;
     match sort {
@@ -214,12 +220,12 @@ pub(crate) fn show(
             }
         } else if a.page != page {
             page = a.page;
-            let n = info.annotations.iter().filter(|x| x.page == page && x.in_reply_to.is_none()).count();
+            let n = per_page.get(&page).copied().unwrap_or(0);
             ui.add_space(6.0);
             ui.horizontal(|ui| {
                 ui.add(icons::image("chevron-down", 14.0, t.text_muted));
                 ui.label(
-                    egui::RichText::new(crate::i18n::fmt(tl!("Page {label}"), &[("label", &info.pages[page].label)]))
+                    egui::RichText::new(crate::i18n::fmt(tl!("Page {label}"), &[("label", info.pages.get(page).map_or("?", |p| p.label.as_str()))]))
                         .font(theme::semibold(12.5))
                         .color(t.text_muted),
                 );

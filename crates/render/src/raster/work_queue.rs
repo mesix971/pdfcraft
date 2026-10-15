@@ -122,15 +122,33 @@ pub(super) struct WorkQueue {
     changed: Condvar,
     max_bytes: usize,
     max_count: usize,
+    /// Called when a result is ready for the consumer (the window, to draw it).
+    waker: Mutex<Option<super::Waker>>,
 }
 
 impl Default for WorkQueue {
     fn default() -> Self {
-        Self { state: Mutex::default(), changed: Condvar::new(), max_bytes: RESULT_BYTES, max_count: RESULT_COUNT }
+        Self { state: Mutex::default(), changed: Condvar::new(), max_bytes: RESULT_BYTES, max_count: RESULT_COUNT, waker: Mutex::new(None) }
     }
 }
 
 impl WorkQueue {
+    pub(super) fn set_waker(&self, waker: super::Waker) {
+        *lock(&self.waker) = Some(waker);
+    }
+
+    pub(super) fn has_waker(&self) -> bool {
+        lock(&self.waker).is_some()
+    }
+
+    /// Tell the consumer a result is ready (outside every lock: the waker may take its own).
+    fn wake_consumer(&self) {
+        let waker = lock(&self.waker).clone();
+        if let Some(wake) = waker {
+            wake();
+        }
+    }
+
     pub(super) fn replace(&self, requests: Vec<RenderRequest>) -> Vec<RenderRequest> {
         let mut state = lock(&self.state);
         if state.closed {
@@ -216,6 +234,7 @@ impl WorkQueue {
                 state.results.push_back(Completed { page, bytes, valid: tokens });
                 drop(state);
                 self.changed.notify_all();
+                self.wake_consumer();
                 return Ok(());
             }
             // The parser validity token can change independently of this queue. Bound the
@@ -253,6 +272,7 @@ impl WorkQueue {
         state.results.push_front(Completed { page, bytes, valid: Vec::new() });
         drop(state);
         self.changed.notify_all();
+        self.wake_consumer();
     }
 
     fn close(&self) {

@@ -180,6 +180,11 @@ pub(crate) fn list(dir: &Path, extensions: Option<&[String]>, folders_only: bool
             continue;
         }
         let path = entry.path();
+        // A plain file of a kind not asked for needs no look at its details (a big folder of
+        // photos, when picking PDFs); a link is followed below.
+        if entry.file_type().is_ok_and(|k| k.is_file()) && (folders_only || !matches_extension(&path, extensions)) {
+            continue;
+        }
         // Follows links, like opening the file does; an entry that can't be read is left out.
         let Ok(meta) = std::fs::metadata(&path) else { continue };
         let dir = meta.is_dir();
@@ -188,7 +193,8 @@ pub(crate) fn list(dir: &Path, extensions: Option<&[String]>, folders_only: bool
         }
         out.push(Entry { name, path, dir, size: if dir { 0 } else { meta.len() }, modified: meta.modified().ok() });
     }
-    out.sort_by(|a, b| b.dir.cmp(&a.dir).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())).then_with(|| a.name.cmp(&b.name)));
+    // Folders first, then by name ignoring case (each name lowered once, not at every comparison).
+    out.sort_by_cached_key(|e| (!e.dir, e.name.to_lowercase(), e.name.clone()));
     Ok(out)
 }
 
