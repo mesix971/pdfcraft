@@ -557,6 +557,25 @@ fn a_notice_shows_below_the_top_bar_and_takes_its_taps() {
     assert!(!h.state().views[0].disk_changed, "the bar didn't take the tap");
 }
 
+/// Android 15 and later draw the app under the status bar (edge-to-edge): the top bar sits below
+/// it, and the notices and the first page below the top bar, not under it.
+#[test]
+fn the_notices_and_the_first_page_clear_the_status_bar_too() {
+    let mut h = harness(true);
+    h.input_mut().safe_area_insets = Some(egui::SafeAreaInsets(egui::epaint::MarginF32 { top: 33.0, bottom: 24.0, ..Default::default() }));
+    h.state_mut().views[0].disk_changed = true;
+    h.run_steps(6);
+    let bar_bottom = 33.0 + 56.0;
+    let back = h.get_by_label("Back").rect();
+    assert!(back.top() >= 33.0 && back.bottom() <= bar_bottom, "{back:?}: the top bar is below the status bar");
+    let notice = h.get_by_label_contains("This file changed on disk").rect();
+    assert!(notice.top() >= bar_bottom - 0.5, "{notice:?} is under the top bar");
+    let dismiss = h.get_by_label("Dismiss").rect();
+    assert!(dismiss.top() >= bar_bottom - 0.5, "{dismiss:?} is under the top bar");
+    let page = h.get_by_role_and_label(Role::Group, "Page 1 of 3").rect();
+    assert!(page.top() >= bar_bottom - 0.5, "{page:?}: the first page starts under the top bar");
+}
+
 /// A job's progress card, and a notice above it, sit over the bars along the bottom (64 tall),
 /// not under them.
 #[test]

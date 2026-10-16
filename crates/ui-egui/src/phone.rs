@@ -30,6 +30,14 @@ const BOTTOM_BAR: f32 = 64.0;
 /// Room above the first page and below the last, so the bars floating there don't cover them.
 pub(crate) const PAGE_PAD: (f32, f32) = (TOP_BAR, BOTTOM_BAR);
 
+/// How much of `rect` the system covers at its top and bottom: from Android 15 on, the app is
+/// drawn under the status and navigation bars (egui's safe area), and the phone layout's own bars
+/// sit inside them, so what is laid out below or above those bars moves in by as much.
+pub(crate) fn system_covered(ctx: &egui::Context, rect: Rect) -> (f32, f32) {
+    let content = ctx.content_rect();
+    ((content.top() - rect.top()).max(0.0), (rect.bottom() - content.bottom()).max(0.0))
+}
+
 /// Which shell draws the window. A phone's screen always gets the phone shell: it has every
 /// tool, so there is no desktop layout to fall back to there.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

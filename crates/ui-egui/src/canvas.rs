@@ -2210,9 +2210,11 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         // Over the pages, like the bars, so showing or hiding them never moves the pages.
         let at = ui.available_rect_before_wrap();
         let fade = ui.opacity();
+        // Below the status bar too, where the system draws the app under it.
+        let covered = crate::phone::system_covered(ui.ctx(), at).0;
         egui::Area::new(egui::Id::new("phone-notices"))
             .order(egui::Order::Middle)
-            .fixed_pos(at.min + vec2(0.0, notice_top))
+            .fixed_pos(at.min + vec2(0.0, covered + notice_top))
             .constrain(false)
             .show(ui.ctx(), |ui| {
                 crate::transition::follow_screen(ui, fade);
@@ -2244,9 +2246,10 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         view.grid_fitted = false;
     }
     if view.organize {
-        // Below the phone layout's top bar.
+        // Below the phone layout's top bar (and the status bar over it).
         if phone {
-            ui.add_space(crate::phone::PAGE_PAD.0);
+            let covered = crate::phone::system_covered(ui.ctx(), ui.available_rect_before_wrap()).0;
+            ui.add_space(crate::phone::PAGE_PAD.0 + covered);
         }
         organize_grid(view, info, doc.allows_assembly(), doc.dirty, unobstructed, phone, ui, &t);
         return;
@@ -2256,7 +2259,13 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     view.viewport_w = avail.width();
     view.viewport_h = avail.height();
     view.side = if phone { PHONE_SIDE } else { SIDE };
-    view.pad = if phone { crate::phone::PAGE_PAD } else { (0.0, 0.0) };
+    view.pad = if phone {
+        // The phone layout's bars, and the system's where it draws the app under them.
+        let (top, bottom) = crate::phone::system_covered(ui.ctx(), avail);
+        (crate::phone::PAGE_PAD.0 + top, crate::phone::PAGE_PAD.1 + bottom)
+    } else {
+        (0.0, 0.0)
+    };
     let old_zoom = view.zoom;
     view.fit_zoom(info);
     if view.shown && view.zoom_anchor.is_none() && view.goto.is_none() && view.goto_point.is_none() && (view.zoom - old_zoom).abs() > 1e-4 {
