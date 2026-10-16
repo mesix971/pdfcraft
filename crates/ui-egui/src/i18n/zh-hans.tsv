@@ -2302,3 +2302,148 @@ animation effects	Off	关
 	The linked PDF opened, but its named destination was not applied.	已打开链接的 PDF，但未应用其命名目标。
 	The linked PDF opened, but its page destination was out of range.	已打开链接的 PDF，但其页面目标超出范围。
 	Local cross-PDF links require the desktop app	PDF 之间的本地链接需要桌面应用
+
+# In-app file browser (Android's file pickers)
+	Internal storage	内部存储
+	Documents	文档
+	PdfCraft files	PdfCraft 文件
+	SD card {name}	SD 卡 {name}
+	Couldn't create the folder {name}: {e}	无法创建文件夹 {name}：{e}
+	Choose this folder	选择此文件夹
+	{name} already exists. Replace it?	{name} 已存在。要替换吗？
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	要在此设备上的任意位置打开和保存文件，请允许 PdfCraft 管理所有文件。
+	Allow access	允许访问
+	All files	所有文件
+	This folder is empty	此文件夹为空
+	New folder	新建文件夹
+
+# Printing through another app (Android)
+	Another app	其他应用
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	可打印的 PDF 会在您选择的应用中打开，并按该应用自己的份数、双面和颜色设置打印。
+	Couldn't hand {name} to another app: {e}	无法将 {name} 交给其他应用：{e}
+phone bar	Edit	编辑
+	Send	发送
+	Thinking…	正在思考…
+	Anthropic API key	Anthropic API 密钥
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	只有在您提问时，您的问题和打开的文档才会使用您自己的 API 密钥发送给 Anthropic（Claude）。请求费用由您的 Anthropic 账户支付。
+	Most pages sent per question	每个问题最多发送的页数
+	Translate page {n}	翻译第 {n} 页
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} 个令牌
+	The answer stopped at its length limit.	回答在达到最大长度时中断。
+	Add your Anthropic API key to use the assistant.	请添加您的 Anthropic API 密钥以使用助手。
+	The API key was refused. Check it in the assistant's settings.	API 密钥被拒绝。请在助手设置中检查。
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	此文档有 {pages} 页；助手最多读取 {max} 页。请在助手设置中提高上限。
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	此文档对助手来说太大（{mb} MB，最多 {max} MB）。
+	Too many requests right now. Try again in a moment.	当前请求过多。请稍后再试。
+	The request was declined ({reason}).	请求被拒绝（{reason}）。
+	Couldn't reach the AI service: {error}	无法连接 AI 服务：{error}
+	The API key isn't valid: paste it again in the assistant's settings.	API 密钥无效：请在助手设置中重新粘贴。
+	The assistant gave no answer. Try asking differently.	助手没有给出回答。请换一种方式提问。
+	Your Anthropic account can't use this model, or has no credit left: {error}	您的 Anthropic 账户无法使用此模型，或已没有余额：{error}
+	The AI service answered: {error}	AI 服务返回：{error}
+	{tokens} tokens	{tokens} 个令牌
+	New conversation	新对话
+	Proposed changes	建议的更改
+	Applied	已应用
+	Discarded	已放弃
+	The document has no page {page}.	文档没有第 {page} 页。
+	The passage wasn't found on page {page}.	在第 {page} 页未找到该段落。
+	The document refused the change.	文档拒绝了此更改。
+	Applied as one step: Undo takes them all back.	一次性应用：“撤销”会全部还原。
+	The passage appears more than once on page {page}.	该段落在第 {page} 页出现了多次。
+	It overlaps another proposed change.	它与另一项建议的更改重叠。
+	A PDF on this device.	此设备上的 PDF。
+	Add my name	添加我的名字
+	Add to Starred	添加到收藏
+	Add your name and a photo. Your name also signs your comments.	添加您的名字和照片。您的名字也会用于签署您的批注。
+	Allow access to your files and PdfCraft lists the PDFs on this device.	允许访问您的文件后，PdfCraft 会列出此设备上的 PDF。
+	An empty page to start from.	从空白页开始。
+	Change its text and pictures.	更改其文本和图片。
+	Choose a photo	选择照片
+	Files	文件
+	Fill in a form and sign it.	填写表单并签名。
+	From photos, scans or other files.	来自照片、扫描件或其他文件。
+	Hello, {name}	您好，{name}
+	It shows on Home and signs your comments.	显示在主页上，并用于签署您的批注。
+	Make PdfCraft yours	打造您的专属 PdfCraft
+	More for {name}	{name} 的更多操作
+	No PDFs found.	未找到 PDF。
+	No files match.	没有匹配的文件。
+	No recent files yet.	还没有最近的文件。
+	No starred files.	没有收藏的文件。
+	On this device	此设备上
+	Open another file…	打开其他文件…
+	PDFs on this device	此设备上的 PDF
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft 会在“下载”“文档”及其自己的文件夹中查找。
+	Photos and scans become the pages of a new PDF.	照片和扫描件会成为新 PDF 的页面。
+	Pictures	图片
+	Places	位置
+	Profile	个人资料
+	Remove from Starred	从收藏中移除
+	Remove the photo	移除照片
+	Search files	搜索文件
+	See your PDFs	查看您的 PDF
+	Set up	设置
+	Several PDFs and pictures in one document.	多个 PDF 和图片合为一个文档。
+	Star a file from its menu to find it here.	通过文件的菜单将其加入收藏，即可在此找到。
+	Starred	收藏
+	Summarize, ask and translate.	总结、提问、翻译。
+	Summarize, question and correct your PDFs with Claude, with your own key.	使用您自己的密钥，借助 Claude 总结、询问和修改您的 PDF。
+	Text, pictures and other files, converted to PDF.	转换为 PDF 的文本、图片和其他文件。
+	The files you open show here.	您打开的文件会显示在这里。
+	What would you like to do?	您想做什么？
+	Which document?	哪个文档？
+	Your AI assistant	您的 AI 助手
+file state	Open	已打开
+	Choose a PNG or JPEG picture.	请选择 PNG 或 JPEG 图片。
+	This picture is too large.	此图片太大。
+	Couldn't use this picture: {e}	无法使用此图片：{e}
+	Couldn't use this picture.	无法使用此图片。
+	{n} MB	{n} MB
+	{n} KB	{n} KB
+decimal separator	.	.
+	Other folders…	其他文件夹…
+	Looking for photos…	正在查找照片…
+	See your photos	查看您的照片
+	Allow PdfCraft to see your photos, and choose one here.	允许 PdfCraft 查看您的照片，然后在此选择一张。
+	No photos found.	未找到照片。
+	PdfCraft shows the photos in Camera, Pictures and Download.	PdfCraft 会显示“相机”“图片”和“下载”中的照片。
+	Automatic	自动
+	Dark mode	深色模式
+	Dark pages	深色页面
+	Light text on a dark page, for reading at night.	深色页面上的浅色文字，适合夜间阅读。
+	Night	夜间
+	Downloads	下载
+	Choose a file	选择文件
+	Choose files	选择多个文件
+	Choose a folder	选择文件夹
+	Tap to unlock	轻点以解锁
+	Browse folders	浏览文件夹
+	Combined from top to bottom. Use the arrows to change the order.	按从上到下的顺序合并。使用箭头更改顺序。
+	PDFs and pictures, combined into one PDF in the order you choose.	按您选择的顺序，将 PDF 和图片合并为一个 PDF。
+	Smaller text	缩小文字
+	Larger text	放大文字
+	Flip	翻转
+	Tap text or a picture to change it	轻点文字或图片即可更改
+	Tap where the text goes	轻点要放置文字的位置
+	White	白色
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	只有在您提问时，您的问题和打开的文档才会使用您自己的 API 密钥发送到您选择的服务。请求费用计入您在该服务的账户。
+	Service	服务
+	Another service (OpenAI-compatible)	其他服务（兼容 OpenAI）
+	API key	API 密钥
+	On Google's free tier, what you send may be used to improve Google's products.	使用 Google 的免费层级时，您发送的内容可能被用于改进 Google 的产品。
+	Fill in for	填入：
+	Service address	服务地址
+	API key (if the service asks for one)	API 密钥（如服务要求）
+	The service reads PDF files	该服务可读取 PDF 文件
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	否则将逐页发送文档的文本（不含其图片或扫描内容）。
+	Add your API key for {service} in the assistant's settings.	请在助手设置中添加您的 {service} API 密钥。
+	Your {service} account can't use this model, or has no credit left: {error}	您的 {service} 账户无法使用此模型，或已没有余额：{error}
+	Choose the model to ask in the assistant's settings.	请在助手设置中选择要提问的模型。
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	此文档没有可发送的文本（是扫描件吗？）。请选择可读取 PDF 文件的服务，或先识别其文本。
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	此文档的文本对助手来说太长（{chars} 个字符，最多 {max} 个）。
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	使用您自己的密钥，借助 Claude、ChatGPT 或 Gemini 总结、询问和修改您的 PDF。
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	服务地址无效：它以 https:// 开头（http:// 仅限本设备或局域网）。
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	此文档不允许复制其内容，因此不会发送给助手。
+	Try again	重试
+	Price per million tokens read / written	每百万令牌价格（读取 / 写入）

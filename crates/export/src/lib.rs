@@ -97,14 +97,56 @@ fn body_size(pages: &[Page]) -> f64 {
 
 /// Heading level for a block: 1 for ≥ 1.6× the body size, 2 for ≥ 1.25×, 0 for body text.
 fn level(b: &Block, body: f64) -> u8 {
-    let short = b.text.len() < 200;
-    if short && b.size >= body * 1.6 {
+    heading_level(&b.text, b.size, b.bold, body)
+}
+
+/// Heading level for text set at `size` (bold or not) in a document whose body text is `body`
+/// points: 1 for ≥ 1.6× the body size, 2 for ≥ 1.25× (or short bold text that doesn't end a
+/// sentence), 0 for body text.
+pub fn heading_level(text: &str, size: f64, bold: bool, body: f64) -> u8 {
+    let short = text.len() < 200;
+    if short && size >= body * 1.6 {
         1
-    } else if short && (b.size >= body * 1.25 || (b.bold && b.size >= body && b.text.len() < 80 && !b.text.ends_with('.'))) {
+    } else if short && (size >= body * 1.25 || (bold && size >= body && text.len() < 80 && !text.ends_with('.'))) {
         2
     } else {
         0
     }
+}
+
+/// What a reading view shows of a document, top to bottom (a phone's reading mode): its pages
+/// as one flow of paragraphs, tables and pictures, with where each page starts. Headings are
+/// paragraphs set larger than the body text ([`heading_level`] once the body size is known).
+#[derive(Clone, Debug, PartialEq)]
+pub enum Flow {
+    /// Page `n` (0-based) starts here.
+    Page(usize),
+    /// A paragraph, as it is set.
+    Text { text: String, size: f64, bold: bool, italic: bool },
+    /// A table, as rows of cell texts.
+    Table(Vec<Vec<String>>),
+    /// A picture: "png" or "jpg", its bytes, and its size on the page in points.
+    Image { ext: &'static str, bytes: Vec<u8>, size: [f64; 2] },
+}
+
+/// Page `index`'s part of the reading flow: where it starts, then its paragraphs, tables and
+/// pictures from the top of the page down (tables as tables, as the other exports find them).
+pub fn page_flow(page: Page, index: usize) -> Vec<Flow> {
+    let (tables, consumed) = tables(&page.blocks);
+    let mut parts: Vec<(f64, f64, Flow)> = page
+        .blocks
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| !consumed.get(*i).copied().unwrap_or(false))
+        .map(|(_, b)| (b.rect[3], b.rect[0], Flow::Text { text: b.text, size: b.size, bold: b.bold, italic: b.italic }))
+        .collect();
+    parts.extend(tables.into_iter().map(|t| {
+        let rows = t.rows.into_iter().map(|row| row.into_iter().map(|c| c.text).collect()).collect();
+        (t.rect[3], t.rect[0], Flow::Table(rows))
+    }));
+    parts.extend(page.images.into_iter().map(|im| (im.rect[3], im.rect[0], Flow::Image { ext: im.ext, bytes: im.bytes, size: im.size })));
+    parts.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.total_cmp(&b.1)));
+    std::iter::once(Flow::Page(index)).chain(parts.into_iter().map(|p| p.2)).collect()
 }
 
 /// How far two cell left edges may drift (points) and still be the same grid column.
@@ -846,6 +888,28 @@ mod tests {
         assert_eq!(h.matches("<hr>").count(), 1);
         assert_eq!(base64(b"Man"), "TWFu");
         assert_eq!(base64(b"Ma"), "TWE=");
+    }
+
+    /// The reading flow: where the page starts, then top to bottom, the picture in its place;
+    /// headings are told from the body size.
+    #[test]
+    fn a_pages_reading_flow_goes_top_to_bottom() {
+        let flow = page_flow(page(), 4);
+        assert_eq!(flow.first(), Some(&Flow::Page(4)));
+        let order: Vec<String> = flow
+            .iter()
+            .skip(1)
+            .map(|f| match f {
+                Flow::Text { text, .. } => text.chars().take(8).collect(),
+                Flow::Image { ext, .. } => format!("image {ext}"),
+                Flow::Table(_) => "table".into(),
+                Flow::Page(n) => format!("page {n}"),
+            })
+            .collect();
+        assert_eq!(order, ["Annual R", "Overview", "Some <bo", "image png", "Body tex"]);
+        assert_eq!(heading_level("Annual Report", 24.0, true, 11.0), 1);
+        assert_eq!(heading_level("Overview", 14.0, true, 11.0), 2);
+        assert_eq!(heading_level("Body text.", 11.0, false, 11.0), 0);
     }
 
     #[test]

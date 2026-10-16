@@ -72,6 +72,20 @@ fn editing_an_ocr_word_covers_the_scan_and_shows_the_new_text() {
     assert!(ink * 100 > px.len() * 3, "the new text shows in the scan's ink colour: {ink} of {}", px.len());
 }
 
+/// The same inside a batch (the AI assistant applies its changes as one): the scanned word is
+/// still covered, not left showing under the new text.
+#[test]
+fn an_ocr_word_rewritten_in_a_batch_covers_the_scan_too() {
+    let (mut s, id) = scanned();
+    let rewrite = Edit::EditTextBlock { page: 0, block: 0, text: "Jane".into(), style: Default::default() };
+    s.apply(id, Edit::Batch { label: "Edit text".into(), edits: vec![rewrite] }).unwrap();
+    let blocks = s.get(id).unwrap().text_blocks(0);
+    assert_eq!(blocks.iter().map(|b| b.text.as_str()).collect::<Vec<_>>(), ["Jane"]);
+    let px = word_pixels(&s, id);
+    let paper = px.iter().filter(|p| near(**p, PAPER)).count();
+    assert!(paper * 10 > px.len() * 4, "mostly paper now: {paper} of {}", px.len());
+}
+
 #[test]
 fn an_explicit_colour_is_kept_for_the_new_text() {
     let (mut s, id) = scanned();

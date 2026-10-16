@@ -15,13 +15,22 @@ pub fn read(manifest: &str) -> Result<String, String> {
     Ok(v)
 }
 
-/// `manifest` with the workspace version replaced; everything else is byte-for-byte unchanged.
+/// `manifest` with the workspace version replaced, and with it the version the workspace's own
+/// crates ask of one another (the `[workspace.dependencies]` entries with a `path`): a path
+/// dependency asking for 0.7.0 refuses 0.8.0. Everything else is byte-for-byte unchanged.
 pub fn replace(manifest: &str, new: &str) -> Result<String, String> {
     validate(new)?;
     let (idx, _) = find_line(manifest)?;
     let mut out = String::with_capacity(manifest.len() + 8);
+    let mut in_dependencies = false;
     for (i, line) in manifest.split_inclusive('\n').enumerate() {
-        if i == idx {
+        let t = line.trim();
+        if t.starts_with('[') {
+            in_dependencies = t == "[workspace.dependencies]";
+        }
+        if in_dependencies && t.contains("path = \"") {
+            out.push_str(&with_version(line, new));
+        } else if i == idx {
             let eol = if line.ends_with("\r\n") {
                 "\r\n"
             } else if line.ends_with('\n') {
@@ -35,6 +44,16 @@ pub fn replace(manifest: &str, new: &str) -> Result<String, String> {
         }
     }
     Ok(out)
+}
+
+/// `line` with the value of its `version = "…"` replaced by `new` (as it was without one).
+fn with_version(line: &str, new: &str) -> String {
+    const KEY: &str = "version = \"";
+    let Some(start) = line.find(KEY).map(|at| at + KEY.len()) else { return line.to_owned() };
+    match (line.get(..start), line.get(start..).and_then(|rest| rest.find('"').and_then(|len| rest.get(len..)))) {
+        (Some(head), Some(tail)) => format!("{head}{new}{tail}"),
+        _ => line.to_owned(),
+    }
 }
 
 /// Semver without build metadata: `MAJOR.MINOR.PATCH` plus an optional `-pre.release` tag.
@@ -129,6 +148,19 @@ mod tests {
         assert_eq!(read(&out).unwrap(), "1.2.3-rc.1");
         assert_eq!(out, MANIFEST.replace("version = \"0.1.0\"", "version = \"1.2.3-rc.1\""));
         assert!(out.contains("foo = { version = \"1\" }"));
+    }
+
+    /// The workspace's own crates ask one another for the new version; other dependencies keep
+    /// theirs.
+    #[test]
+    fn the_workspaces_own_crates_follow_the_version() {
+        let manifest = "[workspace.package]\nversion = \"0.7.1\"\n\n[workspace.dependencies]\n\
+                        pdfcraft-cos = { path = \"crates/cos\", version = \"0.7.0\" }\nfoo = { version = \"1\" }\n\
+                        bar = { path = \"vendor/bar\" }\n";
+        let out = replace(manifest, "0.8.0").unwrap();
+        assert!(out.contains("pdfcraft-cos = { path = \"crates/cos\", version = \"0.8.0\" }"), "{out}");
+        assert!(out.contains("foo = { version = \"1\" }") && out.contains("bar = { path = \"vendor/bar\" }"), "{out}");
+        assert_eq!(read(&out).unwrap(), "0.8.0");
     }
 
     #[test]

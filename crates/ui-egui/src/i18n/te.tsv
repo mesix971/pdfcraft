@@ -2251,3 +2251,148 @@ animation effects	Off	ఆఫ్
 	Local cross-PDF links require the desktop app	PDFల మధ్య స్థానిక లింక్‌లకు డెస్క్‌టాప్ యాప్ అవసరం
 	The existing action will be preserved.	ఉన్న చర్య అలాగే ఉంచబడుతుంది.
 	This form's scripts are turned off because one ran too long. Reopen the document to run them again.	ఒక స్క్రిప్ట్ చాలా సేపు నడిచినందున ఈ ఫారమ్ స్క్రిప్ట్‌లు ఆపివేయబడ్డాయి. వాటిని మళ్లీ నడపడానికి పత్రాన్ని మళ్లీ తెరవండి.
+
+# In-app file browser (Android's file pickers)
+	Internal storage	అంతర్గత నిల్వ
+	Documents	పత్రాలు
+	PdfCraft files	PdfCraft ఫైళ్లు
+	SD card {name}	SD కార్డ్ {name}
+	Couldn't create the folder {name}: {e}	{name} ఫోల్డర్‌ను సృష్టించలేకపోయాం: {e}
+	Choose this folder	ఈ ఫోల్డర్‌ను ఎంచుకోండి
+	{name} already exists. Replace it?	{name} ఇప్పటికే ఉంది. దాన్ని భర్తీ చేయాలా?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	ఈ పరికరంలో ఎక్కడైనా ఫైళ్లను తెరవడానికి మరియు సేవ్ చేయడానికి, అన్ని ఫైళ్లను నిర్వహించడానికి PdfCraftను అనుమతించండి.
+	Allow access	యాక్సెస్‌ను అనుమతించండి
+	All files	అన్ని ఫైళ్లు
+	This folder is empty	ఈ ఫోల్డర్ ఖాళీగా ఉంది
+	New folder	కొత్త ఫోల్డర్
+
+# Printing through another app (Android)
+	Another app	మరొక యాప్
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	ముద్రణకు సిద్ధమైన PDF మీరు ఎంచుకున్న యాప్‌లో తెరుచుకుంటుంది, అది తన సొంత కాపీలు, రెండు వైపులా మరియు రంగు సెట్టింగ్‌లతో దాన్ని ముద్రిస్తుంది.
+	Couldn't hand {name} to another app: {e}	{name}ను మరొక యాప్‌కు అందించలేకపోయాం: {e}
+phone bar	Edit	సవరించు
+	Send	పంపు
+	Thinking…	ఆలోచిస్తోంది…
+	Anthropic API key	Anthropic API కీ
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	మీరు అడిగినప్పుడు మాత్రమే, మీ ప్రశ్న మరియు తెరిచిన పత్రం మీ స్వంత API కీతో Anthropic (Claude)కి పంపబడతాయి. అభ్యర్థనల రుసుము మీ Anthropic ఖాతా నుండి వసూలు చేయబడుతుంది.
+	Most pages sent per question	ఒక్కో ప్రశ్నకు పంపే గరిష్ఠ పేజీలు
+	Translate page {n}	పేజీ {n}ని అనువదించు
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} టోకెన్లు
+	The answer stopped at its length limit.	సమాధానం దాని గరిష్ఠ పొడవు వద్ద ఆగిపోయింది.
+	Add your Anthropic API key to use the assistant.	సహాయకుడిని ఉపయోగించడానికి మీ Anthropic API కీని జోడించండి.
+	The API key was refused. Check it in the assistant's settings.	API కీ తిరస్కరించబడింది. సహాయకుడి సెట్టింగ్‌లలో దాన్ని తనిఖీ చేయండి.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	ఈ పత్రంలో {pages} పేజీలు ఉన్నాయి; సహాయకుడు గరిష్ఠంగా {max} చదువుతుంది. సహాయకుడి సెట్టింగ్‌లలో పరిమితిని పెంచండి.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	ఈ పత్రం సహాయకుడికి చాలా పెద్దది ({mb} MB, గరిష్ఠంగా {max} MB).
+	Too many requests right now. Try again in a moment.	ప్రస్తుతం అభ్యర్థనలు చాలా ఎక్కువగా ఉన్నాయి. కాసేపట్లో మళ్లీ ప్రయత్నించండి.
+	The request was declined ({reason}).	అభ్యర్థన తిరస్కరించబడింది ({reason}).
+	Couldn't reach the AI service: {error}	AI సేవను చేరుకోలేకపోయాం: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	API కీ చెల్లదు: సహాయకుడి సెట్టింగ్‌లలో దాన్ని మళ్లీ అతికించండి.
+	The assistant gave no answer. Try asking differently.	సహాయకుడు సమాధానం ఇవ్వలేదు. వేరే విధంగా అడిగి చూడండి.
+	Your Anthropic account can't use this model, or has no credit left: {error}	మీ Anthropic ఖాతా ఈ మోడల్‌ను ఉపయోగించలేదు, లేదా దానిలో క్రెడిట్ మిగల్లేదు: {error}
+	The AI service answered: {error}	AI సేవ ఇలా సమాధానమిచ్చింది: {error}
+	{tokens} tokens	{tokens} టోకెన్లు
+	New conversation	కొత్త సంభాషణ
+	Proposed changes	ప్రతిపాదిత మార్పులు
+	Applied	వర్తింపజేయబడింది
+	Discarded	విస్మరించబడింది
+	The document has no page {page}.	పత్రంలో {page}వ పేజీ లేదు.
+	The passage wasn't found on page {page}.	{page}వ పేజీలో ఆ భాగం కనబడలేదు.
+	The document refused the change.	పత్రం మార్పును తిరస్కరించింది.
+	Applied as one step: Undo takes them all back.	ఒకే దశలో వర్తిస్తాయి: "రద్దు చేయి" అన్నింటినీ వెనక్కి తీసుకుంటుంది.
+	The passage appears more than once on page {page}.	{page}వ పేజీలో ఆ భాగం ఒకటి కంటే ఎక్కువసార్లు ఉంది.
+	It overlaps another proposed change.	ఇది మరో ప్రతిపాదిత మార్పుతో అతివ్యాప్తి చెందుతోంది.
+	A PDF on this device.	ఈ పరికరంలోని PDF.
+	Add my name	నా పేరు జోడించు
+	Add to Starred	ఇష్టమైనవాటికి జోడించు
+	Add your name and a photo. Your name also signs your comments.	మీ పేరు మరియు ఫోటో జోడించండి. మీ పేరు మీ వ్యాఖ్యలకు సంతకం కూడా చేస్తుంది.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	మీ ఫైల్‌లకు యాక్సెస్ అనుమతించండి, అప్పుడు PdfCraft ఈ పరికరంలోని PDFలను చూపిస్తుంది.
+	An empty page to start from.	ప్రారంభించడానికి ఖాళీ పేజీ.
+	Change its text and pictures.	దాని వచనం మరియు చిత్రాలను మార్చండి.
+	Choose a photo	ఫోటో ఎంచుకోండి
+	Files	ఫైల్‌లు
+	Fill in a form and sign it.	ఫారమ్‌ను పూరించి సంతకం చేయండి.
+	From photos, scans or other files.	ఫోటోలు, స్కాన్‌లు లేదా ఇతర ఫైల్‌ల నుండి.
+	Hello, {name}	నమస్కారం, {name}
+	It shows on Home and signs your comments.	ఇది హోమ్‌లో కనిపిస్తుంది మరియు మీ వ్యాఖ్యలకు సంతకం చేస్తుంది.
+	Make PdfCraft yours	PdfCraftను మీదిగా చేసుకోండి
+	More for {name}	{name} కోసం మరిన్ని
+	No PDFs found.	PDFలు కనబడలేదు.
+	No files match.	సరిపోలే ఫైల్‌లు లేవు.
+	No recent files yet.	ఇంకా ఇటీవలి ఫైల్‌లు లేవు.
+	No starred files.	ఇష్టమైన ఫైల్‌లు లేవు.
+	On this device	ఈ పరికరంలో
+	Open another file…	మరో ఫైల్ తెరువు…
+	PDFs on this device	ఈ పరికరంలోని PDFలు
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft డౌన్‌లోడ్‌లు, పత్రాలు మరియు తన స్వంత ఫోల్డర్‌లో వెతుకుతుంది.
+	Photos and scans become the pages of a new PDF.	ఫోటోలు మరియు స్కాన్‌లు కొత్త PDF పేజీలుగా మారతాయి.
+	Pictures	చిత్రాలు
+	Places	స్థానాలు
+	Profile	ప్రొఫైల్
+	Remove from Starred	ఇష్టమైనవాటి నుండి తీసివేయి
+	Remove the photo	ఫోటోను తీసివేయి
+	Search files	ఫైల్‌లను వెతకండి
+	See your PDFs	మీ PDFలను చూడండి
+	Set up	సెటప్ చేయి
+	Several PDFs and pictures in one document.	అనేక PDFలు మరియు చిత్రాలు ఒకే పత్రంలో.
+	Star a file from its menu to find it here.	ఫైల్‌ను ఇక్కడ కనుగొనడానికి దాని మెనూ నుండి ఇష్టమైనవాటికి జోడించండి.
+	Starred	ఇష్టమైనవి
+	Summarize, ask and translate.	సారాంశం, ప్రశ్నలు, అనువాదం.
+	Summarize, question and correct your PDFs with Claude, with your own key.	మీ స్వంత కీతో Claude సహాయంతో మీ PDFలను సంగ్రహించండి, ప్రశ్నించండి మరియు సరిదిద్దండి.
+	Text, pictures and other files, converted to PDF.	PDFగా మార్చిన వచనం, చిత్రాలు మరియు ఇతర ఫైల్‌లు.
+	The files you open show here.	మీరు తెరిచే ఫైల్‌లు ఇక్కడ కనిపిస్తాయి.
+	What would you like to do?	మీరు ఏమి చేయాలనుకుంటున్నారు?
+	Which document?	ఏ పత్రం?
+	Your AI assistant	మీ AI సహాయకుడు
+file state	Open	తెరిచి ఉంది
+	Choose a PNG or JPEG picture.	PNG లేదా JPEG చిత్రాన్ని ఎంచుకోండి.
+	This picture is too large.	ఈ చిత్రం చాలా పెద్దది.
+	Couldn't use this picture: {e}	ఈ చిత్రాన్ని ఉపయోగించడం సాధ్యం కాలేదు: {e}
+	Couldn't use this picture.	ఈ చిత్రాన్ని ఉపయోగించడం సాధ్యం కాలేదు.
+	{n} MB	{n} MB
+	{n} KB	{n} KB
+decimal separator	.	.
+	Other folders…	ఇతర ఫోల్డర్‌లు…
+	Looking for photos…	ఫోటోల కోసం వెతుకుతోంది…
+	See your photos	మీ ఫోటోలను చూడండి
+	Allow PdfCraft to see your photos, and choose one here.	మీ ఫోటోలను చూడటానికి PdfCraftను అనుమతించి, ఇక్కడ ఒకదాన్ని ఎంచుకోండి.
+	No photos found.	ఫోటోలు కనబడలేదు.
+	PdfCraft shows the photos in Camera, Pictures and Download.	PdfCraft కెమెరా, చిత్రాలు, డౌన్‌లోడ్‌లలోని ఫోటోలను చూపిస్తుంది.
+	Automatic	ఆటోమేటిక్
+	Dark mode	డార్క్ మోడ్
+	Dark pages	చీకటి పేజీలు
+	Light text on a dark page, for reading at night.	చీకటి పేజీపై లేత వచనం, రాత్రి చదవడానికి.
+	Night	రాత్రి
+	Downloads	డౌన్‌లోడ్‌లు
+	Choose a file	ఫైల్‌ను ఎంచుకోండి
+	Choose files	ఫైల్‌లను ఎంచుకోండి
+	Choose a folder	ఫోల్డర్‌ను ఎంచుకోండి
+	Tap to unlock	అన్‌లాక్ చేయడానికి నొక్కండి
+	Browse folders	ఫోల్డర్‌లను బ్రౌజ్ చేయండి
+	Combined from top to bottom. Use the arrows to change the order.	పై నుండి కిందికి కలుపబడతాయి. క్రమాన్ని మార్చడానికి బాణాలను ఉపయోగించండి.
+	PDFs and pictures, combined into one PDF in the order you choose.	PDFలు మరియు చిత్రాలు, మీరు ఎంచుకున్న క్రమంలో ఒకే PDFగా కలుపబడతాయి.
+	Smaller text	చిన్న వచనం
+	Larger text	పెద్ద వచనం
+	Flip	తిప్పు
+	Tap text or a picture to change it	మార్చడానికి వచనం లేదా చిత్రాన్ని నొక్కండి
+	Tap where the text goes	వచనం ఉండాల్సిన చోట నొక్కండి
+	White	తెలుపు
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	మీరు అడిగినప్పుడు మాత్రమే, మీ ప్రశ్న మరియు తెరిచిన పత్రం మీ స్వంత API కీతో మీరు ఎంచుకున్న సేవకు పంపబడతాయి. అభ్యర్థనలు ఆ సేవలోని మీ ఖాతాకు బిల్ చేయబడతాయి.
+	Service	సేవ
+	Another service (OpenAI-compatible)	మరో సేవ (OpenAI అనుకూలమైనది)
+	API key	API కీ
+	On Google's free tier, what you send may be used to improve Google's products.	Google ఉచిత శ్రేణిలో, మీరు పంపేది Google ఉత్పత్తులను మెరుగుపరచడానికి ఉపయోగించబడవచ్చు.
+	Fill in for	దీని కోసం నింపు:
+	Service address	సేవ చిరునామా
+	API key (if the service asks for one)	API కీ (సేవ అడిగితే)
+	The service reads PDF files	సేవ PDF ఫైల్‌లను చదువుతుంది
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	లేకపోతే పత్రం వచనం పేజీ పేజీగా పంపబడుతుంది (దాని చిత్రాలు లేదా స్కాన్‌లు కాదు).
+	Add your API key for {service} in the assistant's settings.	సహాయకుడి సెట్టింగ్‌లలో {service} కోసం మీ API కీని జోడించండి.
+	Your {service} account can't use this model, or has no credit left: {error}	మీ {service} ఖాతా ఈ మోడల్‌ను ఉపయోగించలేదు, లేదా దానిలో క్రెడిట్ మిగల్లేదు: {error}
+	Choose the model to ask in the assistant's settings.	సహాయకుడి సెట్టింగ్‌లలో అడగాల్సిన మోడల్‌ను ఎంచుకోండి.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	ఈ పత్రంలో పంపడానికి వచనం లేదు (ఇది స్కాన్ చేసినదా?). PDF ఫైల్‌లను చదివే సేవను ఎంచుకోండి, లేదా ముందుగా దాని వచనాన్ని గుర్తించండి.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	ఈ పత్రం వచనం సహాయకుడికి చాలా పొడవుగా ఉంది ({chars} అక్షరాలు, గరిష్ఠంగా {max}).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	మీ స్వంత కీతో Claude, ChatGPT లేదా Gemini సహాయంతో మీ PDFలను సంగ్రహించండి, ప్రశ్నించండి మరియు సరిదిద్దండి.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	సేవ చిరునామా చెల్లదు: అది https:// తో మొదలవుతుంది (http:// ఈ పరికరం లేదా స్థానిక నెట్‌వర్క్‌కు మాత్రమే).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	ఈ పత్రం దాని విషయాన్ని కాపీ చేయడానికి అనుమతించదు, కాబట్టి ఇది సహాయకుడికి పంపబడదు.
+	Try again	మళ్లీ ప్రయత్నించండి
+	Price per million tokens read / written	మిలియన్ చదివిన / రాసిన టోకెన్‌లకు ధర

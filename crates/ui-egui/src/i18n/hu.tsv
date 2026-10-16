@@ -2337,3 +2337,148 @@ animation effects	Off	Ki
 	The linked PDF opened, but its named destination was not applied.	A hivatkozott PDF megnyílt, de a nevesített cél nem lett alkalmazva.
 	The linked PDF opened, but its page destination was out of range.	A hivatkozott PDF megnyílt, de a céloldal a tartományon kívül esik.
 	Local cross-PDF links require the desktop app	A PDF-ek közötti helyi hivatkozásokhoz az asztali alkalmazás szükséges
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Belső tárhely
+	Documents	Dokumentumok
+	PdfCraft files	PdfCraft-fájlok
+	SD card {name}	SD-kártya: {name}
+	Couldn't create the folder {name}: {e}	A(z) {name} mappa nem hozható létre: {e}
+	Choose this folder	A mappa kiválasztása
+	{name} already exists. Replace it?	{name} már létezik. Lecseréli?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Ha az eszközön bárhol szeretne fájlokat megnyitni és menteni, engedélyezze, hogy a PdfCraft kezelje az összes fájlt.
+	Allow access	Hozzáférés engedélyezése
+	All files	Minden fájl
+	This folder is empty	Ez a mappa üres
+	New folder	Új mappa
+
+# Printing through another app (Android)
+	Another app	Másik alkalmazás
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	A nyomtatásra kész PDF a választott alkalmazásban nyílik meg, amely a saját példányszám-, kétoldalas és színbeállításaival nyomtatja ki.
+	Couldn't hand {name} to another app: {e}	A(z) {name} nem adható át másik alkalmazásnak: {e}
+phone bar	Edit	Szerkesztés
+	Send	Küldés
+	Thinking…	Gondolkodik…
+	Anthropic API key	Anthropic API-kulcs
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	A kérdésed és a megnyitott dokumentum a saját API-kulcsoddal kerül az Anthropichoz (Claude), csak amikor kéred. A kérések díját az Anthropic-fiókod fizeti.
+	Most pages sent per question	Kérdésenként legfeljebb elküldött oldalak
+	Translate page {n}	{n}. oldal fordítása
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} token
+	The answer stopped at its length limit.	A válasz a legnagyobb hosszánál megszakadt.
+	Add your Anthropic API key to use the assistant.	Add meg az Anthropic API-kulcsodat az asszisztens használatához.
+	The API key was refused. Check it in the assistant's settings.	Az API-kulcsot elutasították. Ellenőrizd az asszisztens beállításaiban.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	A dokumentum {pages} oldalas; az asszisztens legfeljebb {max} oldalt olvas. Növeld a korlátot az asszisztens beállításaiban.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	A dokumentum túl nagy az asszisztensnek ({mb} MB, legfeljebb {max} MB).
+	Too many requests right now. Try again in a moment.	Most túl sok a kérés. Próbáld újra egy pillanat múlva.
+	The request was declined ({reason}).	A kérést elutasították ({reason}).
+	Couldn't reach the AI service: {error}	Nem érhető el az MI-szolgáltatás: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	Az API-kulcs érvénytelen: illeszd be újra az asszisztens beállításaiban.
+	The assistant gave no answer. Try asking differently.	Az asszisztens nem adott választ. Próbáld másképp megfogalmazni a kérdést.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Az Anthropic-fiókod nem használhatja ezt a modellt, vagy elfogyott a kreditje: {error}
+	The AI service answered: {error}	Az MI-szolgáltatás válasza: {error}
+	{tokens} tokens	{tokens} token
+	New conversation	Új beszélgetés
+	Proposed changes	Javasolt módosítások
+	Applied	Alkalmazva
+	Discarded	Elvetve
+	The document has no page {page}.	A dokumentumnak nincs {page}. oldala.
+	The passage wasn't found on page {page}.	A szakasz nem található a(z) {page}. oldalon.
+	The document refused the change.	A dokumentum elutasította a módosítást.
+	Applied as one step: Undo takes them all back.	Egy lépésben alkalmazva: a Visszavonás mindet visszavonja.
+	The passage appears more than once on page {page}.	A szakasz többször is előfordul a(z) {page}. oldalon.
+	It overlaps another proposed change.	Átfedésben van egy másik javasolt módosítással.
+	A PDF on this device.	Egy PDF ezen az eszközön.
+	Add my name	Nevem megadása
+	Add to Starred	Hozzáadás a kedvencekhez
+	Add your name and a photo. Your name also signs your comments.	Add meg a neved és egy fényképet. A neved a megjegyzéseidet is aláírja.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Engedélyezd a hozzáférést a fájljaidhoz, és a PdfCraft listázza az eszközön lévő PDF-eket.
+	An empty page to start from.	Egy üres oldal a kezdéshez.
+	Change its text and pictures.	A szöveg és a képek módosítása.
+	Choose a photo	Fénykép kiválasztása
+	Files	Fájlok
+	Fill in a form and sign it.	Űrlap kitöltése és aláírása.
+	From photos, scans or other files.	Fényképekből, szkennelt képekből vagy más fájlokból.
+	Hello, {name}	Szia, {name}
+	It shows on Home and signs your comments.	A kezdőlapon jelenik meg, és aláírja a megjegyzéseidet.
+	Make PdfCraft yours	Szabd magadra a PdfCraftot
+	More for {name}	Továbbiak: {name}
+	No PDFs found.	Nem található PDF.
+	No files match.	Nincs egyező fájl.
+	No recent files yet.	Még nincsenek legutóbbi fájlok.
+	No starred files.	Nincsenek kedvenc fájlok.
+	On this device	Ezen az eszközön
+	Open another file…	Másik fájl megnyitása…
+	PDFs on this device	PDF-ek ezen az eszközön
+	PdfCraft looks in Download, Documents and its own folder.	A PdfCraft a Letöltések, a Dokumentumok és a saját mappájában keres.
+	Photos and scans become the pages of a new PDF.	A fényképekből és szkennelt képekből egy új PDF oldalai lesznek.
+	Pictures	Képek
+	Places	Helyek
+	Profile	Profil
+	Remove from Starred	Eltávolítás a kedvencek közül
+	Remove the photo	Fénykép eltávolítása
+	Search files	Fájlok keresése
+	See your PDFs	Lásd a PDF-jeidet
+	Set up	Beállítás
+	Several PDFs and pictures in one document.	Több PDF és kép egyetlen dokumentumban.
+	Star a file from its menu to find it here.	Jelölj meg egy fájlt kedvencként a menüjében, hogy itt megtaláld.
+	Starred	Kedvencek
+	Summarize, ask and translate.	Összefoglalás, kérdések, fordítás.
+	Summarize, question and correct your PDFs with Claude, with your own key.	Foglald össze, kérdezd ki és javítsd a PDF-jeidet a Claude-dal, a saját kulcsoddal.
+	Text, pictures and other files, converted to PDF.	Szöveg, képek és más fájlok PDF-be alakítva.
+	The files you open show here.	Az általad megnyitott fájlok itt jelennek meg.
+	What would you like to do?	Mit szeretnél tenni?
+	Which document?	Melyik dokumentum?
+	Your AI assistant	A MI-asszisztensed
+file state	Open	Megnyitva
+	Choose a PNG or JPEG picture.	Válassz PNG vagy JPEG képet.
+	This picture is too large.	Ez a kép túl nagy.
+	Couldn't use this picture: {e}	Ezt a képet nem sikerült használni: {e}
+	Couldn't use this picture.	Ezt a képet nem sikerült használni.
+	{n} MB	{n} MB
+	{n} KB	{n} KB
+decimal separator	.	,
+	Other folders…	Más mappák…
+	Looking for photos…	Fényképek keresése…
+	See your photos	Lásd a fényképeidet
+	Allow PdfCraft to see your photos, and choose one here.	Engedd, hogy a PdfCraft lássa a fényképeidet, és válassz egyet itt.
+	No photos found.	Nem található fénykép.
+	PdfCraft shows the photos in Camera, Pictures and Download.	A PdfCraft a Kamera, a Képek és a Letöltések mappa fényképeit mutatja.
+	Automatic	Automatikus
+	Dark mode	Sötét mód
+	Dark pages	Sötét oldalak
+	Light text on a dark page, for reading at night.	Világos szöveg sötét oldalon, éjszakai olvasáshoz.
+	Night	Éjszaka
+	Downloads	Letöltések
+	Choose a file	Fájl kiválasztása
+	Choose files	Fájlok kiválasztása
+	Choose a folder	Mappa kiválasztása
+	Tap to unlock	Koppints a feloldáshoz
+	Browse folders	Mappák böngészése
+	Combined from top to bottom. Use the arrows to change the order.	Fentről lefelé egyesülnek. A sorrendet a nyilakkal módosíthatod.
+	PDFs and pictures, combined into one PDF in the order you choose.	PDF-ek és képek egyetlen PDF-be egyesítve, az általad választott sorrendben.
+	Smaller text	Kisebb szöveg
+	Larger text	Nagyobb szöveg
+	Flip	Tükrözés
+	Tap text or a picture to change it	Koppints egy szövegre vagy képre a módosításhoz
+	Tap where the text goes	Koppints oda, ahová a szöveg kerül
+	White	Fehér
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	A kérdésed és a megnyitott dokumentum a választott szolgáltatáshoz kerül, a saját API-kulcsoddal, csak amikor kéred. A kéréseket a szolgáltatásnál lévő fiókodra számlázzák.
+	Service	Szolgáltatás
+	Another service (OpenAI-compatible)	Más szolgáltatás (OpenAI-kompatibilis)
+	API key	API-kulcs
+	On Google's free tier, what you send may be used to improve Google's products.	A Google ingyenes szintjén az elküldött tartalmat a Google a termékei fejlesztésére használhatja.
+	Fill in for	Kitöltés ehhez:
+	Service address	A szolgáltatás címe
+	API key (if the service asks for one)	API-kulcs (ha a szolgáltatás kér)
+	The service reads PDF files	A szolgáltatás olvassa a PDF-fájlokat
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	Különben a dokumentum szövege megy el, oldalanként (képek és szkennelt részek nélkül).
+	Add your API key for {service} in the assistant's settings.	Add meg a(z) {service} API-kulcsodat az asszisztens beállításaiban.
+	Your {service} account can't use this model, or has no credit left: {error}	A(z) {service}-fiókod nem használhatja ezt a modellt, vagy elfogyott a kreditje: {error}
+	Choose the model to ask in the assistant's settings.	Válaszd ki a kérdezendő modellt az asszisztens beállításaiban.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	Ebben a dokumentumban nincs elküldhető szöveg (szkennelt?). Válassz PDF-fájlokat olvasó szolgáltatást, vagy előbb ismertesd fel a szövegét.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	A dokumentum szövege túl hosszú az asszisztensnek ({chars} karakter, legfeljebb {max}).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Foglald össze, kérdezd ki és javítsd a PDF-jeidet a Claude-dal, a ChatGPT-vel vagy a Geminivel, a saját kulcsoddal.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	A szolgáltatás címe érvénytelen: https:// előtaggal kezdődik (http:// csak ehhez az eszközhöz vagy a helyi hálózathoz).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	Ez a dokumentum nem engedi a tartalma másolását, ezért nem kerül az asszisztenshez.
+	Try again	Próbáld újra
+	Price per million tokens read / written	Ár millió olvasott / írt tokenenként

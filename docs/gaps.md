@@ -1,6 +1,6 @@
 # Where PdfCraft falls short of Acrobat Pro
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-12 · **Change:** gap 4 closed: the web build prints through the browser's print dialog; exclusive image-crop resize follow-up; minor (Word invoice regression coverage, #773; Office fidelity still partial; gap 2: hayro patch counts after the native-gradient backport) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (gap 23: the AI assistant asks Claude, ChatGPT, Gemini or any OpenAI-compatible service, a local Ollama included); earlier: gap 23: the AI assistant proposes text changes; gap 23 in part: AI assistant with the user's own Anthropic key; gap 4 closed: the web build prints through the browser's print dialog; exclusive image-crop resize follow-up; minor (Word invoice regression coverage, #773; Office fidelity still partial; gap 2: hayro patch counts after the native-gradient backport) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
 > **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-12 · **Change:** minor (gap 13: large-file memory measured, edits keep two copies instead of three, file-backed input blocked on gap 2) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
 > **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** minor (gap 1 closed by #836; fixed issues removed from gaps 3, 6 and 16) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
 > **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** minor (document-font subset completion and curved/shared image clips in the contributor fork; gap 2: hayro patch counts after the native-gradient backport) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
@@ -44,7 +44,7 @@ update the numbers.
 | 20 | Scanners, GPU page rendering, pen pressure, Read Out Loud | hardware | 25–50 | [hardware-parity.md](hardware-parity.md) |
 | 21 | Compare: no side-by-side view or filters | feature | 10–20 | [target-app-parity.md](target-app-parity.md) |
 | 22 | PDF 2.0 extras, linearization, Arlington validation | spec | 20–35 | [pdf-spec-parity.md](pdf-spec-parity.md) |
-| 23 | Local AI provider (summarize, ask, alt text, redaction suggestions) | AI | 20–40 | [target-app-parity.md](target-app-parity.md) |
+| 23 | Local AI provider (summarize, ask, translate shipped with the user's own key for Claude, ChatGPT, Gemini or an OpenAI-compatible service, a local one included; alt text, redaction suggestions left) | AI | 10–22 | [target-app-parity.md](target-app-parity.md) |
 | 24 | Checklist not diffed against Acrobat's own menus | measurement | 4–8 | [target-app-parity.md](target-app-parity.md) |
 
 ## The gaps
@@ -295,10 +295,22 @@ update the numbers.
 
 ### 23. Local AI provider
 
-- **Missing:** the opt-in provider interface (local model or the user's own endpoint) and the
-  features on it: summarize, ask with page citations, alternate-text and redaction suggestions.
-  Acrobat's AI Assistant is a cloud service and out of scope.
-- **Estimate:** 20–40 h. **Doc:** [target-app-parity.md](target-app-parity.md).
+- **Done (2026-10-13):** an opt-in provider with the user's own Anthropic API key (`crates/ai`),
+  off until a key is entered: summarize, ask (answers cite pages as text), translate a page, on
+  the phone layout's assistant screen, with a page limit and each answer's estimated cost.
+  Asked to correct, reword or translate the document in place, it proposes passage replacements
+  that Apply makes as one undo step, each paragraph in its own font and box.
+- **Done (2026-10-15):** the service is the user's choice: Claude (Anthropic's Messages API),
+  ChatGPT's models (OpenAI's Responses API), Gemini (Google's Interactions API), or any
+  OpenAI-compatible service at an address the user gives (OpenRouter, Mistral, DeepSeek, Groq, a
+  local Ollama), which gets the document's text page by page unless it reads PDF files. Each
+  service keeps its own key and model; nothing is stored on the service's side between
+  questions.
+- **Missing:** a model bundled with the app (a local one runs through an OpenAI-compatible
+  server, text only), the same assistant in the desktop layout, an `automation` tool, page
+  citations as links, alternate-text and redaction suggestions. Acrobat's AI Assistant is a cloud
+  service and out of scope.
+- **Estimate:** 10–22 h left. **Doc:** [target-app-parity.md](target-app-parity.md).
 
 ### 24. Checklist not diffed against Acrobat's own menus
 
@@ -312,6 +324,9 @@ update the numbers.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-15 | minor | Gap 23: the assistant asks the service the user chooses (Claude, ChatGPT, Gemini, or any OpenAI-compatible one, a local Ollama included), each with its own key and model; estimate 10–22 h left |
+| 2026-10-13 | minor | Gap 23: the assistant proposes text changes (correct, reword, translate in place) that Apply makes as one undo step; estimate unchanged |
+| 2026-10-13 | minor | Gap 23 in part: the phone layout's AI assistant (summarize, ask, translate a page) with the user's own Anthropic API key, off until a key is set; local model, desktop entry, automation tool, alt text and redaction suggestions left |
 | 2026-10-12 | minor | Exclusive image crops resize with their pixels across nested states, intervening operators and content streams; shared clips remain fixed. Synthetic engine/tool regressions and private image save/reopen checks; estimates unchanged. |
 | 2026-10-12 | minor | Gap 13: measured large-file memory; edits no longer keep the previous working file while writing the next (peak 3 → 2 copies); file-backed input recorded as blocked on gap 2 |
 | 2026-10-11 | minor | Closed gap 4: the web build prints through the browser's print dialog (sheets drawn by PdfCraft at 150–300 dpi, one per printed page); number kept |

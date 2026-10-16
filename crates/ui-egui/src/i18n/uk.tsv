@@ -2360,3 +2360,149 @@ animation effects	Off	Вимкнено
 	The linked PDF opened, but its named destination was not applied.	Пов’язаний PDF відкрито, але його іменоване призначення не застосовано.
 	The linked PDF opened, but its page destination was out of range.	Пов’язаний PDF відкрито, але сторінка призначення поза межами діапазону.
 	Local cross-PDF links require the desktop app	Локальні посилання між PDF працюють лише в настільному застосунку
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Внутрішня пам'ять
+	Documents	Документи
+	PdfCraft files	Файли PdfCraft
+	SD card {name}	SD-картка {name}
+	Couldn't create the folder {name}: {e}	Не вдалося створити папку {name}: {e}
+	Choose this folder	Вибрати цю папку
+	{name} already exists. Replace it?	{name} уже існує. Замінити?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Щоб відкривати й зберігати файли будь-де на цьому пристрої, дозвольте PdfCraft керувати всіма файлами.
+	Allow access	Дозволити доступ
+	All files	Усі файли
+	This folder is empty	Ця папка порожня
+	New folder	Нова папка
+
+# Printing through another app (Android)
+	Another app	Інший застосунок
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Готовий до друку PDF відкриється у вибраному вами застосунку, який надрукує його зі своїми налаштуваннями копій, двобічного друку й кольору.
+	Couldn't hand {name} to another app: {e}	Не вдалося передати {name} іншому застосунку: {e}
+	Tools	Інструменти
+phone bar	Edit	Редагувати
+	Send	Надіслати
+	Thinking…	Думаю…
+	Anthropic API key	API-ключ Anthropic
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	Ваше запитання та відкритий документ надсилаються до Anthropic (Claude) з вашим власним API-ключем, лише коли ви про це просите. Запити оплачуються з вашого облікового запису Anthropic.
+	Most pages sent per question	Найбільше сторінок на запитання
+	Translate page {n}	Перекласти сторінку {n}
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} токенів
+	The answer stopped at its length limit.	Відповідь обірвалася на максимальній довжині.
+	Add your Anthropic API key to use the assistant.	Додайте свій API-ключ Anthropic, щоб користуватися асистентом.
+	The API key was refused. Check it in the assistant's settings.	API-ключ відхилено. Перевірте його в налаштуваннях асистента.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	У цьому документі {pages} стор.; асистент читає щонайбільше {max}. Збільште ліміт у налаштуваннях асистента.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	Цей документ завеликий для асистента ({mb} МБ, щонайбільше {max} МБ).
+	Too many requests right now. Try again in a moment.	Зараз забагато запитів. Спробуйте ще раз за мить.
+	The request was declined ({reason}).	Запит відхилено ({reason}).
+	Couldn't reach the AI service: {error}	Не вдалося зв'язатися з ШІ-сервісом: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	API-ключ недійсний: вставте його знову в налаштуваннях асистента.
+	The assistant gave no answer. Try asking differently.	Асистент не дав відповіді. Спробуйте сформулювати запитання інакше.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Ваш обліковий запис Anthropic не може використовувати цю модель або на ньому закінчилися кошти: {error}
+	The AI service answered: {error}	ШІ-сервіс відповів: {error}
+	{tokens} tokens	{tokens} токенів
+	New conversation	Нова розмова
+	Proposed changes	Запропоновані зміни
+	Applied	Застосовано
+	Discarded	Відхилено
+	The document has no page {page}.	У документі немає сторінки {page}.
+	The passage wasn't found on page {page}.	Фрагмент не знайдено на сторінці {page}.
+	The document refused the change.	Документ не прийняв зміну.
+	Applied as one step: Undo takes them all back.	Застосовуються одним кроком: «Скасувати» скасовує їх усі.
+	The passage appears more than once on page {page}.	Фрагмент трапляється на сторінці {page} кілька разів.
+	It overlaps another proposed change.	Вона перетинається з іншою запропонованою зміною.
+	A PDF on this device.	PDF на цьому пристрої.
+	Add my name	Додати ім'я
+	Add to Starred	Додати до вибраного
+	Add your name and a photo. Your name also signs your comments.	Додайте ім'я та фото. Ім'я також підписує ваші коментарі.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Дозвольте доступ до файлів, і PdfCraft покаже PDF на цьому пристрої.
+	An empty page to start from.	Порожня сторінка для початку.
+	Change its text and pictures.	Змінити текст і зображення.
+	Choose a photo	Вибрати фото
+	Files	Файли
+	Fill in a form and sign it.	Заповнити форму й підписати.
+	From photos, scans or other files.	З фото, сканів або інших файлів.
+	Hello, {name}	Вітаємо, {name}
+	It shows on Home and signs your comments.	Воно відображається на головній і підписує ваші коментарі.
+	Make PdfCraft yours	Налаштуйте PdfCraft під себе
+	More for {name}	Більше для «{name}»
+	No PDFs found.	PDF не знайдено.
+	No files match.	Немає відповідних файлів.
+	No recent files yet.	Нещодавніх файлів поки немає.
+	No starred files.	Немає вибраних файлів.
+	On this device	На пристрої
+	Open another file…	Відкрити інший файл…
+	PDFs on this device	PDF на цьому пристрої
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft шукає в теках «Завантаження», «Документи» та у своїй теці.
+	Photos and scans become the pages of a new PDF.	Фото й скани стають сторінками нового PDF.
+	Pictures	Зображення
+	Places	Розташування
+	Profile	Профіль
+	Remove from Starred	Прибрати з вибраного
+	Remove the photo	Видалити фото
+	Search files	Пошук файлів
+	See your PDFs	Ваші PDF
+	Set up	Налаштувати
+	Several PDFs and pictures in one document.	Кілька PDF і зображень в одному документі.
+	Star a file from its menu to find it here.	Додайте файл до вибраного через його меню, щоб знайти його тут.
+	Starred	Вибране
+	Summarize, ask and translate.	Підсумок, запитання, переклад.
+	Summarize, question and correct your PDFs with Claude, with your own key.	Підсумовуйте, розпитуйте й виправляйте свої PDF із Claude, використовуючи власний ключ.
+	Text, pictures and other files, converted to PDF.	Текст, зображення та інші файли, перетворені на PDF.
+	The files you open show here.	Тут з'являються файли, які ви відкриваєте.
+	What would you like to do?	Що ви хочете зробити?
+	Which document?	Який документ?
+	Your AI assistant	Ваш ШІ-асистент
+file state	Open	Відкрито
+	Choose a PNG or JPEG picture.	Виберіть зображення PNG або JPEG.
+	This picture is too large.	Це зображення завелике.
+	Couldn't use this picture: {e}	Не вдалося використати це зображення: {e}
+	Couldn't use this picture.	Не вдалося використати це зображення.
+	{n} MB	{n} МБ
+	{n} KB	{n} КБ
+decimal separator	.	,
+	Other folders…	Інші теки…
+	Looking for photos…	Пошук фото…
+	See your photos	Ваші фото
+	Allow PdfCraft to see your photos, and choose one here.	Дозвольте PdfCraft доступ до фото й виберіть одне тут.
+	No photos found.	Фото не знайдено.
+	PdfCraft shows the photos in Camera, Pictures and Download.	PdfCraft показує фото з тек «Камера», «Зображення» та «Завантаження».
+	Automatic	Автоматично
+	Dark mode	Темний режим
+	Dark pages	Темні сторінки
+	Light text on a dark page, for reading at night.	Світлий текст на темній сторінці, для читання вночі.
+	Night	Ніч
+	Downloads	Завантаження
+	Choose a file	Вибір файлу
+	Choose files	Вибір файлів
+	Choose a folder	Вибір папки
+	Tap to unlock	Торкніться, щоб розблокувати
+	Browse folders	Переглянути папки
+	Combined from top to bottom. Use the arrows to change the order.	Об’єднуються згори донизу. Порядок змінюється стрілками.
+	PDFs and pictures, combined into one PDF in the order you choose.	PDF-файли та зображення, об’єднані в один PDF у вибраному вами порядку.
+	Smaller text	Менший текст
+	Larger text	Більший текст
+	Flip	Віддзеркалити
+	Tap text or a picture to change it	Торкніться тексту або зображення, щоб змінити його
+	Tap where the text goes	Торкніться місця для тексту
+	White	Білий
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	Ваше запитання й відкритий документ надсилаються до обраного вами сервісу з вашим власним API-ключем і лише на ваш запит. Запити оплачуються з вашого облікового запису в цьому сервісі.
+	Service	Сервіс
+	Another service (OpenAI-compatible)	Інший сервіс (сумісний з OpenAI)
+	API key	API-ключ
+	On Google's free tier, what you send may be used to improve Google's products.	На безкоштовному тарифі Google надіслане вами може використовуватися для вдосконалення продуктів Google.
+	Fill in for	Заповнити для
+	Service address	Адреса сервісу
+	API key (if the service asks for one)	API-ключ (якщо сервіс його просить)
+	The service reads PDF files	Сервіс читає PDF-файли
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	Інакше надсилається текст документа, сторінка за сторінкою (без зображень і сканів).
+	Add your API key for {service} in the assistant's settings.	Додайте свій API-ключ {service} у налаштуваннях асистента.
+	Your {service} account can't use this model, or has no credit left: {error}	Ваш обліковий запис {service} не може використовувати цю модель або на ньому закінчилися кошти: {error}
+	Choose the model to ask in the assistant's settings.	Виберіть модель для запитань у налаштуваннях асистента.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	У цьому документі немає тексту для надсилання (це скан?). Виберіть сервіс, який читає PDF-файли, або спершу розпізнайте його текст.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	Текст цього документа задовгий для асистента ({chars} символів, щонайбільше {max}).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Підсумовуйте, розпитуйте й виправляйте свої PDF із Claude, ChatGPT або Gemini, використовуючи власний ключ.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	Неправильна адреса сервісу: вона починається з https:// (http:// лише для цього пристрою або локальної мережі).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	Цей документ не дозволяє копіювати свій вміст, тому його не надсилають асистентові.
+	Try again	Спробувати ще раз
+	Price per million tokens read / written	Ціна за мільйон прочитаних / написаних токенів

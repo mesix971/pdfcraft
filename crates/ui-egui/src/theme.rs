@@ -1,5 +1,9 @@
 //! Design tokens and egui style (plan/acrobat/02-ui-ux.md §1: neutral chrome, white panels,
-//! one blue accent; Dark Gray keeps pages white). Every custom widget reads `Tokens::get`.
+//! one accent; Dark Gray keeps pages white). Every custom widget reads `Tokens::get`.
+//!
+//! The accent is the green of PdfCraft's own icon (`assets/app-icon`, #12A58A), deepened where
+//! white text sits on it so that text keeps a 4.5:1 contrast; [`Tokens::brand`] is the icon's
+//! green itself, for large surfaces.
 
 use std::sync::Arc;
 
@@ -65,6 +69,13 @@ pub struct Tokens {
     pub badge_new: Color32,
     pub page_shadow: Color32,
     pub radius: u8,
+    /// The icon's green, for large surfaces (the phone's Home header); `on_brand` is the text on it.
+    pub brand: Color32,
+    pub on_brand: Color32,
+    /// What failed or is wrong, and what needs a look: text and icons readable (4.5:1) on every
+    /// surface of their theme.
+    pub error: Color32,
+    pub warning: Color32,
 }
 
 impl Tokens {
@@ -85,14 +96,18 @@ impl Tokens {
                 icon: Color32::from_rgb(0x44, 0x44, 0x4B),
                 hover: Color32::from_rgb(0xF0, 0xF0, 0xF3),
                 pressed: Color32::from_rgb(0xE4, 0xE4, 0xE9),
-                selected: Color32::from_rgb(0xE6, 0xEE, 0xFD),
-                accent: Color32::from_rgb(0x1B, 0x63, 0xE0),
-                accent_text: Color32::from_rgb(0x17, 0x55, 0xC4),
-                accent_soft: Color32::from_rgb(0xE3, 0xEC, 0xFD),
+                selected: Color32::from_rgb(0xD9, 0xF0, 0xEA),
+                accent: Color32::from_rgb(0x0E, 0x7F, 0x6A),
+                accent_text: Color32::from_rgb(0x0B, 0x6E, 0x5C),
+                accent_soft: Color32::from_rgb(0xE2, 0xF4, 0xEF),
                 field: Color32::from_rgb(0xFF, 0xFF, 0xFF),
-                badge_new: Color32::from_rgb(0x1B, 0x63, 0xE0),
+                badge_new: Color32::from_rgb(0x0E, 0x7F, 0x6A),
                 page_shadow: Color32::from_black_alpha(34),
                 radius: 6,
+                brand: Color32::from_rgb(0x12, 0xA5, 0x8A),
+                on_brand: Color32::WHITE,
+                error: Color32::from_rgb(0xC4, 0x2B, 0x32),
+                warning: Color32::from_rgb(0x9C, 0x51, 0x00),
             },
             ThemeKind::Dark => Self {
                 kind,
@@ -109,16 +124,39 @@ impl Tokens {
                 icon: Color32::from_rgb(0xD4, 0xD4, 0xDA),
                 hover: Color32::from_rgb(0x34, 0x34, 0x3A),
                 pressed: Color32::from_rgb(0x3E, 0x3E, 0x45),
-                selected: Color32::from_rgb(0x23, 0x3A, 0x63),
-                accent: Color32::from_rgb(0x4B, 0x8B, 0xF5),
-                accent_text: Color32::from_rgb(0x8C, 0xB6, 0xFA),
-                accent_soft: Color32::from_rgb(0x24, 0x36, 0x57),
+                selected: Color32::from_rgb(0x1B, 0x45, 0x3D),
+                accent: Color32::from_rgb(0x0E, 0x80, 0x6B),
+                accent_text: Color32::from_rgb(0x5F, 0xD6, 0xBD),
+                accent_soft: Color32::from_rgb(0x1A, 0x3A, 0x34),
                 field: Color32::from_rgb(0x1E, 0x1E, 0x22),
-                badge_new: Color32::from_rgb(0x3D, 0x7D, 0xEE),
+                badge_new: Color32::from_rgb(0x0E, 0x80, 0x6B),
                 page_shadow: Color32::from_black_alpha(120),
                 radius: 6,
+                brand: Color32::from_rgb(0x0F, 0x86, 0x70),
+                on_brand: Color32::WHITE,
+                error: Color32::from_rgb(0xF8, 0x71, 0x71),
+                warning: Color32::from_rgb(0xF5, 0x9E, 0x0B),
             },
         }
+    }
+
+    /// The dark palette in true black where it is the ground (backgrounds, bars, the area behind
+    /// the pages): a phone's OLED screen leaves those pixels off. Raised surfaces (cards, sheets,
+    /// panels, fields) stay a step above it, so they still read as surfaces. Light is unchanged.
+    pub fn true_black(mut self) -> Self {
+        if self.dark() {
+            self.titlebar = Color32::BLACK;
+            self.chrome = Color32::BLACK;
+            self.pasteboard = Color32::BLACK;
+            self.panel = Color32::from_rgb(0x12, 0x12, 0x14);
+            self.card = Color32::from_rgb(0x18, 0x18, 0x1B);
+            self.field = Color32::from_rgb(0x0C, 0x0C, 0x0E);
+            self.border = Color32::from_rgb(0x2E, 0x2E, 0x34);
+            self.divider = Color32::from_rgb(0x22, 0x22, 0x26);
+            self.hover = Color32::from_rgb(0x1E, 0x1E, 0x22);
+            self.pressed = Color32::from_rgb(0x2A, 0x2A, 0x30);
+        }
+        self
     }
 
     pub fn get(ctx: &egui::Context) -> Self {
@@ -138,9 +176,23 @@ pub struct Press {
     pub down: f32,
 }
 
+/// How thick the keyboard focus ring is, and how far its corners round at most.
+const FOCUS_RING: f32 = 2.0;
+const FOCUS_RADIUS: f32 = 8.0;
+
 impl Press {
+    /// The control's hover and press, and a ring around it while it has keyboard focus (a click
+    /// never gives one focus in egui: only Tab and assistive technology do).
     pub fn track(ui: &egui::Ui, resp: &Response) -> Self {
-        let hot = resp.hovered() || resp.is_pointer_button_down_on();
+        if resp.has_focus() {
+            focus_ring(ui, resp.rect);
+        }
+        Self::track_without_ring(ui, resp)
+    }
+
+    /// [`Self::track`] for a control that draws its own focus ring (craft-ui's buttons and tabs).
+    pub fn track_without_ring(ui: &egui::Ui, resp: &Response) -> Self {
+        let hot = resp.hovered() || resp.is_pointer_button_down_on() || resp.has_focus();
         let ease = egui::emath::easing::quadratic_out;
         // With animation effects off the wash and the press are simply there.
         let (hover, down) = if crate::motion::animated(ui.ctx()) { (0.12, 0.06) } else { (0.0, 0.0) };
@@ -175,6 +227,18 @@ impl Press {
             ui.painter().rect_filled(rect, radius, fill);
         }
     }
+}
+
+/// The keyboard focus ring around `rect`, outside it: the control's own fill, painted after,
+/// would cover a ring inside it. In the accent's text shade: the accent itself is under 3:1 on
+/// the dark theme's surfaces.
+fn focus_ring(ui: &egui::Ui, rect: Rect) {
+    if !rect.is_positive() {
+        return;
+    }
+    let radius = (rect.height() / 2.0).min(FOCUS_RADIUS);
+    let stroke = Stroke::new(FOCUS_RING, Tokens::get(ui.ctx()).accent_text);
+    ui.painter().rect_stroke(rect, radius, stroke, egui::StrokeKind::Outside);
 }
 
 /// Pointing hand, the cursor for a control that clicks.
@@ -371,11 +435,16 @@ pub fn semibold(size: f32) -> FontId {
 }
 
 pub fn apply(ctx: &egui::Context, kind: ThemeKind) {
+    apply_on(ctx, kind, false);
+}
+
+/// [`apply`], in [`Tokens::true_black`] when `black` (the phone layout).
+pub fn apply_on(ctx: &egui::Context, kind: ThemeKind, black: bool) {
     // Keep the native window inherited. A concrete egui theme pins macOS's
     // NSWindow appearance and prevents winit from delivering ThemeChanged.
     // Our saved choice owns the palette; both egui branches receive it below.
     ctx.set_theme(egui::ThemePreference::System);
-    let t = Tokens::for_kind(kind);
+    let t = if black { Tokens::for_kind(kind).true_black() } else { Tokens::for_kind(kind) };
     ctx.data_mut(|d| d.insert_temp(egui::Id::new("pdfcraft-theme"), t));
     let mut v = if t.dark() { Visuals::dark() } else { Visuals::light() };
     v.panel_fill = t.panel;
@@ -665,11 +734,65 @@ mod tests {
         assert_eq!(held.offset(), Vec2::new(0.0, 1.0));
     }
 
+    /// A control with keyboard focus is ringed, and lit as if hovered; without focus, or when it
+    /// draws its own ring, it isn't.
+    #[test]
+    fn keyboard_focus_rings_a_control() {
+        let ctx = egui::Context::default();
+        // Effects off: the wash is there or not, not easing in.
+        ctx.all_styles_mut(|s| s.animation_time = 0.0);
+        let id = egui::Id::new("focus-ring-probe");
+        let frame = |focus: bool, ring: bool| {
+            let mut lit = 0.0;
+            let mut target = Rect::NOTHING;
+            let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
+                let resp = ui.interact(Rect::from_min_size(egui::pos2(20.0, 20.0), Vec2::new(80.0, 30.0)), id, egui::Sense::click());
+                if focus {
+                    resp.request_focus();
+                } else {
+                    resp.surrender_focus();
+                }
+                target = resp.rect;
+                lit = if ring { Press::track(ui, &resp) } else { Press::track_without_ring(ui, &resp) }.hover;
+            });
+            out.textures_delta.clear();
+            let ink = Tokens::get(&ctx).accent_text;
+            let ringed = out.shapes.iter().any(|s| {
+                matches!(&s.shape, egui::Shape::Rect(r) if r.rect == target && r.stroke.color == ink && r.stroke_kind == egui::StrokeKind::Outside)
+            });
+            (ringed, lit)
+        };
+        // Focus asked for one frame is the widget's from the next.
+        let _ = frame(true, true);
+        assert_eq!(frame(true, true), (true, 1.0), "focused: ringed and lit");
+        assert!(!frame(true, false).0, "its own ring: not a second one");
+        let _ = frame(false, true);
+        assert_eq!(frame(false, true), (false, 0.0), "not focused");
+    }
+
+    /// Errors and warnings are read as text, and the focus ring is seen, on every surface of
+    /// their theme. The signature bar's red was 4.1:1 on the light pasteboard and its amber 2.4:1.
+    #[test]
+    fn status_colours_and_the_focus_ring_stand_out() {
+        for kind in [ThemeKind::Light, ThemeKind::Dark] {
+            for t in [Tokens::for_kind(kind), Tokens::for_kind(kind).true_black()] {
+                let look = crate::phone_home::look(&t);
+                for (name, fg) in [("error", t.error), ("warning", t.warning), ("focus ring", t.accent_text)] {
+                    for bg in [t.titlebar, t.chrome, t.panel, t.card, t.pasteboard, t.field, look.ground, look.surface] {
+                        let r = contrast(fg, bg);
+                        assert!(r >= 4.5, "{kind:?} {name} on {bg:?}: {r:.2}:1, WCAG AA needs 4.5:1");
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn text_is_readable_on_every_surface() {
         // #76: the faintest text (hints, zoom level, captions) was 3.3:1 in the light theme.
-        for kind in [ThemeKind::Light, ThemeKind::Dark] {
-            let t = Tokens::for_kind(kind);
+        for (kind, t) in
+            [ThemeKind::Light, ThemeKind::Dark].into_iter().flat_map(|k| [(k, Tokens::for_kind(k)), (k, Tokens::for_kind(k).true_black())])
+        {
             for (name, fg) in [("text", t.text), ("text_muted", t.text_muted), ("text_faint", t.text_faint)] {
                 for bg in [t.chrome, t.panel, t.card, t.pasteboard] {
                     let r = contrast(fg, bg);

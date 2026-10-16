@@ -334,8 +334,18 @@ pub fn system_lang() -> Lang {
     if cfg!(test) {
         return Lang::EN;
     }
-    static SYSTEM: OnceLock<Lang> = OnceLock::new();
-    *SYSTEM.get_or_init(detect_system_lang)
+    *SYSTEM_LANG.get_or_init(detect_system_lang)
+}
+
+/// The system language, found once (see [`system_lang`], [`seed_system_locale`]).
+static SYSTEM_LANG: OnceLock<Lang> = OnceLock::new();
+
+/// Tell Auto the system's locale (`fr_FR`, `pt-BR`) where the environment doesn't carry one
+/// (Android). Only counts before the first lookup; a locale without a catalog means English.
+/// Returns whether it was taken.
+pub fn seed_system_locale(tag: &str) -> bool {
+    let lang = lang_from_tag(tag.trim()).unwrap_or(Lang::EN);
+    SYSTEM_LANG.set(lang).is_ok()
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -404,13 +414,72 @@ pub fn set_current(lang: Lang) {
     CURRENT.set(lang);
 }
 
-/// The language the UI is drawn in.
 /// `label` as it reads inside a sentence ("add a text box"): lowercased, except in languages
 /// that capitalise nouns (German), where lowercasing would misspell it.
 pub fn in_sentence(label: &str) -> std::borrow::Cow<'_, str> {
-    if current().code() == "de" { std::borrow::Cow::Borrowed(label) } else { std::borrow::Cow::Owned(label.to_lowercase()) }
+    if current().code() == "de" { std::borrow::Cow::Borrowed(label) } else { std::borrow::Cow::Owned(lower(label)) }
 }
 
+/// Whether the UI language pairs dotted and dotless i in its capitals (Turkish: i/İ, ı/I),
+/// which Rust's case mapping, the same for every language, doesn't.
+fn dotted_i() -> bool {
+    current().code() == "tr"
+}
+
+/// `text` in capitals as the UI language writes them ("bilgi" is "BİLGİ" in Turkish).
+pub fn upper(text: &str) -> String {
+    if dotted_i() { text.replace('i', "İ").to_uppercase() } else { text.to_uppercase() }
+}
+
+/// `text` in small letters as the UI language writes them ("BİLGİ" is "bilgi", "ILIK" "ılık" in
+/// Turkish; Rust would give "i̇" with a combining dot, and "ilik").
+pub fn lower(text: &str) -> String {
+    if dotted_i() { text.replace('İ', "i").replace('I', "ı").to_lowercase() } else { text.to_lowercase() }
+}
+
+/// `shown`, a label of a right-to-left interface as egui draws it, in reading order for a screen
+/// reader: the catalog keeps its labels in display order ([`crate::bidi::display_rtl`]). `None`
+/// when it reads as drawn, or isn't a label of the catalog (a file name, a filled-in template).
+pub fn spoken(lang: Lang, shown: &str) -> Option<&'static str> {
+    if !lang.0.rtl {
+        return None;
+    }
+    lang.catalog().written(shown)
+}
+
+/// Puts the labels of a right-to-left interface back in reading order for screen readers, as
+/// they leave each frame ([`spoken`]).
+pub(crate) struct SpokenOrder;
+
+impl egui::Plugin for SpokenOrder {
+    fn debug_name(&self) -> &'static str {
+        "pdfcraft-spoken-order"
+    }
+
+    fn output_hook(&mut self, _ctx: &egui::Context, output: &mut egui::FullOutput) {
+        let lang = current();
+        if !lang.0.rtl {
+            return;
+        }
+        let Some(update) = output.platform_output.accesskit_update.as_mut() else { return };
+        for (_, node) in &mut update.nodes {
+            if let Some(text) = node.label().and_then(|s| spoken(lang, s)) {
+                node.set_label(text);
+            }
+            if let Some(text) = node.value().and_then(|s| spoken(lang, s)) {
+                node.set_value(text);
+            }
+            if let Some(text) = node.description().and_then(|s| spoken(lang, s)) {
+                node.set_description(text);
+            }
+            if let Some(text) = node.placeholder().and_then(|s| spoken(lang, s)) {
+                node.set_placeholder(text);
+            }
+        }
+    }
+}
+
+/// The language the UI is drawn in.
 pub fn current() -> Lang {
     CURRENT.get()
 }
@@ -1349,6 +1418,8 @@ mod tests {
             "ΔLOC",
             "+Bin",
             "−Bin",
+            // The unit's symbol is the same in Czech (only kB differs).
+            "{n} MB",
         ];
         let (entries, errors) = parse_entries(cs.0.source, cs.0.plural_forms());
         assert!(errors.is_empty(), "{errors:?}");
@@ -1461,6 +1532,9 @@ mod tests {
             "−Bin",
             "Model",
             "Home / End",
+            // The units' symbols are the same in Turkish.
+            "{n} MB",
+            "{n} KB",
         ];
         let (entries, errors) = parse_entries(tr_lang.0.source, tr_lang.0.plural_forms());
         assert!(errors.is_empty(), "Turkish catalog errors: {errors:?}");
@@ -1723,6 +1797,15 @@ mod tests {
 
     /// French translates every registered command and every All tools group, section and item.
     #[test]
+    fn a_small_file_is_counted_in_the_languages_bytes() {
+        let fr = Lang::from_code("fr").expect("fr registered");
+        assert_eq!(trn(fr, 442, "{n} byte", "{n} bytes"), "442 octets");
+        assert_eq!(trn(fr, 1, "{n} byte", "{n} bytes"), "1 octet");
+        let de = Lang::from_code("de").expect("de registered");
+        assert_eq!(trn(de, 2, "{n} byte", "{n} bytes"), "2 Byte");
+    }
+
+    #[test]
     fn french_covers_commands_and_catalogue() {
         let fr = Lang::from_code("fr").expect("fr registered");
         for command in pdfcraft_engine::commands::COMMANDS {
@@ -1898,6 +1981,19 @@ mod tests {
         set_current(Lang::from_code("de").expect("de registered"));
         assert_eq!(in_sentence("Textfeld"), "Textfeld");
         set_current(Lang::EN);
+    }
+
+    /// Turkish capitals keep the dot on i (İ) and none on ı (I), both ways; elsewhere i is I.
+    #[test]
+    fn turkish_capitals_keep_their_dots() {
+        set_current(Lang::from_code("tr").expect("tr registered"));
+        assert_eq!(upper("dosya bilgileri"), "DOSYA BİLGİLERİ");
+        assert_eq!(upper("ılık"), "ILIK");
+        assert_eq!(lower("BİLGİ ILIK"), "bilgi ılık");
+        assert_eq!(in_sentence("Metin Kutusu İçeriği"), "metin kutusu içeriği");
+        set_current(Lang::EN);
+        assert_eq!(upper("file info"), "FILE INFO");
+        assert_eq!(lower("FILE INFO"), "file info");
     }
 
     #[test]

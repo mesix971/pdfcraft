@@ -3,7 +3,6 @@
 
 use std::sync::Arc;
 
-use egui::{Align, Layout};
 use serde::{Deserialize, Serialize};
 
 use crate::theme::{self, Tokens};
@@ -67,7 +66,7 @@ pub(crate) fn create_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) 
         ui.horizontal(|ui| {
             ui.add(crate::widgets::line(&mut d.category).desired_width(200.0).hint_text(tl!("e.g. My stamps"))).labelled_by(l.id);
             if !categories.is_empty() {
-                egui::ComboBox::from_id_salt("stamp-categories").selected_text("").width(24.0).show_ui(ui, |ui| {
+                crate::widgets::combo("stamp-categories").selected_text("").width(24.0).show_ui(ui, |ui| {
                     for c in &categories {
                         if ui.selectable_label(d.category == *c, c).clicked() {
                             d.category = c.clone();
@@ -84,7 +83,7 @@ pub(crate) fn create_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) 
     ui.add_space(12.0);
     let ok = !d.category.trim().is_empty() && !d.name.trim().is_empty();
     let (mut save, mut cancel) = (false, false);
-    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+    widgets::buttons_row(ui, |ui| {
         if ui.add_enabled_ui(ok, |ui| widgets::pill_button(ui, tl!("OK"), true)).inner.clicked() {
             save = true;
         }
@@ -144,7 +143,7 @@ impl PdfCraftApp {
                 Some(p) if [".png", ".jpg", ".pdf"].iter().any(|e| p.ends_with(e)) => read(self, p.into()),
                 Some(_) => {}
                 None => {
-                    let dialog = rfd::AsyncFileDialog::new()
+                    let dialog = crate::file_dialog::AsyncFileDialog::new()
                         .add_filter(tl!("PDF or image"), &["pdf", "png", "jpg", "jpeg", "tif", "tiff", "gif", "bmp", "jp2", "j2k", "jpx"])
                         .set_title(tl!("Select a file for the stamp"));
                     self.ask_one(crate::pickers::Ask::File(dialog), None, read);

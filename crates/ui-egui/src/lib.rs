@@ -24,6 +24,8 @@ macro_rules! tl_ctx {
 
 mod a11y_ui;
 mod actions_ui;
+#[cfg(not(target_arch = "wasm32"))]
+mod ai_ui;
 mod appearance;
 pub mod canvas;
 mod chrome;
@@ -74,6 +76,10 @@ pub mod bulk_fields;
 mod dialogs;
 mod edit_text_ui;
 mod editing;
+/// The in-app file browser: every file picker on Android (see the module).
+#[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+pub mod file_browser;
+mod file_dialog;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod file_watch;
 mod files;
@@ -89,6 +95,9 @@ mod page_selection_ui;
 mod pageboxes;
 mod palette;
 mod panels;
+pub mod phone;
+mod phone_edit;
+pub mod phone_home;
 #[cfg(not(target_arch = "wasm32"))]
 mod pickers;
 pub mod prepare;
@@ -114,6 +123,14 @@ pub(crate) fn date_text_for_pdf(session: &Session) -> Result<String, String> {
     session.today_text_for_pdf(None, Some(lang))
 }
 
+/// The system's locale (`fr_FR`, `en-US`) for hosts whose environment doesn't carry one
+/// (Android): the Auto interface language and the default unit follow it. Call it before the app
+/// is created; later calls change nothing.
+pub fn set_system_locale(tag: &str) {
+    i18n::seed_system_locale(tag);
+    units::Unit::seed_system_locale(tag);
+}
+
 /// The longest author name kept (Preferences ▸ Identity, restored settings).
 pub(crate) const MAX_AUTHOR_CHARS: usize = 200;
 
@@ -125,6 +142,8 @@ pub mod scroll_speed;
 mod system_fonts;
 mod tab_context;
 pub mod theme;
+pub mod touch;
+mod transition;
 pub mod ui_scale;
 pub mod updates;
 mod wheel_pager;
@@ -137,6 +156,7 @@ pub use editing::{CloseRequest, SaveTarget};
 pub use files::{ExtractDraft, FilePurpose, FileRequest, RotateDraft, SplitDraft, SplitMode, SplitPlan};
 pub use recovery::{AUTOSAVE_SECS, RecoveryMeta, RecoveryStore};
 use theme::{ThemeKind, ThemePreference};
+pub use widgets::ProgressNotice;
 
 /// Top-level workspace modes (Acrobat's mode bar).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -380,6 +400,13 @@ pub enum OsEvent {
 /// Returns the [`OsEvent`]s that arrived since it was last called (set by the desktop app).
 pub type OsEventsFn = Box<dyn FnMut() -> Vec<OsEvent>>;
 
+/// Reads the text on the system clipboard, where egui can't (Android).
+pub type ClipboardTextFn = Box<dyn Fn() -> Option<String>>;
+
+/// Hands a print-ready PDF `(file name, bytes)` to an app that prints it, where there is no print
+/// spooler (Android: the user picks the app). `Err` says why it couldn't.
+pub type HostPrintFn = Box<dyn Fn(&str, Vec<u8>) -> Result<(), String>>;
+
 /// Hands a saved PDF to the page embedding PdfCraft (web): `(name, bytes, save_as)`. `save_as`
 /// is `true` for Save As. Set by the web app when a host page (such as a Nextcloud app) asked
 /// for saves; without it the browser downloads the file.
@@ -463,6 +490,18 @@ pub struct PdfCraftApp {
     /// The user closed the Comments panel, so picking a comment tool leaves it closed until they
     /// open it again (#225). Remembered across restarts.
     pub comments_panel_closed: bool,
+    /// The profile photo Home shows: a small square PNG (signature_image::profile_picture).
+    pub profile_photo: Option<std::sync::Arc<Vec<u8>>>,
+    /// The files starred on Home, newest first.
+    pub starred: Vec<String>,
+    /// The folders the phone's photo grid looks in, instead of the device's camera folder,
+    /// Pictures and Download (tests and automation).
+    pub photo_folders: Vec<std::path::PathBuf>,
+    /// Where Home looks for the device's PDFs; empty: the in-app browser's Download, Documents
+    /// and PdfCraft's own folder (Android).
+    pub device_folders: Vec<std::path::PathBuf>,
+    /// The tips Home no longer shows (dismissed).
+    pub home_tips_dismissed: Vec<String>,
     pub quick_tool: QuickTool,
     /// The tool to go back to when Space, held for a temporary Hand, is released.
     space_hand: Option<QuickTool>,
@@ -471,6 +510,8 @@ pub struct PdfCraftApp {
     /// Resolved colours, including the current OS theme when following the system.
     pub theme: ThemeKind,
     pub theme_preference: ThemePreference,
+    /// The user chose the theme (a phone otherwise follows the system's).
+    pub theme_chosen: bool,
     /// The reading-colours preference (Preferences ▸ Reading colours): applied to every open
     /// document, and documents open with it (Acrobat's Replace Document Colors).
     pub reading_colors: pdfcraft_render::ReadingColors,
@@ -492,8 +533,21 @@ pub struct PdfCraftApp {
     /// The desktop's text scaling (GNOME's text scaling factor), which the desktop app reads at
     /// launch. 1.0 elsewhere, so tests and screenshots don't depend on the machine.
     pub system_text_scale: f32,
+    /// Which shell draws the window: the desktop one, the phone one (`phone.rs`), or the one
+    /// that suits the screen ([`Self::phone_screen`]).
+    pub shell: phone::ShellPref,
+    /// The screen is a phone's (the Android app sets it). With the layout on Auto it gets the
+    /// phone shell.
+    pub phone_screen: bool,
+    /// The phone shell's own state: its bars, sheets and tool mode.
+    pub(crate) phone: phone::PhoneState,
+    /// The AI assistant: the user's own API key, its settings and conversations.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub ai: ai_ui::AiState,
     /// The interface size last given to egui ([`ui_scale::sync`]).
     ui_scale_applied: Option<f32>,
+    /// A finger lifted last frame: its `PointerGone` is delivered this frame ([`touch`]).
+    pointer_gone_pending: bool,
     /// Preferences: bake Fill & Sign marks into the page when saving. Off, so a normal save stays editable.
     pub flatten_fill_sign_on_save: bool,
     /// Point size for new Fill & Sign text and dates, kept across launches.
@@ -526,7 +580,17 @@ pub struct PdfCraftApp {
     pub(crate) watch: file_watch::FileWatch,
     /// Folders pinned to Home, and what they held when last listed.
     pub pinned: folders_ui::PinnedFolders,
+    /// The latest notice and when it was first shown (0 until it is).
     pub toast: Option<(String, f64)>,
+    /// Notices still showing when a newer one came, oldest first: shown above it until their own
+    /// time is up, so two notices close together are both read.
+    pub(crate) toast_earlier: Vec<(String, f64)>,
+    /// The latest notice reports this document's edit, undone by the notice's Undo while the
+    /// document's edit generation is still this one.
+    pub(crate) toast_undo: Option<(DocId, u64)>,
+    /// The latest notice is a step of a job's progress ("page 3 of 10"): the next notice takes
+    /// its place rather than coming under it.
+    pub(crate) toast_progress: bool,
     /// Whether the macOS title bar is drawn by us (traffic lights over our tab strip).
     pub integrated_titlebar: bool,
     pub password_prompt: Option<PasswordPrompt>,
@@ -564,6 +628,15 @@ pub struct PdfCraftApp {
     /// Pick these files instead of showing a picker (tests and automation).
     #[cfg(not(target_arch = "wasm32"))]
     pub pick_override: Option<Vec<String>>,
+    /// The in-app file browser while it shows (Android's pickers; see `file_browser`).
+    #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+    pub(crate) file_browser: Option<file_browser::Browser>,
+    /// Where the in-app browser was last used: the next pick starts there.
+    #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+    pub(crate) file_browser_dir: Option<std::path::PathBuf>,
+    /// Starting points and storage access for the in-app browser (the Android app sets them).
+    #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+    pub file_browser_host: file_browser::Host,
     /// Write exported files (split) here instead of asking (tests and automation).
     pub export_dir_override: Option<String>,
     /// Split dialog settings.
@@ -649,6 +722,14 @@ pub struct PdfCraftApp {
     /// system clipboard as a file when `system_clipboard` is on.
     pub last_copied_file: Option<(String, Vec<u8>)>,
     pub system_clipboard: bool,
+    /// Reads the system clipboard's text where egui can't (Android sets it; Create ▸ Clipboard).
+    pub clipboard_text: Option<ClipboardTextFn>,
+    /// Prints through other apps where there is no spooler (Android sets it): the Print dialog
+    /// lists "Another app" first and hands it the print-ready PDF.
+    pub host_print: Option<HostPrintFn>,
+    /// Sends the app to the back, where the system has one (Android sets it): Back on Home's
+    /// first screen, as the system's own apps do. PdfCraft keeps running where it was.
+    pub to_background: Option<Box<dyn Fn()>>,
     /// Attach file: the file to attach instead of asking (tests, automation).
     pub attach_override: Option<(String, Vec<u8>)>,
     /// Duplicate Field: which field and onto which pages.
@@ -659,6 +740,12 @@ pub struct PdfCraftApp {
     pub recovery: Option<RecoveryStore>,
     /// Entries left by a previous session, offered in the Recovery dialog.
     pub recoverable: Vec<RecoveryMeta>,
+    /// This process's lock in the recovery folder: other PdfCraft windows leave its entries
+    /// alone while it runs.
+    recovery_lock: Option<std::fs::File>,
+    /// Writes autosaves off the UI thread (started with the first one).
+    #[cfg(not(target_arch = "wasm32"))]
+    autosaver: Option<recovery::Autosaver>,
     recovery_keys: std::collections::HashMap<DocId, String>,
     last_autosave: f64,
     allow_quit: bool,
@@ -672,6 +759,8 @@ pub struct PdfCraftApp {
     /// The egui context, for commands that change window or theme state.
     ctx: Option<egui::Context>,
     styled: bool,
+    /// The palette last given to egui is the phone's (true black in the dark theme).
+    theme_black: bool,
     fonts_ready: bool,
     /// The CJK fallback order the installed fonts follow (see `theme::installed_font_definitions`).
     fonts_cjk: theme::CjkPreference,
@@ -810,11 +899,17 @@ impl PdfCraftApp {
             right: None,
             right_before_read: None,
             comments_panel_closed: false,
+            profile_photo: None,
+            starred: Vec::new(),
+            photo_folders: Vec::new(),
+            device_folders: Vec::new(),
+            home_tips_dismissed: Vec::new(),
             quick_tool: QuickTool::Select,
             space_hand: None,
             comment_prefs: Default::default(),
             theme: ThemeKind::Light,
             theme_preference: ThemePreference::Light,
+            theme_chosen: false,
             reading_colors: Default::default(),
             #[cfg(target_os = "linux")]
             desktop_theme: None,
@@ -826,7 +921,13 @@ impl PdfCraftApp {
             language: i18n::AUTO.to_string(),
             ui_scale: None,
             system_text_scale: 1.0,
+            shell: phone::ShellPref::Auto,
+            phone_screen: false,
+            phone: phone::PhoneState::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            ai: ai_ui::AiState::default(),
             ui_scale_applied: None,
+            pointer_gone_pending: false,
             flatten_fill_sign_on_save: false,
             fill_text_size: fill_sign::TEXT_SIZE,
             dialog: None,
@@ -846,6 +947,9 @@ impl PdfCraftApp {
             watch: Default::default(),
             pinned: Default::default(),
             toast: None,
+            toast_earlier: Vec::new(),
+            toast_undo: None,
+            toast_progress: false,
             integrated_titlebar: false,
             password_prompt: None,
             unlock_prompt: None,
@@ -867,6 +971,12 @@ impl PdfCraftApp {
             pickers: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
             pick_override: None,
+            #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+            file_browser: None,
+            #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+            file_browser_dir: None,
+            #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+            file_browser_host: file_browser::Host::default(),
             export_dir_override: None,
             split_draft: SplitDraft::default(),
             extract_draft: ExtractDraft::default(),
@@ -915,12 +1025,18 @@ impl PdfCraftApp {
             last_copied_image: None,
             last_copied_file: None,
             system_clipboard: true,
+            clipboard_text: None,
+            host_print: None,
+            to_background: None,
             attach_override: None,
             duplicate_draft: None,
             form_preview: false,
             window_title: String::new(),
             recovery: None,
             recoverable: Vec::new(),
+            recovery_lock: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            autosaver: None,
             recovery_keys: Default::default(),
             last_autosave: 0.0,
             allow_quit: false,
@@ -929,6 +1045,7 @@ impl PdfCraftApp {
             dialog_epoch: 0,
             ctx: None,
             styled: false,
+            theme_black: false,
             fonts_ready: false,
             fonts_cjk: theme::CjkPreference::Default,
             control: None,
@@ -968,7 +1085,14 @@ impl PdfCraftApp {
     /// Fields are being edited (Prepare a form is open or a field tool is picked), unless the
     /// form is being previewed.
     pub fn is_preparing(&self) -> bool {
-        ((self.left_open && self.left == LeftPanel::Tool("form")) || matches!(self.quick_tool, QuickTool::Field(_))) && !self.form_preview
+        (self.tool_panel_shows("form") || matches!(self.quick_tool, QuickTool::Field(_))) && !self.form_preview
+    }
+
+    /// Whether the tool panel is open on tool group `id`. The phone layout shows it in its tool
+    /// drawer, so a panel left open in the desktop layout changes nothing there.
+    pub(crate) fn tool_panel_shows(&self, id: &str) -> bool {
+        let open = if self.phone_layout() { self.phone_drawer() } else { self.left_open };
+        open && self.left_open && matches!(self.left, LeftPanel::Tool(t) if t == id)
     }
 
     /// Open a document the way it asks to be opened: navigation panel, layout, magnification,
@@ -1231,7 +1355,7 @@ impl PdfCraftApp {
             }
             (Ok(bytes), false) => {
                 #[cfg(not(target_arch = "wasm32"))]
-                self.ask_one(pickers::Ask::Save(rfd::AsyncFileDialog::new().set_file_name(&att.name)), None, move |app, path| {
+                self.ask_one(pickers::Ask::Save(crate::file_dialog::AsyncFileDialog::new().set_file_name(&att.name)), None, move |app, path| {
                     match crate::editing::write_atomically(&path.to_string_lossy(), &bytes) {
                         Ok(()) => app.notify_fmt("Saved {name}", &[("name", &path.display().to_string())]),
                         Err(e) => app.notify_fmt("Couldn't save: {e}", &[("e", &e.to_string())]),
@@ -1403,8 +1527,10 @@ impl PdfCraftApp {
 
     /// The File ▸ Open picker: PDFs, and images and text that become PDFs.
     #[cfg(not(target_arch = "wasm32"))]
-    fn open_picker() -> rfd::AsyncFileDialog {
-        rfd::AsyncFileDialog::new().add_filter("PDF", &["pdf"]).add_filter(tl!("Images and text (converted to PDF)"), &create_ui::CONVERTIBLE)
+    fn open_picker() -> crate::file_dialog::AsyncFileDialog {
+        crate::file_dialog::AsyncFileDialog::new()
+            .add_filter("PDF", &["pdf"])
+            .add_filter(tl!("Images and text (converted to PDF)"), &create_ui::CONVERTIBLE)
     }
 
     pub fn open_dialog(&mut self) {
@@ -1412,7 +1538,9 @@ impl PdfCraftApp {
         #[cfg(not(target_arch = "wasm32"))]
         self.pick(
             pickers::PickFor::Open,
-            rfd::AsyncFileDialog::new().add_filter("PDF", &["pdf"]).add_filter(tl!("Images and text (converted to PDF)"), &create_ui::CONVERTIBLE),
+            crate::file_dialog::AsyncFileDialog::new()
+                .add_filter("PDF", &["pdf"])
+                .add_filter(tl!("Images and text (converted to PDF)"), &create_ui::CONVERTIBLE),
             true,
         );
         // Browsers pick files asynchronously; the bytes arrive through `inbox`.
@@ -1421,7 +1549,7 @@ impl PdfCraftApp {
             let inbox = self.inbox.clone();
             let ctx = self.ctx.clone();
             wasm_bindgen_futures::spawn_local(async move {
-                if let Some(h) = rfd::AsyncFileDialog::new()
+                if let Some(h) = crate::file_dialog::AsyncFileDialog::new()
                     .add_filter("PDF", &["pdf"])
                     .add_filter(tl!("Images and text"), &create_ui::CONVERTIBLE)
                     .pick_file()
@@ -1475,6 +1603,15 @@ impl PdfCraftApp {
             || self.unlock_prompt.is_some()
             || self.pending_link.is_some()
             || self.updates.open
+            || self.file_browser_open()
+    }
+
+    /// The in-app file browser shows (it is a modal over everything else).
+    fn file_browser_open(&self) -> bool {
+        #[cfg(all(not(target_arch = "wasm32"), any(test, target_os = "android")))]
+        return self.file_browser.is_some();
+        #[cfg(not(all(not(target_arch = "wasm32"), any(test, target_os = "android"))))]
+        false
     }
 
     /// Enable the UI control channel on `ctx` (opt-in; see [`control`]). Returns a client that
@@ -1527,7 +1664,39 @@ impl PdfCraftApp {
     }
 
     pub fn notify(&mut self, msg: impl Into<String>) {
-        self.toast = Some((msg.into(), 0.0));
+        let msg = msg.into();
+        // The notice showing stays, above the new one, until its time is up (a progress step
+        // goes: what follows says more).
+        let progress = std::mem::take(&mut self.toast_progress);
+        if let Some(earlier) = self.toast.take().filter(|(m, _)| *m != msg && !progress) {
+            self.toast_earlier.push(earlier);
+            let extra = self.toast_earlier.len().saturating_sub(widgets::EARLIER_TOASTS);
+            self.toast_earlier.drain(..extra);
+        }
+        self.toast_undo = None;
+        self.toast = Some((msg, 0.0));
+    }
+
+    /// Take every notice off the screen: what they said no longer holds (the import an error was
+    /// about has now worked).
+    pub(crate) fn clear_notices(&mut self) {
+        self.toast = None;
+        self.toast_earlier.clear();
+        self.toast_undo = None;
+        self.toast_progress = false;
+    }
+
+    /// Say how far a job has got: the next notice, its next step or its outcome, takes this one's
+    /// place rather than stacking under it.
+    pub(crate) fn notify_progress(&mut self, msg: impl Into<String>) {
+        self.notify(msg);
+        self.toast_progress = true;
+    }
+
+    /// Give the notice just shown an Undo for the edit it reports: the active document's last.
+    /// It goes once anything else changes the document.
+    pub(crate) fn offer_undo(&mut self) {
+        self.toast_undo = self.active_ids().and_then(|(_, id)| self.session.get(id).map(|d| (id, d.edit_generation())));
     }
 
     /// Notify with a static message in the UI language.
@@ -1546,11 +1715,32 @@ impl PdfCraftApp {
         self.notify(i18n::fmt(tl!(template), args));
     }
 
+    /// Whether pages are shown dark (the night reading colours).
+    pub fn dark_pages(&self) -> bool {
+        self.reading_colors == pdfcraft_render::ReadingColors::NIGHT
+    }
+
+    /// Show pages dark (light grey text on a black page), or no longer: other reading colours
+    /// chosen in Preferences are left as they are.
+    pub fn set_dark_pages(&mut self, on: bool) {
+        if on {
+            self.set_reading_colors(pdfcraft_render::ReadingColors::NIGHT);
+        } else if self.dark_pages() {
+            self.set_reading_colors(pdfcraft_render::ReadingColors::default());
+        }
+    }
+
+    /// The colours the phone layout wants for the system's status bar (above) and navigation bar
+    /// (below), as this frame drew the screen's top and bottom; `None` outside the phone layout.
+    pub fn phone_system_bars(&self) -> Option<(egui::Color32, egui::Color32)> {
+        self.phone.system_bars
+    }
+
     pub fn set_theme_preference(&mut self, preference: ThemePreference) {
         self.theme_preference = preference;
         if let Some(ctx) = self.ctx.clone() {
             self.sync_theme(&ctx);
-            theme::apply(&ctx, self.theme);
+            self.apply_theme(&ctx);
         } else {
             self.theme = preference.resolve(None, ThemeKind::Light);
         }
@@ -1603,8 +1793,14 @@ impl PdfCraftApp {
         let kind = self.theme_preference.resolve(system, ThemeKind::Light);
         if kind != self.theme {
             self.theme = kind;
-            theme::apply(ctx, kind);
+            self.apply_theme(ctx);
         }
+    }
+
+    /// Give egui the theme's palette: in true black on a phone (its dark theme's ground and bars).
+    fn apply_theme(&mut self, ctx: &egui::Context) {
+        self.theme_black = self.phone_layout();
+        theme::apply_on(ctx, self.theme, self.theme_black);
     }
 
     /// Run a catalogue command. Commands that aren't implemented yet say which milestone ships them.
@@ -1745,7 +1941,9 @@ impl PdfCraftApp {
     /// Serialize the user's persistent state (recent files, theme). Local only.
     pub fn persist(&self) -> String {
         let trusted: Vec<String> = self.session.trusted_certificates().iter().map(pdfcraft_engine::sign::x509::to_pem).collect();
-        serde_json::json!({
+        // The web build adds nothing to it.
+        #[cfg_attr(target_arch = "wasm32", allow(unused_mut))]
+        let mut settings = serde_json::json!({
             "docking": self.docking,
             "docking_left_open": self.left_open,
             "docking_right": self.right,
@@ -1756,6 +1954,7 @@ impl PdfCraftApp {
             "reload_changed_files": self.reload_changed_files,
             "pinned_folders": self.pinned.folders,
             "theme": self.theme_preference,
+            "theme_chosen": self.theme_chosen,
             "scroll_speed": self.scroll_speed,
             "animation_effects": self.animation_effects,
             "default_mode": self.default_mode,
@@ -1767,6 +1966,7 @@ impl PdfCraftApp {
             "reading_colors": self.reading_colors,
             // Null follows the system's text scaling.
             "ui_scale": self.ui_scale,
+            "shell": self.shell,
             "flatten_fill_sign": self.flatten_fill_sign_on_save,
             "fill_text_size": self.fill_text_size,
             "date_format": self.session.date_format(),
@@ -1802,8 +2002,32 @@ impl PdfCraftApp {
             "combine_view": self.combine_view.as_str(),
             "combine_zoom": self.combine_zoom,
             "comments_panel_closed": self.comments_panel_closed,
-        })
-        .to_string()
+        });
+        // Home: starred files, dismissed tips, and the profile photo (a small PNG, as signature images are).
+        if let Some(map) = settings.as_object_mut() {
+            use base64::Engine as _;
+            map.insert("starred".into(), serde_json::json!(self.starred));
+            map.insert("home_tips_dismissed".into(), serde_json::json!(self.home_tips_dismissed));
+            let photo = self.profile_photo.as_ref().map(|png| base64::engine::general_purpose::STANDARD.encode(png.as_slice()));
+            map.insert("profile_photo".into(), serde_json::json!(photo));
+        }
+        // The AI assistant: the service asked, and each one's key (the user's own) and model, kept
+        // with the other settings (app-private storage on Android, the user's settings file
+        // elsewhere).
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(map) = settings.as_object_mut() {
+            let by_service = |values: &[String; 4]| {
+                serde_json::Value::Object(pdfcraft_ai::Provider::ALL.iter().zip(values).map(|(p, v)| (p.id().to_owned(), v.clone().into())).collect())
+            };
+            map.insert("ai_provider".into(), self.ai.provider.id().into());
+            map.insert("ai_keys".into(), by_service(&self.ai.keys));
+            map.insert("ai_models".into(), by_service(&self.ai.models));
+            map.insert("ai_url".into(), self.ai.base_url.clone().into());
+            map.insert("ai_key_host".into(), self.ai.key_host.clone().into());
+            map.insert("ai_reads_pdfs".into(), self.ai.reads_pdfs.into());
+            map.insert("ai_max_pages".into(), self.ai.max_pages.into());
+        }
+        settings.to_string()
     }
 
     /// Restore state written by `persist`. Unknown or malformed data is ignored.
@@ -1840,6 +2064,8 @@ impl PdfCraftApp {
         }
         self.pinned.restore(&v["pinned_folders"]);
         if let Ok(preference) = serde_json::from_value::<ThemePreference>(v["theme"].clone()) {
+            // Settings from before the choice was kept: a theme other than the system's was one.
+            self.theme_chosen = v["theme_chosen"].as_bool().unwrap_or(preference != ThemePreference::System);
             self.set_theme_preference(preference);
         }
         if let Ok(speed) = serde_json::from_value::<scroll_speed::ScrollSpeed>(v["scroll_speed"].clone()) {
@@ -1860,8 +2086,76 @@ impl PdfCraftApp {
         if let Some(on) = v["highlight_fields"].as_bool() {
             self.view_defaults.highlight_fields = on;
         }
+        // Settings are untrusted: a key, a model or an address that isn't one line of plain
+        // characters is dropped, a known service's model must be one it offers, and the page limit
+        // is kept within what the services read.
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            use pdfcraft_ai::Provider;
+            let plain = |v: &serde_json::Value, max: usize| {
+                v.as_str().map(str::trim).filter(|s| s.len() <= max && s.bytes().all(|b| b.is_ascii_graphic())).map(str::to_owned)
+            };
+            if let Some(provider) = v["ai_provider"].as_str().and_then(Provider::from_id) {
+                self.ai.provider = provider;
+            }
+            for p in Provider::ALL {
+                // Before there were several services, the one key and model were Anthropic's.
+                let (key, model) = if p == Provider::Anthropic && v.get("ai_keys").is_none() {
+                    (&v["ai_key"], &v["ai_model"])
+                } else {
+                    (&v["ai_keys"][p.id()], &v["ai_models"][p.id()])
+                };
+                if let Some(key) = plain(key, 512)
+                    && let Some(slot) = self.ai.keys.get_mut(p.index())
+                {
+                    *slot = key;
+                }
+                if let Some(model) = plain(model, 200).filter(|m| p == Provider::Compatible || p.models().any(|k| k.id == m))
+                    && let Some(slot) = self.ai.models.get_mut(p.index())
+                {
+                    *slot = model;
+                }
+            }
+            if let Some(url) = plain(&v["ai_url"], 2048) {
+                self.ai.base_url = url;
+            }
+            if let Some(host) = plain(&v["ai_key_host"], 2048) {
+                self.ai.key_host = host;
+            }
+            if let Some(on) = v["ai_reads_pdfs"].as_bool() {
+                self.ai.reads_pdfs = on;
+            }
+            if let Some(pages) = v["ai_max_pages"].as_u64().and_then(|p| usize::try_from(p).ok()) {
+                self.ai.max_pages = pages.clamp(1, pdfcraft_ai::API_MAX_PAGES);
+            }
+        }
         if let Some(closed) = v["comments_panel_closed"].as_bool() {
             self.comments_panel_closed = closed;
+        }
+        // Settings are untrusted: lists are capped, and a photo is kept only if it reads as one.
+        if let Some(starred) = v["starred"].as_array() {
+            // Files only ("doc:" names a document without one, never kept), each once. A file
+            // not found now stays: shared storage reads as empty until access is allowed.
+            let mut seen = std::collections::HashSet::new();
+            self.starred = starred
+                .iter()
+                .filter_map(serde_json::Value::as_str)
+                .filter(|p| !p.is_empty() && p.len() <= 4096 && !p.starts_with("doc:") && seen.insert(*p))
+                .take(phone_home::MAX_STARRED)
+                .map(str::to_owned)
+                .collect();
+        }
+        if let Some(tips) = v["home_tips_dismissed"].as_array() {
+            self.home_tips_dismissed =
+                tips.iter().filter_map(serde_json::Value::as_str).filter(|t| t.len() <= 64).take(32).map(str::to_owned).collect();
+        }
+        if let Some(encoded) = v["profile_photo"].as_str() {
+            use base64::Engine as _;
+            self.profile_photo = base64::engine::general_purpose::STANDARD
+                .decode(encoded)
+                .ok()
+                .filter(|png| pdfcraft_engine::signature_image::profile_picture_pixels(png).is_some())
+                .map(std::sync::Arc::new);
         }
         if let Some(defaults) = v["default_zoom"].as_str().and_then(|zoom| self.view_defaults.with_zoom(zoom)) {
             self.view_defaults = defaults;
@@ -1882,6 +2176,8 @@ impl PdfCraftApp {
         }
         // Settings are untrusted: a size out of range follows the system instead.
         self.ui_scale = v["ui_scale"].as_f64().and_then(ui_scale::valid);
+        // An unknown layout keeps Auto.
+        self.shell = serde_json::from_value(v["shell"].clone()).unwrap_or_default();
         // Settings are untrusted: an unusable pattern keeps the default.
         if let Some(f) = v["date_format"].as_str() {
             let _ = self.session.set_date_format(f);
@@ -1977,6 +2273,8 @@ impl PdfCraftApp {
                     "dark" => ThemePreference::Dark,
                     _ => return Err("theme must be light, dark, or system".into()),
                 };
+                // A theme set from outside (automation, a script) is a choice too.
+                self.theme_chosen = true;
                 self.set_theme_preference(preference);
             }
             ("scroll_speed", _) => {
@@ -2017,7 +2315,20 @@ impl PdfCraftApp {
                 self.select_tool(g.id);
             }
             ("left", _) => self.left_open = value != "closed",
+            ("shell", _) => self.shell = phone::ShellPref::parse(value).ok_or("shell must be auto or phone")?,
             ("home", _) => self.active = None,
+            ("phone", _) => self.open_phone_screen(value)?,
+            ("dark_pages", _) => match value {
+                "on" => self.set_dark_pages(true),
+                "off" => self.set_dark_pages(false),
+                _ => return Err("dark_pages must be on or off".into()),
+            },
+            ("home_tab", _) => {
+                // A wrong value changes nothing, not even the document shown.
+                let tab = phone_home::HomeTab::parse(value).ok_or("home_tab must be home, files, create or tools")?;
+                self.active = None;
+                self.phone.home.tab = tab;
+            }
             ("dialog", _) => {
                 self.dialog = match value {
                     "properties" => Some(Dialog::Properties(PropsTab::Description)),
@@ -2374,6 +2685,13 @@ impl eframe::App for PdfCraftApp {
     /// would keep the place the pointer entered at: tell it where the pointer really is, so the
     /// page grid can show (and use) the gap under it.
     fn raw_input_hook(&mut self, ctx: &egui::Context, raw: &mut egui::RawInput) {
+        // A tap's position must outlive its release frame, or links and fields never see it.
+        touch::defer_pointer_gone(raw, &mut self.pointer_gone_pending);
+        if self.pointer_gone_pending {
+            // Deliver it next frame even when nothing else asks for one, or the finger's last
+            // place keeps showing as a hover.
+            ctx.request_repaint();
+        }
         // Before egui reads this frame's wheel input.
         self.scroll_speed.apply(ctx, raw);
         if raw.hovered_files.is_empty() && raw.dropped_files.is_empty() {
@@ -2399,9 +2717,10 @@ impl eframe::App for PdfCraftApp {
         let cjk = theme::CjkPreference::for_language(lang.code());
         if !self.styled {
             egui_extras::install_image_loaders(ctx);
+            ctx.add_plugin(i18n::SpokenOrder);
             theme::install_fonts_for(ctx, cjk);
             self.fonts_cjk = cjk;
-            theme::apply(ctx, self.theme);
+            self.apply_theme(ctx);
             self.styled = true;
         } else {
             self.fonts_ready = true;
@@ -2412,8 +2731,15 @@ impl eframe::App for PdfCraftApp {
             }
         }
         self.sync_theme(ctx);
+        // The shell changed (a preview switched to the phone's): its palette with it.
+        if self.theme_black != self.phone_layout() {
+            self.apply_theme(ctx);
+        }
         let native = ctx.native_pixels_per_point().unwrap_or(1.0);
-        ui_scale::sync(ctx, ui_scale::zoom(self.ui_scale, self.system_text_scale, native), &mut self.ui_scale_applied);
+        let width = ctx.input(|i| i.viewport_rect().width()) * ctx.zoom_factor();
+        ui_scale::sync(ctx, ui_scale::zoom(self.ui_scale, self.auto_text_scale(width), native), &mut self.ui_scale_applied);
+        // The phone layout shows dialogs as screens of their own.
+        widgets::set_phone_dialogs(ctx, self.phone_layout());
         // Remember user work even if its tab is subsequently closed or Home is selected.
         self.startup_superseded |= !self.views.is_empty() || self.combine_showing() || self.dialog.is_some() || self.password_prompt.is_some();
         // Also done in `raw_input_hook`, before input; here for hosts that don't call the hook.
@@ -2503,6 +2829,10 @@ impl eframe::App for PdfCraftApp {
         self.poll_print();
         // Shortcuts deferred last frame: the text field has taken that frame's typing since.
         let deferred = std::mem::take(&mut self.deferred_commands);
+        // The phone layout's Back first: it takes the Escape it uses.
+        if self.phone_layout() {
+            phone::back_key(self, ctx);
+        }
         self.shortcuts(ctx);
         // Scrolling and group-drag previews are transient: never resume after changing tabs,
         // opening a modal/palette, or returning to a window that lost focus.
@@ -2525,6 +2855,8 @@ impl eframe::App for PdfCraftApp {
         }
         self.poll_export();
         self.poll_ocr();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.poll_ai();
         self.poll_optimize();
         self.poll_action();
         self.process_file_requests();
@@ -2554,6 +2886,20 @@ impl eframe::App for PdfCraftApp {
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
             self.window_title = title;
         }
+        if self.phone_layout() {
+            // The phone shell: its own bars and sheets around the same page view. Its reader hides
+            // the bars at a tap, so it has no separate full screen.
+            phone::show(self, ui);
+            self.process_pending_edits();
+            palette::show(self, &ctx);
+            dialogs::show(self, &ctx);
+            self.show_progress(&ctx);
+            widgets::toast(self, &ctx);
+            self.finish_render_frame(&ctx);
+            return;
+        }
+        // A phone screen's slide, cut short by a switch to the desktop layout, ends here.
+        ctx.set_transform_layer(ui.layer_id(), egui::emath::TSTransform::IDENTITY);
         if self.full_screen && self.active.is_some() {
             // Full screen: the page, nothing else (Esc or ⌘L to leave).
             let t = theme::Tokens::get(&ctx);

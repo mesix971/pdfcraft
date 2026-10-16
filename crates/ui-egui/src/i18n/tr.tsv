@@ -2334,3 +2334,148 @@ animation effects	Off	Kapalı
 	The linked PDF opened, but its named destination was not applied.	Bağlantılı PDF açıldı, ancak adlandırılmış hedefi uygulanmadı.
 	The linked PDF opened, but its page destination was out of range.	Bağlantılı PDF açıldı, ancak sayfa hedefi aralık dışında.
 	Local cross-PDF links require the desktop app	PDF'ler arası yerel bağlantılar masaüstü uygulamasını gerektirir
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Dahili depolama
+	Documents	Belgeler
+	PdfCraft files	PdfCraft dosyaları
+	SD card {name}	SD kart {name}
+	Couldn't create the folder {name}: {e}	{name} klasörü oluşturulamadı: {e}
+	Choose this folder	Bu klasörü seç
+	{name} already exists. Replace it?	{name} zaten var. Değiştirilsin mi?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Bu cihazın herhangi bir yerinde dosya açıp kaydetmek için PdfCraft'ın tüm dosyaları yönetmesine izin verin.
+	Allow access	Erişime izin ver
+	All files	Tüm dosyalar
+	This folder is empty	Bu klasör boş
+	New folder	Yeni klasör
+
+# Printing through another app (Android)
+	Another app	Başka bir uygulama
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Yazdırmaya hazır PDF seçtiğiniz uygulamada açılır ve o uygulama kendi kopya, çift taraflı ve renk ayarlarıyla yazdırır.
+	Couldn't hand {name} to another app: {e}	{name} başka bir uygulamaya aktarılamadı: {e}
+phone bar	Edit	Düzenle
+	Send	Gönder
+	Thinking…	Düşünüyor…
+	Anthropic API key	Anthropic API anahtarı
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	Sorunuz ve açık belge, yalnızca siz istediğinizde, kendi API anahtarınızla Anthropic'e (Claude) gönderilir. İstekler Anthropic hesabınızdan ücretlendirilir.
+	Most pages sent per question	Soru başına en fazla gönderilen sayfa
+	Translate page {n}	{n}. sayfayı çevir
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} token
+	The answer stopped at its length limit.	Yanıt en fazla uzunluğunda kesildi.
+	Add your Anthropic API key to use the assistant.	Asistanı kullanmak için Anthropic API anahtarınızı ekleyin.
+	The API key was refused. Check it in the assistant's settings.	API anahtarı reddedildi. Asistanın ayarlarından kontrol edin.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	Bu belge {pages} sayfa; asistan en fazla {max} sayfa okur. Sınırı asistanın ayarlarından artırın.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	Bu belge asistan için çok büyük ({mb} MB, en fazla {max} MB).
+	Too many requests right now. Try again in a moment.	Şu anda çok fazla istek var. Biraz sonra yeniden deneyin.
+	The request was declined ({reason}).	İstek reddedildi ({reason}).
+	Couldn't reach the AI service: {error}	Yapay zekâ hizmetine ulaşılamadı: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	API anahtarı geçerli değil: asistanın ayarlarına yeniden yapıştırın.
+	The assistant gave no answer. Try asking differently.	Asistan bir yanıt vermedi. Farklı bir şekilde sormayı deneyin.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Anthropic hesabınız bu modeli kullanamıyor veya kredisi kalmadı: {error}
+	The AI service answered: {error}	Yapay zekâ hizmetinin yanıtı: {error}
+	{tokens} tokens	{tokens} token
+	New conversation	Yeni sohbet
+	Proposed changes	Önerilen değişiklikler
+	Applied	Uygulandı
+	Discarded	Vazgeçildi
+	The document has no page {page}.	Belgede {page}. sayfa yok.
+	The passage wasn't found on page {page}.	Pasaj {page}. sayfada bulunamadı.
+	The document refused the change.	Belge değişikliği reddetti.
+	Applied as one step: Undo takes them all back.	Tek adımda uygulanır: Geri al hepsini geri alır.
+	The passage appears more than once on page {page}.	Pasaj {page}. sayfada birden fazla kez geçiyor.
+	It overlaps another proposed change.	Önerilen başka bir değişiklikle çakışıyor.
+	A PDF on this device.	Bu cihazdaki bir PDF.
+	Add my name	Adımı ekle
+	Add to Starred	Favorilere ekle
+	Add your name and a photo. Your name also signs your comments.	Adınızı ve bir fotoğraf ekleyin. Adınız yorumlarınızı da imzalar.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Dosyalarınıza erişim izni verin, PdfCraft bu cihazdaki PDF'leri listelesin.
+	An empty page to start from.	Başlamak için boş bir sayfa.
+	Change its text and pictures.	Metnini ve görsellerini değiştirin.
+	Choose a photo	Fotoğraf seç
+	Files	Dosyalar
+	Fill in a form and sign it.	Bir formu doldurup imzalayın.
+	From photos, scans or other files.	Fotoğraflardan, taramalardan veya diğer dosyalardan.
+	Hello, {name}	Merhaba, {name}
+	It shows on Home and signs your comments.	Ana sayfada görünür ve yorumlarınızı imzalar.
+	Make PdfCraft yours	PdfCraft'ı kendinize göre ayarlayın
+	More for {name}	{name} için diğer seçenekler
+	No PDFs found.	PDF bulunamadı.
+	No files match.	Eşleşen dosya yok.
+	No recent files yet.	Henüz son dosya yok.
+	No starred files.	Favori dosya yok.
+	On this device	Bu cihazda
+	Open another file…	Başka bir dosya aç…
+	PDFs on this device	Bu cihazdaki PDF'ler
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft, İndirilenler, Belgeler ve kendi klasöründe arar.
+	Photos and scans become the pages of a new PDF.	Fotoğraflar ve taramalar yeni bir PDF'nin sayfaları olur.
+	Pictures	Görseller
+	Places	Konumlar
+	Profile	Profil
+	Remove from Starred	Favorilerden kaldır
+	Remove the photo	Fotoğrafı kaldır
+	Search files	Dosya ara
+	See your PDFs	PDF'lerinizi görün
+	Set up	Ayarla
+	Several PDFs and pictures in one document.	Birden çok PDF ve görsel tek bir belgede.
+	Star a file from its menu to find it here.	Bir dosyayı burada bulmak için menüsünden favorilere ekleyin.
+	Starred	Favoriler
+	Summarize, ask and translate.	Özetleyin, sorun, çevirin.
+	Summarize, question and correct your PDFs with Claude, with your own key.	PDF'lerinizi kendi anahtarınızla Claude ile özetleyin, sorgulayın ve düzeltin.
+	Text, pictures and other files, converted to PDF.	PDF'ye dönüştürülmüş metin, görseller ve diğer dosyalar.
+	The files you open show here.	Açtığınız dosyalar burada görünür.
+	What would you like to do?	Ne yapmak istersiniz?
+	Which document?	Hangi belge?
+	Your AI assistant	Yapay zekâ asistanınız
+file state	Open	Açık
+	Choose a PNG or JPEG picture.	PNG veya JPEG görseli seçin.
+	This picture is too large.	Bu görsel çok büyük.
+	Couldn't use this picture: {e}	Bu görsel kullanılamadı: {e}
+	Couldn't use this picture.	Bu görsel kullanılamadı.
+	{n} MB	{n} MB
+	{n} KB	{n} KB
+decimal separator	.	,
+	Other folders…	Diğer klasörler…
+	Looking for photos…	Fotoğraflar aranıyor…
+	See your photos	Fotoğraflarınızı görün
+	Allow PdfCraft to see your photos, and choose one here.	PdfCraft'ın fotoğraflarınızı görmesine izin verin ve buradan birini seçin.
+	No photos found.	Fotoğraf bulunamadı.
+	PdfCraft shows the photos in Camera, Pictures and Download.	PdfCraft, Kamera, Görseller ve İndirilenler klasörlerindeki fotoğrafları gösterir.
+	Automatic	Otomatik
+	Dark mode	Koyu mod
+	Dark pages	Koyu sayfalar
+	Light text on a dark page, for reading at night.	Koyu sayfada açık renkli metin, gece okumak için.
+	Night	Gece
+	Downloads	İndirilenler
+	Choose a file	Dosya seç
+	Choose files	Dosyaları seç
+	Choose a folder	Klasör seç
+	Tap to unlock	Kilidi açmak için dokunun
+	Browse folders	Klasörlere göz at
+	Combined from top to bottom. Use the arrows to change the order.	Yukarıdan aşağıya birleştirilir. Sırayı değiştirmek için okları kullanın.
+	PDFs and pictures, combined into one PDF in the order you choose.	PDF'ler ve resimler, seçtiğiniz sırayla tek bir PDF'de birleştirilir.
+	Smaller text	Daha küçük metin
+	Larger text	Daha büyük metin
+	Flip	Çevir
+	Tap text or a picture to change it	Değiştirmek için bir metne veya resme dokunun
+	Tap where the text goes	Metnin gideceği yere dokunun
+	White	Beyaz
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	Sorunuz ve açık belge, yalnızca siz istediğinizde, kendi API anahtarınızla seçtiğiniz hizmete gönderilir. İstekler o hizmetteki hesabınıza faturalandırılır.
+	Service	Hizmet
+	Another service (OpenAI-compatible)	Başka bir hizmet (OpenAI uyumlu)
+	API key	API anahtarı
+	On Google's free tier, what you send may be used to improve Google's products.	Google'ın ücretsiz katmanında gönderdikleriniz Google ürünlerini geliştirmek için kullanılabilir.
+	Fill in for	Şunun için doldur:
+	Service address	Hizmet adresi
+	API key (if the service asks for one)	API anahtarı (hizmet isterse)
+	The service reads PDF files	Hizmet PDF dosyalarını okur
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	Aksi halde belgenin metni sayfa sayfa gönderilir (resimleri ve taramaları olmadan).
+	Add your API key for {service} in the assistant's settings.	{service} API anahtarınızı asistanın ayarlarından ekleyin.
+	Your {service} account can't use this model, or has no credit left: {error}	{service} hesabınız bu modeli kullanamıyor veya kredisi kalmadı: {error}
+	Choose the model to ask in the assistant's settings.	Sorulacak modeli asistanın ayarlarından seçin.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	Bu belgede gönderilecek metin yok (taranmış mı?). PDF dosyalarını okuyan bir hizmet seçin veya önce metnini tanıyın.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	Bu belgenin metni asistan için çok uzun ({chars} karakter, en fazla {max}).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	PDF'lerinizi kendi anahtarınızla Claude, ChatGPT veya Gemini ile özetleyin, sorgulayın ve düzeltin.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	Hizmet adresi geçerli değil: https:// ile başlar (http:// yalnızca bu cihaz veya yerel ağ için).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	Bu belge içeriğinin kopyalanmasına izin vermiyor, bu yüzden asistana gönderilmez.
+	Try again	Tekrar dene
+	Price per million tokens read / written	Okunan / yazılan milyon token başına fiyat

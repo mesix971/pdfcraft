@@ -251,3 +251,20 @@ fn checker_finding_opens_its_structure_tag() {
     h.run_steps(2);
     assert_eq!(h.state().right, Some(RightPanel::Accessibility), "an unfinished tag edit is preserved");
 }
+
+/// In the Arabic interface a screen reader gets each label in reading order: egui draws them in
+/// display order, the words of a line the other way round.
+#[test]
+fn arabic_labels_reach_screen_readers_in_reading_order() {
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_cc| {
+        let mut app = PdfCraftApp::new();
+        app.set_option("language", "ar").unwrap();
+        app
+    });
+    h.run_steps(4);
+    // "Keyboard shortcuts" as the catalog writes it, and as it is drawn.
+    let written = "\u{627}\u{62e}\u{62a}\u{635}\u{627}\u{631}\u{627}\u{62a} \u{644}\u{648}\u{62d}\u{629} \u{627}\u{644}\u{645}\u{641}\u{627}\u{62a}\u{64a}\u{62d}";
+    let drawn = "\u{627}\u{644}\u{645}\u{641}\u{627}\u{62a}\u{64a}\u{62d} \u{644}\u{648}\u{62d}\u{629} \u{627}\u{62e}\u{62a}\u{635}\u{627}\u{631}\u{627}\u{62a}";
+    assert!(h.query_by_label(written).is_some(), "read as written");
+    assert!(h.query_by_label(drawn).is_none(), "not as drawn");
+}

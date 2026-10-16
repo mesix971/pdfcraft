@@ -2212,3 +2212,151 @@ animation effects	Off	關
 	The linked PDF opened, but its page destination was out of range.	已開啟連結的 PDF，但其頁面目的地超出範圍。
 	Local cross-PDF links require the desktop app	PDF 之間的本機連結需要桌面應用程式
 	The existing action will be preserved.	將保留現有動作。
+
+# In-app file browser (Android's file pickers)
+	Internal storage	內部儲存空間
+	Documents	文件
+	PdfCraft files	PdfCraft 檔案
+	SD card {name}	SD 卡 {name}
+	Couldn't create the folder {name}: {e}	無法建立資料夾 {name}：{e}
+	Choose this folder	選擇此資料夾
+	{name} already exists. Replace it?	{name} 已存在。要取代嗎？
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	若要在此裝置上的任何位置開啟及儲存檔案，請允許 PdfCraft 管理所有檔案。
+	Allow access	允許存取
+	All files	所有檔案
+	This folder is empty	此資料夾是空的
+	New folder	新增資料夾
+	Create	建立
+
+# Printing through another app (Android)
+	Another app	其他應用程式
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	可列印的 PDF 會在您選擇的應用程式中開啟，並依該應用程式自己的份數、雙面與色彩設定列印。
+	Couldn't hand {name} to another app: {e}	無法將 {name} 交給其他應用程式：{e}
+phone bar	Edit	編輯
+	Send	傳送
+	Thinking…	正在思考…
+	Anthropic API key	Anthropic API 金鑰
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	只有在您提問時，您的問題和開啟的文件才會使用您自己的 API 金鑰傳送給 Anthropic（Claude）。請求費用由您的 Anthropic 帳戶支付。
+	Most pages sent per question	每個問題最多傳送的頁數
+	Translate page {n}	翻譯第 {n} 頁
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} 個權杖
+	The answer stopped at its length limit.	回答在達到最大長度時中斷。
+	Add your Anthropic API key to use the assistant.	請新增您的 Anthropic API 金鑰以使用助理。
+	The API key was refused. Check it in the assistant's settings.	API 金鑰遭拒。請在助理設定中檢查。
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	此文件有 {pages} 頁；助理最多讀取 {max} 頁。請在助理設定中提高上限。
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	此文件對助理來說太大（{mb} MB，最多 {max} MB）。
+	Too many requests right now. Try again in a moment.	目前請求過多。請稍後再試。
+	The request was declined ({reason}).	請求遭拒（{reason}）。
+	Couldn't reach the AI service: {error}	無法連線至 AI 服務：{error}
+	Model	模型
+	The API key isn't valid: paste it again in the assistant's settings.	API 金鑰無效：請在助理設定中重新貼上。
+	The assistant gave no answer. Try asking differently.	助理沒有給出回答。請換個方式提問。
+	Your Anthropic account can't use this model, or has no credit left: {error}	您的 Anthropic 帳戶無法使用此模型，或已無餘額：{error}
+	The AI service answered: {error}	AI 服務回應：{error}
+	{tokens} tokens	{tokens} 個權杖
+	New conversation	新對話
+	Proposed changes	建議的變更
+	Applied	已套用
+	Discarded	已捨棄
+	The document has no page {page}.	文件沒有第 {page} 頁。
+	The passage wasn't found on page {page}.	在第 {page} 頁找不到該段落。
+	The document refused the change.	文件拒絕了此變更。
+	Applied as one step: Undo takes them all back.	一次套用：「復原」會全部還原。
+	The passage appears more than once on page {page}.	該段落在第 {page} 頁出現了多次。
+	It overlaps another proposed change.	它與另一項建議的變更重疊。
+	A PDF on this device.	此裝置上的 PDF。
+	Add my name	加入我的名字
+	Add to Starred	加入最愛
+	Add your name and a photo. Your name also signs your comments.	加入您的名字和相片。您的名字也會用來簽署您的註解。
+	Allow access to your files and PdfCraft lists the PDFs on this device.	允許存取您的檔案後，PdfCraft 會列出此裝置上的 PDF。
+	An empty page to start from.	從空白頁開始。
+	Change its text and pictures.	變更其文字和圖片。
+	Choose a photo	選擇相片
+	Files	檔案
+	Fill in a form and sign it.	填寫表單並簽名。
+	From photos, scans or other files.	來自相片、掃描檔或其他檔案。
+	Hello, {name}	您好，{name}
+	It shows on Home and signs your comments.	會顯示在首頁，並用來簽署您的註解。
+	Make PdfCraft yours	打造專屬於您的 PdfCraft
+	More for {name}	{name} 的更多操作
+	No PDFs found.	找不到 PDF。
+	No files match.	沒有相符的檔案。
+	No recent files yet.	尚無最近使用的檔案。
+	No starred files.	沒有最愛的檔案。
+	On this device	此裝置上
+	Open another file…	開啟其他檔案…
+	PDFs on this device	此裝置上的 PDF
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft 會在「下載」、「文件」及其自己的資料夾中尋找。
+	Photos and scans become the pages of a new PDF.	相片和掃描檔會成為新 PDF 的頁面。
+	Pictures	圖片
+	Places	位置
+	Profile	個人資料
+	Remove from Starred	從最愛移除
+	Remove the photo	移除相片
+	Search files	搜尋檔案
+	See your PDFs	檢視您的 PDF
+	Set up	設定
+	Several PDFs and pictures in one document.	多個 PDF 和圖片合成一份文件。
+	Star a file from its menu to find it here.	從檔案的選單將其加入最愛，即可在此找到。
+	Starred	最愛
+	Summarize, ask and translate.	摘要、提問、翻譯。
+	Summarize, question and correct your PDFs with Claude, with your own key.	使用您自己的金鑰，透過 Claude 摘要、詢問和修正您的 PDF。
+	Text, pictures and other files, converted to PDF.	轉換為 PDF 的文字、圖片和其他檔案。
+	The files you open show here.	您開啟的檔案會顯示在這裡。
+	What would you like to do?	您想做什麼？
+	Which document?	哪份文件？
+	Your AI assistant	您的 AI 助理
+file state	Open	已開啟
+	Choose a PNG or JPEG picture.	請選擇 PNG 或 JPEG 圖片。
+	This picture is too large.	此圖片太大。
+	Couldn't use this picture: {e}	無法使用此圖片：{e}
+	Couldn't use this picture.	無法使用此圖片。
+	{n} MB	{n} MB
+	{n} KB	{n} KB
+decimal separator	.	.
+	Other folders…	其他資料夾…
+	Looking for photos…	正在尋找相片…
+	See your photos	檢視您的相片
+	Allow PdfCraft to see your photos, and choose one here.	允許 PdfCraft 檢視您的相片，然後在此選擇一張。
+	No photos found.	找不到相片。
+	PdfCraft shows the photos in Camera, Pictures and Download.	PdfCraft 會顯示「相機」、「圖片」和「下載」中的相片。
+	Automatic	自動
+	Dark mode	深色模式
+	Dark pages	深色頁面
+	Light text on a dark page, for reading at night.	深色頁面上的淺色文字，適合夜間閱讀。
+	Night	夜間
+	Downloads	下載
+	Choose a file	選擇檔案
+	Choose files	選擇多個檔案
+	Choose a folder	選擇資料夾
+	Tap to unlock	點一下以解鎖
+	Browse folders	瀏覽資料夾
+	Combined from top to bottom. Use the arrows to change the order.	依從上到下的順序合併。使用箭頭變更順序。
+	PDFs and pictures, combined into one PDF in the order you choose.	依您選擇的順序，將 PDF 和圖片合併為一個 PDF。
+	Smaller text	縮小文字
+	Larger text	放大文字
+	Flip	翻轉
+	Tap text or a picture to change it	點一下文字或圖片即可變更
+	Tap where the text goes	點一下要放置文字的位置
+	White	白色
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	只有在您提問時，您的問題和開啟的文件才會使用您自己的 API 金鑰傳送到您選擇的服務。請求費用計入您在該服務的帳戶。
+	Service	服務
+	Another service (OpenAI-compatible)	其他服務（相容 OpenAI）
+	API key	API 金鑰
+	On Google's free tier, what you send may be used to improve Google's products.	使用 Google 的免費方案時，您傳送的內容可能被用於改善 Google 的產品。
+	Fill in for	填入：
+	Service address	服務位址
+	API key (if the service asks for one)	API 金鑰（如服務要求）
+	The service reads PDF files	該服務可讀取 PDF 檔案
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	否則將逐頁傳送文件的文字（不含其圖片或掃描內容）。
+	Add your API key for {service} in the assistant's settings.	請在助理設定中新增您的 {service} API 金鑰。
+	Your {service} account can't use this model, or has no credit left: {error}	您的 {service} 帳戶無法使用此模型，或已無餘額：{error}
+	Choose the model to ask in the assistant's settings.	請在助理設定中選擇要提問的模型。
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	此文件沒有可傳送的文字（是掃描檔嗎？）。請選擇可讀取 PDF 檔案的服務，或先辨識其文字。
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	此文件的文字對助理來說太長（{chars} 個字元，最多 {max} 個）。
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	使用您自己的金鑰，透過 Claude、ChatGPT 或 Gemini 摘要、詢問和修正您的 PDF。
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	服務位址無效：它以 https:// 開頭（http:// 僅限本裝置或區域網路）。
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	此文件不允許複製其內容，因此不會傳送給助理。
+	Sign yourself	自行簽名
+	Try again	重試
+	Price per million tokens read / written	每百萬權杖價格（讀取 / 寫入）

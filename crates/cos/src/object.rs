@@ -156,8 +156,12 @@ pub struct Stream {
     pub raw: Bytes,
 }
 
-/// Upper bound for a single decoded stream (decompression-bomb defence).
+/// Upper bound for a single decoded stream (decompression-bomb defence). Lower on a phone, where
+/// a gigabyte allocation would have the system kill the app (no error to recover from).
+#[cfg(not(target_os = "android"))]
 pub const MAX_DECODED: usize = 1 << 30;
+#[cfg(target_os = "android")]
+pub const MAX_DECODED: usize = 256 << 20;
 
 impl Stream {
     /// A new stream from already-encoded bytes (`/Length` is set at write time).

@@ -21,6 +21,8 @@ const GAP: f32 = 14.0;
 const MARGIN: f32 = 28.0;
 /// Horizontal gutter that keeps pages clear of the floating quick-action bar.
 const SIDE: f32 = 70.0;
+/// The phone layout's gutter: it has no floating bar, and a phone screen has no room to spare.
+const PHONE_SIDE: f32 = 6.0;
 const THUMB_TAG: u64 = 1 << 63;
 const TEXT_TAG: u64 = 1 << 62;
 /// A page rendered for the organize grid at the size it is drawn there.
@@ -40,8 +42,15 @@ pub(crate) const BASE_SIDE: f32 = 2048.0;
 const THUMB_W: f32 = 240.0;
 const THUMB_H: f32 = 320.0;
 const THUMB_BYTES: usize = 24 * 1024 * 1024;
+/// Rendered pages and tiles kept: half as much on a phone, which has less memory to give.
+#[cfg(not(target_os = "android"))]
 const PAGE_BYTES: usize = 128 * 1024 * 1024;
+#[cfg(target_os = "android")]
+const PAGE_BYTES: usize = 64 * 1024 * 1024;
+#[cfg(not(target_os = "android"))]
 const TILE_BYTES: usize = 128 * 1024 * 1024;
+#[cfg(target_os = "android")]
+const TILE_BYTES: usize = 64 * 1024 * 1024;
 const UPLOAD_BYTES_PER_FRAME: usize = 16 * 1024 * 1024;
 const RESULTS_PER_FRAME: usize = 8;
 /// A defensive ceiling for unusually large viewports / n-up previews.
@@ -52,6 +61,19 @@ const MAX_CACHED_PAGES: usize = 24;
 /// Text layers are glyph structs, far smaller than rasters; deliberately independent of
 /// `MAX_CACHED_PAGES` so raster tuning never silently retunes text memory.
 const MAX_CACHED_TEXT_PAGES: usize = 24;
+/// The most bytes the text layers of pages off screen may take (matched pages included: a
+/// search through a long book would otherwise keep every page's glyphs). Less on a phone.
+#[cfg(not(target_os = "android"))]
+const TEXT_BYTES: usize = 64 << 20;
+#[cfg(target_os = "android")]
+const TEXT_BYTES: usize = 24 << 20;
+/// How many pages ahead a search asks text for at once (it moves on as they arrive).
+const SEARCH_AHEAD: usize = 32;
+
+/// About what a page's text layer takes in memory: its glyphs, their text, and their lines.
+fn text_bytes(t: &PageText) -> usize {
+    t.glyphs.len().saturating_mul(std::mem::size_of::<pdfcraft_render::TextGlyph>() + 24)
+}
 
 fn rgba_bytes(width: usize, height: usize) -> usize {
     width.saturating_mul(height).saturating_mul(4)
@@ -222,6 +244,9 @@ pub struct Find {
     pub whole_words: bool,
     /// Shown in the Search panel (Advanced Search) instead of the find bar.
     pub in_panel: bool,
+    /// The pages searched for this query: their text isn't asked for again once it goes from
+    /// the cache (a search through a long book keeps only what fits).
+    pub searched: HashSet<usize>,
 }
 
 /// A text selection on one page.
@@ -393,6 +418,13 @@ pub struct DocView {
     /// line being edited.
     pub(crate) edit_lines: HashMap<usize, (u64, Vec<pdfcraft_engine::TextBlock>)>,
     pub line_editor: Option<crate::edit_text_ui::LineEditor>,
+    /// The phone's Edit: the press (when it began, as egui counts it) that already picked
+    /// something up, or found nothing to, so it doesn't again.
+    pub(crate) carried_press: Option<f64>,
+    /// The phone's Edit: the corner handles drawn last frame (page, screen rect, what it resizes).
+    pub(crate) phone_handles: Vec<(usize, Rect, crate::phone_edit::Handle)>,
+    /// This frame's, kept apart until every page has looked at last frame's.
+    pub(crate) phone_handles_next: Vec<(usize, Rect, crate::phone_edit::Handle)>,
     pub(crate) text_background: crate::edit_text_ui::TextBackground,
     /// Edit text & images: the images per page (by document generation), and the selected one.
     pub(crate) edit_images: HashMap<usize, (u64, Vec<pdfcraft_engine::PageImage>)>,
@@ -447,6 +479,9 @@ pub struct DocView {
     pub grid_gap: Option<usize>,
     /// How large the page grid draws its pages (1.0 = the usual thumbnails).
     grid_zoom: f32,
+    /// The page grid has fitted its pages to a phone's width since it opened (two a row; a pinch
+    /// changes it after that).
+    grid_fitted: bool,
     /// A zoom asked for this frame (toolbar, pinch, keys); the grid applies it once it has laid
     /// out, so it can keep the same pages in view.
     grid_zoom_request: Option<f32>,
@@ -473,6 +508,15 @@ pub struct DocView {
     /// Pages whose raster proved slow (see `SLOW_MILLIS`): only these get the zoom/pan
     /// settle holds. Fast pages render straight through, with no added latency.
     slow_pages: HashSet<usize>,
+    /// The horizontal gutter beside the pages, as last drawn ([`SIDE`], or [`PHONE_SIDE`] in the
+    /// phone layout).
+    side: f32,
+    /// Room kept clear above the first page and below the last, as last drawn: the phone
+    /// layout's bars float over the pages there.
+    pad: (f32, f32),
+    /// Reading in the phone layout: a tap on the page (where, egui time), held until it can't
+    /// be the first half of a double tap. The phone shell takes it to show or hide its bars.
+    pub(crate) tap: Option<(Pos2, f64)>,
 }
 
 /// The page grid's zoom range and the step of its buttons and keys.
@@ -634,6 +678,9 @@ impl DocView {
             pending_edit: None,
             edit_lines: HashMap::new(),
             line_editor: None,
+            carried_press: None,
+            phone_handles: Vec::new(),
+            phone_handles_next: Vec::new(),
             text_background: Default::default(),
             edit_images: HashMap::new(),
             objects: Default::default(),
@@ -644,6 +691,7 @@ impl DocView {
             insert_at: None,
             grid_gap: None,
             grid_zoom: 1.0,
+            grid_fitted: false,
             grid_zoom_request: None,
             grid_anchor: None,
             grid_pages: HashMap::new(),
@@ -671,6 +719,9 @@ impl DocView {
             fill_text: None,
             fill_signature_page: None,
             signature_drag: Default::default(),
+            side: SIDE,
+            pad: (0.0, 0.0),
+            tap: None,
         }
     }
 
@@ -809,6 +860,7 @@ impl DocView {
         if let Some(f) = self.find.as_mut() {
             f.matches.clear();
             f.current = None;
+            f.searched.clear();
         }
     }
 
@@ -840,6 +892,10 @@ impl DocView {
         self.texts.remove(&page);
         self.text_failed.remove(&page);
         self.errors.remove(&page);
+        // Its text changed: searched again when it arrives.
+        if let Some(f) = self.find.as_mut() {
+            f.searched.remove(&page);
+        }
         self.last_queue.clear();
         if self.selection.is_some_and(|s| s.page == page) {
             self.selection = None;
@@ -901,6 +957,7 @@ impl DocView {
         f.case_query = f.query.clone();
         f.matches.clear();
         f.current = None;
+        f.searched.clear();
         if f.case_query.trim().is_empty() {
             return;
         }
@@ -909,6 +966,7 @@ impl DocView {
         for &p in &pages {
             if let Some(text) = self.texts.get(&p) {
                 f.matches.extend(text.find_opts(&f.case_query, f.case_sensitive, f.whole_words).into_iter().map(|r| (p, r)));
+                f.searched.insert(p);
             }
         }
         f.matches.sort_by_key(|(p, r)| (*p, r.start));
@@ -928,6 +986,7 @@ impl DocView {
             return;
         }
         let current_key = f.current.and_then(|c| f.matches.get(c).cloned());
+        f.searched.insert(page);
         f.matches.retain(|(p, _)| *p != page);
         f.matches.extend(text.find_opts(&f.case_query, f.case_sensitive, f.whole_words).into_iter().map(|r| (page, r)));
         f.matches.sort_by_key(|(p, r)| (*p, r.start));
@@ -1032,7 +1091,7 @@ impl DocView {
         let point = |x: Option<f32>, y: Option<f32>| p.dest_fraction(x, y, self.rotation);
         // The window's top-left as far as pages go: its left edge is the gutter that keeps them
         // clear of the floating quick-action bar, so `left` 0 shows the page's edge beside it.
-        let corner = vec2(SIDE, 0.0);
+        let corner = vec2(self.side, 0.0);
         let (fx, fy, rel) = match dest {
             DestView::Top => return,
             DestView::Xyz { left, top, zoom } => {
@@ -1245,6 +1304,13 @@ impl DocView {
         true
     }
 
+    /// Something is being moved on the page: a paragraph, an added item or a picture.
+    pub(crate) fn carrying(&self) -> bool {
+        self.block_drag.is_some()
+            || self.content.grabbing()
+            || self.image_selection.as_ref().is_some_and(crate::edit_text_ui::ImageSelection::dragging)
+    }
+
     /// How large the page grid draws its pages (1.0 = the usual thumbnails).
     pub fn grid_zoom(&self) -> f32 {
         self.grid_zoom
@@ -1295,6 +1361,33 @@ impl DocView {
             // Nothing on screen yet (e.g. a launch option): align the current page instead.
             None => self.goto = Some((self.current, 0.0)),
         }
+    }
+
+    /// The phone reader's double tap: while the pages fit the window, zoom in on `screen_pos`;
+    /// zoomed by hand, back to the page width.
+    pub fn double_tap_zoom(&mut self, screen_pos: Pos2) {
+        if self.fit == Fit::None {
+            self.fit = Fit::Width;
+        } else {
+            self.zoom_at(self.zoom * 2.5, screen_pos);
+        }
+    }
+
+    /// Select the word under `screen_pos` (the phone reader's long press). `false` when no text
+    /// is within a fingertip of it, or the page's text isn't read yet.
+    pub(crate) fn select_word_at(&mut self, screen_pos: Pos2) -> bool {
+        // A fingertip covers a few points of text: forgive a press just beside a glyph.
+        const REACH: f32 = 4.0;
+        let Some((page, xf)) = self.screen_xforms.iter().find(|(_, xf)| xf.rect.contains(screen_pos)).copied() else { return false };
+        let Some(text) = self.texts.get(&page) else { return false };
+        let (vx, vy) = xf.screen_to_view(screen_pos);
+        let near = |g: &[f32; 4]| vx >= g[0] - REACH && vx <= g[2] + REACH && vy >= g[1] - REACH && vy <= g[3] + REACH;
+        if !text.glyphs.iter().any(|g| near(&g.rect)) {
+            return false;
+        }
+        let Some((first, last)) = text.nearest(vx, vy).and_then(|a| text.word_at(a)) else { return false };
+        self.selection = Some(Selection::run(page, first, last));
+        true
     }
 
     /// Standard zoom steps (as in Acrobat's zoom menu).
@@ -1489,33 +1582,66 @@ impl DocView {
     }
 
     /// Drop text layers nothing can still need. Every visited page's text used to stay
-    /// cached for the session. Keep visible, selected and matched pages plus the nearest
-    /// prefetch window; evicted pages re-extract on revisit. (Count window only: unlike
-    /// rasters there is no byte budget here.) While a search is active keep everything:
-    /// demand still wants every page, so evicting would re-request evicted pages each
-    /// frame and churn the workers. Failures are never evicted either: they cost nothing
-    /// to remember, and evicting one would re-request and re-fail it every frame.
+    /// cached for the session. Kept whatever they cost: the visible pages, the selection's and
+    /// the current match's. Then, within [`TEXT_BYTES`]: matched pages (the Search panel quotes
+    /// them), nearest the current page first, and at most [`MAX_CACHED_TEXT_PAGES`] others,
+    /// nearest first. Evicted pages re-extract on revisit; a search never asks again for a page
+    /// it searched ([`Find::searched`]), so evicting mid-search doesn't churn the workers.
+    /// Failures are never evicted: they cost nothing to remember, and evicting one would
+    /// re-request and re-fail it every frame.
     fn retain_text_layers(&mut self) {
         if self.texts.len() <= MAX_CACHED_TEXT_PAGES {
-            return;
-        }
-        if self.find.as_ref().is_some_and(|f| !f.case_query.trim().is_empty()) {
             return;
         }
         let mut keep: HashSet<usize> = self.frame_visible.clone();
         if let Some(s) = self.selection {
             keep.insert(s.page);
         }
+        let mut matched: HashSet<usize> = HashSet::new();
         if let Some(f) = self.find.as_ref() {
-            keep.extend(f.matches.iter().map(|(p, _)| *p));
+            matched.extend(f.matches.iter().map(|(p, _)| *p));
+            if let Some((p, _)) = f.current.and_then(|c| f.matches.get(c)) {
+                keep.insert(*p);
+            }
         }
+        let mut used: usize = keep.iter().filter_map(|p| self.texts.get(p)).map(|t| text_bytes(t)).fold(0, usize::saturating_add);
         let mut rest: Vec<usize> = self.texts.keys().filter(|p| !keep.contains(*p)).copied().collect();
-        rest.sort_by_key(|p| p.abs_diff(self.current));
-        keep.extend(rest.into_iter().take(MAX_CACHED_TEXT_PAGES));
+        rest.sort_by_key(|p| (!matched.contains(p), p.abs_diff(self.current)));
+        let mut others = 0usize;
+        for p in rest {
+            let is_match = matched.contains(&p);
+            if !is_match && others >= MAX_CACHED_TEXT_PAGES {
+                continue;
+            }
+            let bytes = self.texts.get(&p).map_or(0, |t| text_bytes(t));
+            if used.saturating_add(bytes) > TEXT_BYTES {
+                continue;
+            }
+            used = used.saturating_add(bytes);
+            others += usize::from(!is_match);
+            keep.insert(p);
+        }
         self.texts.retain(|p, _| keep.contains(p));
     }
 
+    /// The pages a search asks text for next: from the current page on, the next ones not
+    /// searched yet and not cached, a few at a time.
+    fn search_demand(&self, pages: usize) -> Vec<usize> {
+        let Some(f) = self.find.as_ref().filter(|f| !f.case_query.trim().is_empty()) else { return Vec::new() };
+        let cur = self.current.min(pages.saturating_sub(1));
+        (0..pages)
+            .map(|k| (cur + k) % pages)
+            .filter(|p| !f.searched.contains(p) && !self.texts.contains_key(p) && !self.text_failed.contains(p))
+            .take(SEARCH_AHEAD)
+            .collect()
+    }
+
     pub(crate) fn finish_render_frame(&mut self, ctx: &egui::Context, info: &DocInfo, pool: &RenderPool) {
+        // The workers wake the window when a page is ready (a new pool comes with every edit).
+        if !pool.is_inline() && !pool.has_waker() {
+            let window = ctx.clone();
+            pool.set_waker(Arc::new(move || window.request_repaint()));
+        }
         let queue = self.prepare_render_queue(info, ctx.pixels_per_point());
         if queue != self.last_queue {
             pool.set_queue(queue.clone());
@@ -1523,7 +1649,10 @@ impl DocView {
         }
         self.receive(ctx, pool);
         if !self.last_queue.is_empty() {
-            ctx.request_repaint_after(std::time::Duration::from_millis(30));
+            // An inline pool renders as it is asked; the others wake the window themselves, and
+            // a slower look keeps their watchdog going for a render that never ends.
+            let wait = if pool.is_inline() { 30 } else { 250 };
+            ctx.request_repaint_after(std::time::Duration::from_millis(wait));
         }
     }
 
@@ -1667,16 +1796,16 @@ impl DocView {
         } else {
             (max_w, largest(|s| s.1))
         };
-        let avail_w = (self.viewport_w - 2.0 * SIDE).max(100.0);
+        let avail_w = (self.viewport_w - 2.0 * self.side).max(100.0);
         let per_row = if self.layout == PageLayout::TwoUp { 2.0 } else { 1.0 };
         match self.fit {
             Fit::Width => self.zoom = (avail_w - GAP * (per_row - 1.0)) / (w * PT * per_row),
             Fit::Page => {
                 let zw = (avail_w - GAP * (per_row - 1.0)) / (w * PT * per_row);
-                let zh = (self.viewport_h - 2.0 * MARGIN) / (h * PT);
+                let zh = (self.viewport_h - 2.0 * MARGIN - self.pad.0 - self.pad.1) / (h * PT);
                 self.zoom = zw.min(zh);
             }
-            Fit::Height => self.zoom = (self.viewport_h - 2.0 * MARGIN) / (h * PT),
+            Fit::Height => self.zoom = (self.viewport_h - 2.0 * MARGIN - self.pad.0 - self.pad.1) / (h * PT),
             Fit::None => {}
         }
         self.zoom = self.zoom.clamp(0.08, 64.0);
@@ -1689,20 +1818,20 @@ impl DocView {
         let shown = info.pages.iter().enumerate().filter(|&(i, _)| single.is_none_or(|c| c == i));
         let max_w = shown.map(|(_, p)| self.display_size(p).0).fold(0.0, f32::max);
         let per_row = if self.layout == PageLayout::TwoUp { 2.0 } else { 1.0 };
-        (max_w * self.zoom * PT * per_row + 2.0 * SIDE).max(avail_w)
+        (max_w * self.zoom * PT * per_row + 2.0 * self.side).max(avail_w)
     }
 
     /// Page rects in content coordinates (origin at the scroll content's top-left).
     fn layout(&self, info: &DocInfo, content_w: f32) -> Vec<Rect> {
         let s = self.zoom * PT;
         let mut rects = Vec::with_capacity(info.pages.len());
-        let mut y = MARGIN;
+        let mut y = MARGIN + self.pad.0;
         match self.layout {
             PageLayout::Single => {
                 for p in &info.pages {
                     let (w, h) = self.display_size(p);
                     let size = vec2(w * s, h * s);
-                    rects.push(Rect::from_min_size(pos2(((content_w - size.x) / 2.0).max(SIDE), y), size));
+                    rects.push(Rect::from_min_size(pos2(((content_w - size.x) / 2.0).max(self.side), y), size));
                     y += size.y + GAP;
                 }
             }
@@ -1717,7 +1846,8 @@ impl DocView {
                     let sizes: Vec<Vec2> = pair.iter().map(|p| self.display_size(p)).map(|(w, h)| vec2(w * s, h * s)).collect();
                     let row_w: f32 = sizes.iter().map(|v| v.x).sum::<f32>() + GAP * (sizes.len() as f32 - 1.0);
                     let row_h = sizes.iter().map(|v| v.y).fold(0.0, f32::max);
-                    let mut x = if self.cover && ri == 0 { (content_w / 2.0 + GAP / 2.0).max(SIDE) } else { ((content_w - row_w) / 2.0).max(SIDE) };
+                    let mut x =
+                        if self.cover && ri == 0 { (content_w / 2.0 + GAP / 2.0).max(self.side) } else { ((content_w - row_w) / 2.0).max(self.side) };
                     for size in sizes {
                         rects.push(Rect::from_min_size(pos2(x, y + (row_h - size.y) / 2.0), size));
                         x += size.x + GAP;
@@ -2029,6 +2159,11 @@ pub fn shortcuts(view: &mut DocView, ctx: &egui::Context) {
 const KEY_SCROLL_LINE: f32 = 40.0;
 
 pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
+    // Every `app.views[index]` below is in range: checked here, and nothing in this function
+    // closes a document.
+    if app.views.get(index).is_none() {
+        return;
+    }
     let t = Tokens::get(ui.ctx());
     // Keyboard scrolling applies to this frame's page view only, never later.
     let key_scroll = std::mem::take(&mut app.views[index].key_scroll);
@@ -2054,14 +2189,43 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     // The Prepare a form panel is open (or a field tool is picked): fields are edited, not filled.
     let preparing = app.is_preparing();
     // Edit a PDF: added text and images can be selected, moved and edited.
-    let editing_content =
-        (app.left_open && app.left == crate::LeftPanel::Tool("edit")) || matches!(app.quick_tool, QuickTool::AddText | QuickTool::EditText);
+    let editing_content = app.tool_panel_shows("edit") || matches!(app.quick_tool, QuickTool::AddText | QuickTool::EditText);
+    // Reading in the phone layout (no tool picked): a finger scrolls the pages instead of
+    // selecting text, a tap shows or hides the bars, a double tap zooms and a long press selects
+    // a word, as phone readers do (`phone.rs`).
+    let phone = app.phone_layout();
+    let touch_view = phone && app.quick_tool == QuickTool::Select && !preparing && !editing_content;
+    // Editing on a phone, a finger scrolls the pages too, and a tap picks what to change (the
+    // typing happens on a screen of its own: `phone_edit.rs`).
+    let tap_edit = phone && matches!(app.quick_tool, QuickTool::EditText | QuickTool::AddText);
+    // The phone layout's bars float over the top of the page view: its notices go below them.
+    let notice_top = if phone && app.phone_bars_shown() { crate::phone::PAGE_PAD.0 } else { 0.0 };
     let text_style = app.text_style.clone();
     let view = &mut app.views[index];
     // Opened without the owner password and something is restricted.
     let secured = doc.security_summary().is_some_and(|s| !(s.owner || (s.permissions.modify() && s.permissions.assemble())));
     let repaired = !doc.repair_log().is_empty();
-    match notices(view, doc, secured, repaired, crate::sign_ui::banner(&doc.signatures), ui, &t) {
+    let banner = crate::sign_ui::banner(&doc.signatures, &t);
+    let notice = if phone {
+        // Over the pages, like the bars, so showing or hiding them never moves the pages.
+        let at = ui.available_rect_before_wrap();
+        let fade = ui.opacity();
+        // Below the status bar too, where the system draws the app under it.
+        let covered = crate::phone::system_covered(ui.ctx(), at).0;
+        egui::Area::new(egui::Id::new("phone-notices"))
+            .order(egui::Order::Middle)
+            .fixed_pos(at.min + vec2(0.0, covered + notice_top))
+            .constrain(false)
+            .show(ui.ctx(), |ui| {
+                crate::transition::follow_screen(ui, fade);
+                ui.set_width(at.width());
+                notices(view, doc, secured, repaired, banner, ui, &t)
+            })
+            .inner
+    } else {
+        notices(view, doc, secured, repaired, banner, ui, &t)
+    };
+    match notice {
         #[cfg(not(target_arch = "wasm32"))]
         Some(Notice::Reload) => app.watch.reload_request = Some(view.id),
         #[cfg(target_arch = "wasm32")]
@@ -2077,14 +2241,31 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     // No dialog, close prompt or palette over the page: only then does page input count.
     let unobstructed = !app.modal_open() && !app.palette_open;
     let view = &mut app.views[index];
+    if !view.organize {
+        // The next time the grid opens on a phone, it fits the width again.
+        view.grid_fitted = false;
+    }
     if view.organize {
-        organize_grid(view, info, doc.allows_assembly(), doc.dirty, unobstructed, ui, &t);
+        // Below the phone layout's top bar (and the status bar over it).
+        if phone {
+            let covered = crate::phone::system_covered(ui.ctx(), ui.available_rect_before_wrap()).0;
+            ui.add_space(crate::phone::PAGE_PAD.0 + covered);
+        }
+        organize_grid(view, info, doc.allows_assembly(), doc.dirty, unobstructed, phone, ui, &t);
         return;
     }
 
     let avail = ui.available_rect_before_wrap();
     view.viewport_w = avail.width();
     view.viewport_h = avail.height();
+    view.side = if phone { PHONE_SIDE } else { SIDE };
+    view.pad = if phone {
+        // The phone layout's bars, and the system's where it draws the app under them.
+        let (top, bottom) = crate::phone::system_covered(ui.ctx(), avail);
+        (crate::phone::PAGE_PAD.0 + top, crate::phone::PAGE_PAD.1 + bottom)
+    } else {
+        (0.0, 0.0)
+    };
     let old_zoom = view.zoom;
     view.fit_zoom(info);
     if view.shown && view.zoom_anchor.is_none() && view.goto.is_none() && view.goto_point.is_none() && (view.zoom - old_zoom).abs() > 1e-4 {
@@ -2114,7 +2295,8 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     let navigation_enabled = app.dialog.is_none() && app.close_request.is_none() && !app.palette_open && ui.is_enabled() && ui.input(|i| i.focused);
     if zoom_delta.is_finite() && zoom_delta > 0.0 && zoom_delta != 1.0 && navigation_enabled && ui.rect_contains_pointer(navigation_rect) {
         let z = view.zoom * zoom_delta;
-        match ui.input(|i| i.pointer.hover_pos()) {
+        // Two fingers zoom about the point between them, not about the first finger.
+        match ui.input(|i| i.multi_touch().map(|m| m.center_pos).or(i.pointer.hover_pos())) {
             Some(p) => view.zoom_at(z, p),
             None => view.set_zoom(z),
         }
@@ -2218,19 +2400,21 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     }
     let visible_pages: Vec<usize> = if view.continuous { (0..rects.len()).collect() } else { row.clone() };
     let (y_shift, content_h) = if view.continuous {
-        (0.0, rects.last().map(|r| r.bottom() + MARGIN).unwrap_or(0.0))
+        (0.0, rects.last().map(|r| r.bottom() + MARGIN + view.pad.1).unwrap_or(0.0))
     } else {
         // Only the current row scrolls into view; the content is its bounding box plus margins.
         match row.iter().filter_map(|&i| rects.get(i)).copied().reduce(Rect::union) {
-            Some(r) => (r.top() - MARGIN, r.height() + 2.0 * MARGIN),
+            Some(r) => (r.top() - MARGIN - view.pad.0, r.height() + 2.0 * MARGIN + view.pad.0 + view.pad.1),
             None => (0.0, 0.0),
         }
     };
 
     let mut scroll = egui::ScrollArea::both().auto_shrink([false, false]).scroll_source(egui::scroll_area::ScrollSource {
-        drag: if middle_gesture {
+        // (While a finger carries something on a phone it moves that, never the pages: a guard
+        // for touch input, which the tests' mouse input can't show.)
+        drag: if middle_gesture || tap_edit && view.carrying() {
             egui::scroll_area::DragScroll::Never
-        } else if app.quick_tool == QuickTool::Hand {
+        } else if app.quick_tool == QuickTool::Hand || touch_view || tap_edit {
             egui::scroll_area::DragScroll::Always
         } else {
             egui::scroll_area::DragScroll::OnTouch
@@ -2252,7 +2436,8 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     } else if let Some((page, frac)) = view.goto.take() {
         let page = page.min(rects.len() - 1);
         let r = rects[page];
-        scroll = scroll.vertical_scroll_offset((r.top() - y_shift - GAP + frac * r.height()).max(0.0));
+        // Below the room kept clear for bars floating over the pages.
+        scroll = scroll.vertical_scroll_offset((r.top() - y_shift - GAP - view.pad.0 + frac * r.height()).max(0.0));
     }
     let ppp = ui.ctx().pixels_per_point();
     let scale = view.render_scale(ppp);
@@ -2275,7 +2460,8 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     // Text selection runs for the Select tool and for the markup tools (highlight…).
     let selects_text = match tool {
         QuickTool::Comment(t) => t.markup().is_some() || t == comments::CommentTool::ReplaceText,
-        QuickTool::Select => !preparing,
+        // Reading on a phone a long press selects instead, and a double tap zooms (below).
+        QuickTool::Select => !preparing && !touch_view,
         QuickTool::Redact | QuickTool::ColumnSelect => true,
         QuickTool::Hand
         | QuickTool::Measure(_)
@@ -2339,7 +2525,10 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         view.prepare.selected = None;
     }
     view.objects.prepare(doc, tool == QuickTool::EditText && can_modify, ui.ctx());
-    view.text_background.prepare(ui.ctx(), doc, view.line_editor.as_ref(), scale);
+    // (On a phone the paragraph is typed on a screen of its own: no page without it to draw.)
+    if !phone {
+        view.text_background.prepare(ui.ctx(), doc, view.line_editor.as_ref(), scale);
+    }
     let added = doc.added.clone();
     let doc_links = if tool == QuickTool::Link { doc.links.clone() } else { Vec::new() };
     if editing_content {
@@ -2376,7 +2565,19 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         if delta != Vec2::ZERO {
             ui.scroll_with_delta_animation(delta, egui::style::ScrollAnimation::none());
         }
-        let (resp_rect, resp) = ui.allocate_exact_size(vec2(content_w, content_h), Sense::click_and_drag());
+        // Two fingers pan the pages while a tool takes one finger's drags (drawing, editing,
+        // placing fields); when reading, the scroll area already follows the finger.
+        if !touch_view
+            && !tap_edit
+            && let Some(touch) = ui.input(|i| i.multi_touch())
+        {
+            ui.scroll_with_delta_animation(touch.translation_delta, egui::style::ScrollAnimation::none());
+        }
+        // Reading on a phone the pages take taps only, so a drag reaches the scroll area under them.
+        let sense = if touch_view || tap_edit { Sense::click() } else { Sense::click_and_drag() };
+        let (resp_rect, resp) = ui.allocate_exact_size(vec2(content_w, content_h), sense);
+        // Named for screen readers; each page on screen is a node of its own beside it ([`page_node`]).
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Other, true, tl!("Pages")));
         // The Hand tool pans: the content widget takes every drag, so scroll by its delta.
         if hand {
             if resp.dragged() {
@@ -2401,6 +2602,11 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         let mut current_overlap = -1.0f32;
         let mut current_height = f32::INFINITY;
         let pointer = ui.input(|i| i.pointer.hover_pos());
+        // A field, comment or other page object took this frame's pointer (so a tap is not the
+        // reader's "show or hide the bars").
+        let mut page_consumed = false;
+        // A tap that clears a selection only clears it.
+        let had_selection = view.selection.is_some();
         if resp.secondary_clicked() {
             // Set again below when the right-click lands on a link.
             view.links.context = None;
@@ -2412,6 +2618,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
             }
             if r.intersects(visible) {
                 visible_now.push(i);
+                page_node(ui, view.texts.get(&i).map(Arc::as_ref), i, info.pages.len(), r);
                 view.screen_rects.push((i, r));
                 view.screen_xforms
                     .push((i, PageXform { rect: r, rot: view.rotation, pw: info.pages[i].width.max(1.0), ph: info.pages[i].height.max(1.0) }));
@@ -2668,11 +2875,18 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                 };
                 crate::redact_ui::page_input(ui, &resp, &xf, i, info, over_text, view)
             };
+            if tap_edit && tool == QuickTool::EditText && can_modify {
+                crate::phone_edit::long_press(ui, &resp, &xf, i, info, &added, doc.edit_generation(), view);
+            }
             let image_owns_pointer = tool == QuickTool::EditText && crate::edit_text_ui::image_owns_pointer(ui, &xf, i, info, view);
-            let on_objects =
-                !image_owns_pointer && tool == QuickTool::EditText && can_modify && crate::object_ui::page_input(ui, &resp, &xf, i, doc, view);
+            // Several objects at once are a mouse's (Shift-click, a box dragged): not a phone's.
+            let on_objects = !phone
+                && !image_owns_pointer
+                && tool == QuickTool::EditText
+                && can_modify
+                && crate::object_ui::page_input(ui, &resp, &xf, i, doc, view);
             let on_content = !on_objects && editing_content && can_modify && {
-                crate::content_ui::page_input(ui, &resp, &xf, i, info, &added, tool == QuickTool::AddText, &text_style, view)
+                crate::content_ui::page_input(ui, &resp, &xf, i, info, &added, tool == QuickTool::AddText, &text_style, phone, view)
                     || tool == QuickTool::AddText
             };
             // Added content owns its gesture; its source text must not queue a second edit.
@@ -2696,11 +2910,14 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                 };
                 // Editable text takes precedence over background/overlapping artwork. Both
                 // inventories are painted every frame, even when text owns the pointer.
-                let text_used = crate::edit_text_ui::page_input(ui, &resp, &xf, i, doc, &lines, view, !image_owns_pointer);
+                let text_used = crate::edit_text_ui::page_input(ui, &resp, &xf, i, doc, &lines, view, !image_owns_pointer, !phone);
                 let image_used =
                     crate::edit_text_ui::image_input(ui, &resp, &xf, i, info, &images, view, &mut image_action, image_owns_pointer || !text_used);
                 text_used || image_used
             };
+            if tap_edit && tool == QuickTool::EditText && can_modify {
+                crate::phone_edit::handles(ui, &xf, i, info, &added, doc.edit_generation(), view);
+            }
             let on_link = tool == QuickTool::Link && can_modify && crate::link_ui::page_input(ui, &resp, &xf, i, info, &doc_links, view);
             if tool == QuickTool::Select
                 && resp.secondary_clicked()
@@ -2711,6 +2928,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                 view.links.context = Some((i, l.index));
             }
             let consumed = on_objects || on_edit_text || on_link || on_content || boxing || on_field || comments::page_input(ui, &resp, &pcx, view);
+            page_consumed |= consumed;
 
             let preview_target =
                 (matches!(tool, QuickTool::Select | QuickTool::Fill(_)) && !comments_hidden).then_some(view.comments.selected).flatten();
@@ -2776,16 +2994,12 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                         view.last_press_pos = Some(p);
 
                         // Multi-click highlights immediately on pointer press instead of release (#1024).
-                        let clicks = if view.clicks > 2 && tool != QuickTool::Select { 1 } else { view.clicks };
-                        if clicks >= 2 && over_text {
-                            let span = text.nearest(vx, vy).and_then(|a| match clicks {
-                                2 => text.word_at(a),
-                                3 => text.line_at(a),
-                                _ => text.glyphs.len().checked_sub(1).map(|last| (0, last)),
-                            });
-                            if let Some((first, last)) = span {
-                                view.selection = Some(Selection::run(i, first, last));
-                            }
+                        let clicks = effective_clicks(view.clicks, tool);
+                        if clicks >= 2
+                            && over_text
+                            && let Some((first, last)) = multi_click_span(&text, clicks, vx, vy)
+                        {
+                            view.selection = Some(Selection::run(i, first, last));
                         }
                     }
                     if resp.drag_started() && press_here && !over_link {
@@ -2832,20 +3046,15 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                     if release_clicks > 0 {
                         view.clicks = release_clicks;
                     }
-                    let clicks = if view.clicks > 2 && tool != QuickTool::Select { 1 } else { view.clicks };
+                    let clicks = effective_clicks(view.clicks, tool);
                     // Only on the frame egui reports the multi-click: `view.clicks` outlives it, and
                     // acting on every frame re-selected the word as soon as a selection was cleared
                     // (a highlight made by the double-click left its word selected).
                     if release_clicks > 0 && clicks >= 2 && over_text {
-                        if view.selection.is_none() {
-                            let span = text.nearest(vx, vy).and_then(|a| match clicks {
-                                2 => text.word_at(a),
-                                3 => text.line_at(a),
-                                _ => text.glyphs.len().checked_sub(1).map(|last| (0, last)),
-                            });
-                            if let Some((first, last)) = span {
-                                view.selection = Some(Selection::run(i, first, last));
-                            }
+                        if view.selection.is_none()
+                            && let Some((first, last)) = multi_click_span(&text, clicks, vx, vy)
+                        {
+                            view.selection = Some(Selection::run(i, first, last));
                         }
                     } else if resp.clicked() && view.clicks < 2 && !over_link {
                         // ⇧-click extends a selection on this page to the click, keeping its
@@ -2967,10 +3176,11 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                 if age < 1.6 {
                     let a = ((1.6 - age) / 1.6 * 255.0) as u8;
                     let sr = xf.user_rect(info, i, fr).expand(4.0);
+                    let [r, g, b, _] = crate::theme::Tokens::get(ui.ctx()).accent.to_array();
                     painter.rect_stroke(
                         sr,
                         CornerRadius::same(3),
-                        Stroke::new(2.5, Color32::from_rgba_unmultiplied(0x1B, 0x63, 0xE0, a)),
+                        Stroke::new(2.5, Color32::from_rgba_unmultiplied(r, g, b, a)),
                         egui::StrokeKind::Outside,
                     );
                     ui.ctx().request_repaint();
@@ -2979,6 +3189,10 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                 }
             }
         }
+        // (What a long press carried lands on the release, in its own branch, before anything
+        // else sees the release as a tap.)
+        // The handles drawn this frame are the ones a finger finds next frame.
+        view.phone_handles = std::mem::take(&mut view.phone_handles_next);
         // The page navigated to stays current while no page shows more of itself, so the next
         // page step starts from it rather than from a page further down the screen (#188).
         // It also stays current while it is wholly on screen: a short page (a cheque) gone to
@@ -2993,105 +3207,129 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                 view.page_input = (current + 1).to_string();
             }
         }
-        resp.context_menu(|ui| {
-            // Preparing a form: the selected field's menu.
-            if preparing && let Some((name, wi)) = view.prepare.selected.clone() {
-                // Several fields: Align, Center, Distribute, Set Fields to Same Size.
-                if !view.prepare.also.is_empty() {
-                    use crate::prepare::Arrange as A;
-                    let others = view.prepare.also.clone();
-                    let anchor = (name.clone(), wi);
-                    let mut pick = |ui: &mut egui::Ui, op: A, label: &str| {
-                        if ui.add_enabled(can_modify, egui::Button::new(tl!(label))).clicked() {
-                            view.pending_edit = crate::prepare::arrange(&form, &anchor, &others, op);
-                            ui.close();
+        // Reading on a phone: a double tap zooms in on the point or back out to the page width,
+        // a lone tap is held for the phone shell (`tap`), and a long press selects the word under
+        // the finger, whose actions then show beside it, instead of opening the page menu.
+        let mut word_pressed = false;
+        if touch_view {
+            let at = ui.input(|i| i.pointer.interact_pos());
+            if resp.double_clicked() {
+                view.tap = None;
+                if let Some(p) = at {
+                    view.double_tap_zoom(p);
+                }
+            } else if resp.clicked() && had_selection {
+                view.selection = None;
+            } else if resp.clicked() && !page_consumed && clicked_link.is_none() {
+                view.tap = at.map(|p| (p, ui.input(|i| i.time)));
+            }
+            if resp.long_touched()
+                && let Some(p) = at
+            {
+                word_pressed = view.select_word_at(p);
+            }
+        }
+        if !word_pressed && !tap_edit {
+            resp.context_menu(|ui| {
+                // Preparing a form: the selected field's menu.
+                if preparing && let Some((name, wi)) = view.prepare.selected.clone() {
+                    // Several fields: Align, Center, Distribute, Set Fields to Same Size.
+                    if !view.prepare.also.is_empty() {
+                        use crate::prepare::Arrange as A;
+                        let others = view.prepare.also.clone();
+                        let anchor = (name.clone(), wi);
+                        let mut pick = |ui: &mut egui::Ui, op: A, label: &str| {
+                            if ui.add_enabled(can_modify, egui::Button::new(tl!(label))).clicked() {
+                                view.pending_edit = crate::prepare::arrange(&form, &anchor, &others, op);
+                                ui.close();
+                            }
+                        };
+                        ui.menu_button(tl!("Align"), |ui| {
+                            pick(ui, A::AlignLeft, "Left");
+                            pick(ui, A::AlignRight, "Right");
+                            pick(ui, A::AlignTop, "Top");
+                            pick(ui, A::AlignBottom, "Bottom");
+                            pick(ui, A::AlignCenterV, "Center vertically");
+                            pick(ui, A::AlignCenterH, "Center horizontally");
+                        });
+                        ui.menu_button(tl!("Distribute"), |ui| {
+                            pick(ui, A::DistributeH, "Horizontally");
+                            pick(ui, A::DistributeV, "Vertically");
+                        });
+                        ui.menu_button(tl!("Set Fields to Same Size"), |ui| {
+                            pick(ui, A::SameHeight, "Height");
+                            pick(ui, A::SameWidth, "Width");
+                            pick(ui, A::SameSize, "Both");
+                        });
+                        ui.separator();
+                    }
+                    if ui.button(tl!("Properties…")).clicked() {
+                        field_menu = Some(FieldMenu::Properties);
+                        ui.close();
+                    }
+                    if ui.add_enabled(can_modify, egui::Button::new(tl!("Duplicate…"))).clicked() {
+                        field_menu = Some(FieldMenu::Duplicate(name.clone()));
+                        ui.close();
+                    }
+                    ui.separator();
+                    let delete = if view.prepare.also.is_empty() { "Delete" } else { "Delete selected fields" };
+                    if ui.add_enabled(can_modify, egui::Button::new(tl!(delete))).clicked() {
+                        view.pending_edit = crate::prepare::delete_selected(view);
+                        ui.close();
+                    }
+                    return;
+                }
+                if let Some((page, index)) = view.links.context {
+                    if ui.button(tl!("Properties…")).clicked() {
+                        view.links.open_existing = Some((page, index));
+                        ui.close();
+                    }
+                    if ui.add_enabled(can_modify, egui::Button::new(tl!("Delete"))).clicked() {
+                        view.pending_edit = Some(Edit::DeleteLink { page, index });
+                        view.links.selected = None;
+                        view.links.context = None;
+                        ui.close();
+                    }
+                    ui.separator();
+                    if ui.add_enabled(can_modify, egui::Button::new(tl!("Remove all links"))).clicked() {
+                        view.pending_edit = Some(Edit::RemoveLinks { pages: None });
+                        view.links.selected = None;
+                        view.links.context = None;
+                        ui.close();
+                    }
+                    return;
+                }
+                // Over a picture (and no comment): Copy Image, as in Acrobat's page menu.
+                let mut copy_image = None;
+                if view.comments.selected.is_none()
+                    && let Some((page, at)) = view.comments.context_at
+                {
+                    // The page's content is parsed once per right-click, not on every frame the menu is open.
+                    let key = egui::Id::new("copy-image-under-menu");
+                    let cached = ui.data(|d| d.get_temp::<(usize, [f64; 2], Option<usize>)>(key)).filter(|c| c.0 == page && c.1 == at);
+                    let hit = match cached {
+                        Some(c) => c.2,
+                        None => {
+                            let hit = doc.page_image_at(page, at);
+                            ui.data_mut(|d| d.insert_temp(key, (page, at, hit)));
+                            hit
                         }
                     };
-                    ui.menu_button(tl!("Align"), |ui| {
-                        pick(ui, A::AlignLeft, "Left");
-                        pick(ui, A::AlignRight, "Right");
-                        pick(ui, A::AlignTop, "Top");
-                        pick(ui, A::AlignBottom, "Bottom");
-                        pick(ui, A::AlignCenterV, "Center vertically");
-                        pick(ui, A::AlignCenterH, "Center horizontally");
-                    });
-                    ui.menu_button(tl!("Distribute"), |ui| {
-                        pick(ui, A::DistributeH, "Horizontally");
-                        pick(ui, A::DistributeV, "Vertically");
-                    });
-                    ui.menu_button(tl!("Set Fields to Same Size"), |ui| {
-                        pick(ui, A::SameHeight, "Height");
-                        pick(ui, A::SameWidth, "Width");
-                        pick(ui, A::SameSize, "Both");
-                    });
-                    ui.separator();
-                }
-                if ui.button(tl!("Properties…")).clicked() {
-                    field_menu = Some(FieldMenu::Properties);
-                    ui.close();
-                }
-                if ui.add_enabled(can_modify, egui::Button::new(tl!("Duplicate…"))).clicked() {
-                    field_menu = Some(FieldMenu::Duplicate(name.clone()));
-                    ui.close();
-                }
-                ui.separator();
-                let delete = if view.prepare.also.is_empty() { "Delete" } else { "Delete selected fields" };
-                if ui.add_enabled(can_modify, egui::Button::new(tl!(delete))).clicked() {
-                    view.pending_edit = crate::prepare::delete_selected(view);
-                    ui.close();
-                }
-                return;
-            }
-            if let Some((page, index)) = view.links.context {
-                if ui.button(tl!("Properties…")).clicked() {
-                    view.links.open_existing = Some((page, index));
-                    ui.close();
-                }
-                if ui.add_enabled(can_modify, egui::Button::new(tl!("Delete"))).clicked() {
-                    view.pending_edit = Some(Edit::DeleteLink { page, index });
-                    view.links.selected = None;
-                    view.links.context = None;
-                    ui.close();
-                }
-                ui.separator();
-                if ui.add_enabled(can_modify, egui::Button::new(tl!("Remove all links"))).clicked() {
-                    view.pending_edit = Some(Edit::RemoveLinks { pages: None });
-                    view.links.selected = None;
-                    view.links.context = None;
-                    ui.close();
-                }
-                return;
-            }
-            // Over a picture (and no comment): Copy Image, as in Acrobat's page menu.
-            let mut copy_image = None;
-            if view.comments.selected.is_none()
-                && let Some((page, at)) = view.comments.context_at
-            {
-                // The page's content is parsed once per right-click, not on every frame the menu is open.
-                let key = egui::Id::new("copy-image-under-menu");
-                let cached = ui.data(|d| d.get_temp::<(usize, [f64; 2], Option<usize>)>(key)).filter(|c| c.0 == page && c.1 == at);
-                let hit = match cached {
-                    Some(c) => c.2,
-                    None => {
-                        let hit = doc.page_image_at(page, at);
-                        ui.data_mut(|d| d.insert_temp(key, (page, at, hit)));
-                        hit
+                    if let Some(image) = hit {
+                        if ui.button(tl!("Copy Image")).clicked() {
+                            copy_image = Some(comments::CanvasAction::CopyImage(page, image));
+                            ui.close();
+                        }
+                        if ui.button(tl!("Copy Image in Original Format")).clicked() {
+                            copy_image = Some(comments::CanvasAction::CopyImageFile(page, image));
+                            ui.close();
+                        }
+                        ui.separator();
                     }
-                };
-                if let Some(image) = hit {
-                    if ui.button(tl!("Copy Image")).clicked() {
-                        copy_image = Some(comments::CanvasAction::CopyImage(page, image));
-                        ui.close();
-                    }
-                    if ui.button(tl!("Copy Image in Original Format")).clicked() {
-                        copy_image = Some(comments::CanvasAction::CopyImageFile(page, image));
-                        ui.close();
-                    }
-                    ui.separator();
                 }
-            }
-            canvas_action = comments::context_menu(ui, view, info, prefs, allowed).or(copy_image);
-        });
+                canvas_action = comments::context_menu(ui, view, info, prefs, allowed).or(copy_image);
+            });
+        }
         (wanted, visible_now)
     });
     view.single_edges = visible_pages.first().copied().filter(|_| !view.continuous).map(|page| {
@@ -3185,10 +3423,10 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     // Text layers: visible pages for selection, every page while a search is active.
     let need_text = |p: &usize| !view.texts.contains_key(p) && !view.text_failed.contains(p);
     let mut text_pages: Vec<usize> = if hand { Vec::new() } else { visible_now.iter().copied().filter(need_text).collect() };
-    if view.find.as_ref().is_some_and(|f| !f.case_query.trim().is_empty()) {
-        let n = info.pages.len();
-        let rest: Vec<usize> = (0..n).map(|k| (cur + k) % n).filter(need_text).filter(|p| !text_pages.contains(p)).collect();
-        text_pages.extend(rest);
+    for p in view.search_demand(info.pages.len()) {
+        if !text_pages.contains(&p) {
+            text_pages.push(p);
+        }
     }
     queue.extend(text_pages.into_iter().map(|page| RenderRequest {
         page,
@@ -3209,14 +3447,17 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
             });
         });
     }
-    find_bar(view, info.pages.len(), avail, ui, &t);
+    // The phone layout searches from its own top bar.
+    if !phone {
+        find_bar(view, info.pages.len(), avail, ui, &t);
+    }
     if tool == QuickTool::EnhanceCamera {
         crate::camera_ui::bar(ui.ctx(), view, avail, &t, can_modify);
     }
     if let Some(e) = comments::composer(ui.ctx(), view, info, prefs) {
         view.pending_edit = Some(e);
     }
-    if let Some(e) = crate::edit_text_ui::overlay(ui.ctx(), view, info) {
+    if !phone && let Some(e) = crate::edit_text_ui::overlay(ui.ctx(), view, info) {
         view.pending_edit = Some(e);
     }
     if let Some(e) = crate::forms_ui::overlay(ui.ctx(), view, info, &form, today) {
@@ -3225,7 +3466,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     if let Some(e) = crate::fill_sign::type_box(ui.ctx(), view, info, &author) {
         view.pending_edit = Some(e);
     }
-    let (typed, text_done) = crate::content_ui::editor(ui.ctx(), view, info, &added);
+    let (typed, text_done) = if phone { (None, false) } else { crate::content_ui::editor(ui.ctx(), view, info, &added) };
     if typed.is_some() {
         view.pending_edit = typed;
     }
@@ -3377,7 +3618,10 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     if let Some((name, action)) = app.views[index].forms.button.take() {
         run_button(app, index, &name, action);
     }
-    quick_bar(app, avail, ui);
+    // The phone layout's tools are in its bottom bar.
+    if !phone {
+        quick_bar(app, avail, ui);
+    }
     if let Some((source, file, destination)) = remote_open {
         app.open_remote_link(source, file, destination);
     }
@@ -3472,6 +3716,12 @@ fn selection_actions(ui: &mut egui::Ui, viewport: Rect, view: &mut DocView, info
 /// Run a push button's action (the ones that need no JavaScript engine).
 fn run_button(app: &mut PdfCraftApp, index: usize, name: &str, action: pdfcraft_engine::form_scripts::ButtonAction) {
     use pdfcraft_engine::form_scripts::ButtonAction as B;
+    // Every `app.views[index]` below is in range: checked here, and nothing in this function
+    // closes a document.
+    if app.views.get(index).is_none() {
+        return;
+    }
+
     let pages = app.session.get(app.views[index].id).map_or(0, |d| d.info.pages.len());
     match action {
         B::Reset { fields, exclude } => {
@@ -3552,7 +3802,7 @@ fn run_button(app: &mut PdfCraftApp, index: usize, name: &str, action: pdfcraft_
 /// Run a set-layer-visibility action from a button or link. It changes what is shown, as the
 /// Layers panel does (which follows), not the document.
 fn set_layers(app: &mut PdfCraftApp, index: usize, changes: &[(LayerOp, (u32, u16))], preserve_rb: bool) {
-    let id = app.views[index].id;
+    let Some(id) = app.views.get(index).map(|v| v.id) else { return };
     if app.session.set_layer_state(id, changes, preserve_rb) {
         app.views[index].invalidate_content();
     }
@@ -3567,7 +3817,7 @@ fn find_bar(view: &mut DocView, pages: usize, area: Rect, ui: &mut egui::Ui, t: 
     }
     let mut close = false;
     let mut step: Option<bool> = None;
-    let searched = view.texts.len() + view.text_failed.len();
+    let searched = find.searched.len() + view.text_failed.len();
     egui::Area::new(egui::Id::new("find-bar"))
         .order(egui::Order::Middle)
         .pivot(Align2::RIGHT_TOP)
@@ -3675,6 +3925,47 @@ enum Notice {
     Unlock,
 }
 
+/// How many quick clicks count: only the Select tool goes past a double click (a third click
+/// of a highlight tool is a single one).
+fn effective_clicks(clicks: u32, tool: QuickTool) -> u32 {
+    if clicks > 2 && tool != QuickTool::Select { 1 } else { clicks }
+}
+
+/// What `clicks` (two or more) quick clicks at view point (`vx`, `vy`) select of a page's text:
+/// two a word, three its line, four or more the whole page.
+fn multi_click_span(text: &PageText, clicks: u32, vx: f32, vy: f32) -> Option<(usize, usize)> {
+    text.nearest(vx, vy).and_then(|a| match clicks {
+        2 => text.word_at(a),
+        3 => text.line_at(a),
+        _ => text.glyphs.len().checked_sub(1).map(|last| (0, last)),
+    })
+}
+
+/// The most of a page's text a screen reader is given at once (a page of small print is a few
+/// thousand characters).
+const PAGE_NODE_TEXT: usize = 20_000;
+
+/// A page on screen as a screen reader's node, "Page 3 of 10", its text the description once it
+/// is extracted: the pages were one nameless node. Hover only, so the pages' own widget keeps
+/// the pointer. The text is built only while a screen reader listens.
+fn page_node(ui: &egui::Ui, text: Option<&PageText>, page: usize, pages: usize, rect: Rect) {
+    let node = ui.interact(rect, ui.id().with(("page-node", page)), Sense::hover());
+    let label = crate::i18n::fmt(tl!("Page {p} of {n}"), &[("p", &page.saturating_add(1).to_string()), ("n", &pages.to_string())]);
+    // Where it is, as any widget's node says; then a group rather than a widget.
+    node.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Other, true, &label));
+    ui.ctx().accesskit_node_builder(node.id, |b| {
+        b.set_role(egui::accesskit::Role::Group);
+        if let Some(text) = text {
+            // Only the glyphs that can be given: a page of tiny print isn't put together whole.
+            let mut words = text.text_of(0..text.glyphs.len().min(PAGE_NODE_TEXT));
+            if let Some((cut, _)) = words.char_indices().nth(PAGE_NODE_TEXT) {
+                words.truncate(cut);
+            }
+            b.set_description(words);
+        }
+    });
+}
+
 /// The notice bar above the pages: the signature status first (Acrobat's signature bar), then
 /// a form's scripts having been turned off, security, forms and warnings.
 fn notices(
@@ -3692,20 +3983,14 @@ fn notices(
     // replacing it, ahead of every other notice.
     if view.disk_changed {
         let mut reload = false;
-        egui::Frame::NONE.fill(t.accent_soft).inner_margin(egui::Margin::symmetric(14, 7)).show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.add(icons::image("rotate-cw", 16.0, t.accent_text));
-                ui.label(
-                    egui::RichText::new(tl!("This file changed on disk. Reload it to see the new version; your unsaved changes will be lost."))
-                        .color(t.text),
-                );
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if icons::button(ui, "x", 22.0, false, tl!("Dismiss")).clicked() {
-                        view.disk_changed = false;
-                    }
-                    reload = crate::widgets::pill_button(ui, tl!("Reload"), false).clicked();
-                });
-            });
+        // The shared bar: its message wraps beside the buttons, so on a narrow (phone) window the
+        // buttons stay on screen.
+        let text = tl!("This file changed on disk. Reload it to see the new version; your unsaved changes will be lost.").to_string();
+        notice_bar(ui, t, "rotate-cw", t.accent_text, text, |ui| {
+            if icons::button(ui, "x", 22.0, false, tl!("Dismiss")).clicked() {
+                view.disk_changed = false;
+            }
+            reload = crate::widgets::pill_button(ui, tl!("Reload"), false).clicked();
         });
         return reload.then_some(Notice::Reload);
     }
@@ -4024,7 +4309,83 @@ fn quick_bar(app: &mut PdfCraftApp, area: Rect, ui: &mut egui::Ui) {
 }
 
 /// The organize toolbar: page operations on the selection (Acrobat's Organize Pages bar).
-fn organize_toolbar(view: &mut DocView, info: &DocInfo, editable: bool, dirty: bool, unobstructed: bool, ui: &mut egui::Ui, t: &Tokens) {
+/// What a tool of the page grid does.
+#[derive(Clone, Copy)]
+enum OrgAct {
+    RotateCcw,
+    RotateCw,
+    Delete,
+    Blank,
+    InsertFile,
+    Replace,
+    Extract,
+    Split,
+    Earlier,
+    Later,
+    Save,
+}
+
+/// Do `act` to the pages `targets` (the selection, or the current page).
+fn org_apply(view: &mut DocView, info: &DocInfo, targets: &[usize], act: OrgAct) {
+    let n = info.pages.len();
+    let (first, last) = (targets.first().copied().unwrap_or(0), targets.last().copied().unwrap_or(0));
+    let pages = targets.to_vec();
+    match act {
+        OrgAct::RotateCcw => view.pending_edit = Some(Edit::RotatePages { pages, degrees: -90 }),
+        OrgAct::RotateCw => view.pending_edit = Some(Edit::RotatePages { pages, degrees: 90 }),
+        OrgAct::Delete if targets.len() < n => view.pending_edit = Some(Edit::DeletePages { pages }),
+        OrgAct::Blank => {
+            if let Some(p) = info.pages.get(last) {
+                let c = p.crop;
+                let (w, h) = ((c[2] - c[0]).abs().max(1.0) as f64, (c[3] - c[1]).abs().max(1.0) as f64);
+                view.pending_edit = Some(Edit::InsertBlankPage { at: last + 1, width: w, height: h });
+            }
+        }
+        OrgAct::InsertFile => view.pending_action = Some(ViewAction::InsertFromFile),
+        OrgAct::Replace => view.pending_action = Some(ViewAction::ReplacePages),
+        OrgAct::Extract => view.pending_action = Some(ViewAction::Extract),
+        OrgAct::Split => view.pending_action = Some(ViewAction::Split),
+        OrgAct::Earlier if first > 0 => view.pending_edit = Some(Edit::MovePages { pages, to: first - 1 }),
+        OrgAct::Later if last + 1 < n => view.pending_edit = Some(Edit::MovePages { pages, to: first + 1 }),
+        OrgAct::Save => view.pending_action = Some(ViewAction::Save),
+        OrgAct::Delete | OrgAct::Earlier | OrgAct::Later => {}
+    }
+}
+
+/// Select ▸ all, odd, even, landscape or portrait pages, or none, from the menu `button` opens.
+fn select_menu(view: &mut DocView, info: &DocInfo, button: &egui::Response) {
+    egui::Popup::menu(button).show(|ui| {
+        use pdfcraft_engine::{PageOrientation as O, PageParity as P, filter_pages};
+        let all: Vec<usize> = (0..info.pages.len()).collect();
+        for (label, parity, orient) in [
+            ("All pages", P::Both, O::Both),
+            ("Odd pages", P::Odd, O::Both),
+            ("Even pages", P::Even, O::Both),
+            ("Landscape pages", P::Both, O::Landscape),
+            ("Portrait pages", P::Both, O::Portrait),
+        ] {
+            if ui.button(tl!(label)).clicked() {
+                view.select_pages(&filter_pages(info, &all, parity, orient));
+                ui.close();
+            }
+        }
+        if ui.button(tl!("None")).clicked() {
+            view.select_pages(&[]);
+            ui.close();
+        }
+    });
+}
+
+/// The grid zoom that fits `cols` columns of pages in `width` points (a phone's two).
+fn grid_zoom_for_columns(width: f32, cols: usize) -> f32 {
+    // A cell is 146 · zoom + 44 wide, and the grid keeps 40 points of margin; a little under, so
+    // rounding never drops a column.
+    let cell = (width - 40.0) / cols.max(1) as f32 - 46.0;
+    if cell.is_finite() { (cell / 146.0).clamp(*GRID_ZOOM_RANGE.start(), *GRID_ZOOM_RANGE.end()) } else { 1.0 }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn organize_toolbar(view: &mut DocView, info: &DocInfo, editable: bool, dirty: bool, unobstructed: bool, phone: bool, ui: &mut egui::Ui, t: &Tokens) {
     egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin::symmetric(16, 4)).show(ui, |ui| {
         let pages = ui.add_enabled_ui(unobstructed, |ui| view.organize_range.show(ui, &view.selected, info.pages.len())).inner;
         if let Some(pages) = pages {
@@ -4034,111 +4395,130 @@ fn organize_toolbar(view: &mut DocView, info: &DocInfo, editable: bool, dirty: b
     let targets = view.target_pages();
     let n = info.pages.len();
     let (first, last) = (targets.first().copied().unwrap_or(0), targets.last().copied().unwrap_or(0));
-    egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin::symmetric(16, 8)).show(ui, |ui| {
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 4.0;
-            let label = match view.selected.len() {
-                0 => crate::i18n::fmt(tl!("Page {p} of {n}"), &[("p", &(view.current + 1).to_string()), ("n", &n.to_string())]),
-                1 => tl!("1 page selected").to_string(),
-                k => crate::i18n::fmt(tl!("{n} pages selected"), &[("n", &k.to_string())]),
-            };
-            // Fixed width so the buttons never shift as the selection text changes.
-            ui.add_sized([150.0, 30.0], egui::Label::new(egui::RichText::new(label).font(theme::medium(13.0)).color(t.text_muted)).truncate());
-            ui.add_enabled_ui(editable, |ui| {
-                if icons::button(ui, "rotate-ccw", 30.0, false, tl!("Rotate counterclockwise")).clicked() {
-                    view.pending_edit = Some(Edit::RotatePages { pages: targets.clone(), degrees: -90 });
-                }
-                if icons::button(ui, "rotate-cw", 30.0, false, tl!("Rotate clockwise")).clicked() {
-                    view.pending_edit = Some(Edit::RotatePages { pages: targets.clone(), degrees: 90 });
-                }
-                let can_delete = targets.len() < n;
-                if ui.add_enabled_ui(can_delete, |ui| icons::button(ui, "trash-2", 30.0, false, tl!("Delete pages (Delete)"))).inner.clicked() {
-                    view.pending_edit = Some(Edit::DeletePages { pages: targets.clone() });
-                }
-                if icons::button(ui, "file-plus", 30.0, false, tl!("Insert a blank page after the selection")).clicked() {
-                    let c = info.pages[last].crop;
-                    let (w, h) = ((c[2] - c[0]).abs().max(1.0) as f64, (c[3] - c[1]).abs().max(1.0) as f64);
-                    view.pending_edit = Some(Edit::InsertBlankPage { at: last + 1, width: w, height: h });
-                }
-                if icons::button(ui, "file-input", 30.0, false, tl!("Insert pages from a file…")).clicked() {
-                    view.pending_action = Some(ViewAction::InsertFromFile);
-                }
-                if icons::button(ui, "replace", 30.0, false, tl!("Replace pages…")).clicked() {
-                    view.pending_action = Some(ViewAction::ReplacePages);
-                }
-                if icons::button(ui, "file-output", 30.0, false, tl!("Extract pages to a new document")).clicked() {
-                    view.pending_action = Some(ViewAction::Extract);
-                }
-                if icons::button(ui, "scissors", 30.0, false, tl!("Split into files…")).clicked() {
-                    view.pending_action = Some(ViewAction::Split);
-                }
-                // Select ▸ all, odd, even, landscape, portrait pages (Acrobat's page range
-                // selection in Organize Pages).
-                let sel = icons::button(ui, "list", 30.0, false, tl!("Select pages"));
-                egui::Popup::menu(&sel).show(|ui| {
-                    use pdfcraft_engine::{PageOrientation as O, PageParity as P, filter_pages};
-                    let all: Vec<usize> = (0..n).collect();
-                    for (label, parity, orient) in [
-                        ("All pages", P::Both, O::Both),
-                        ("Odd pages", P::Odd, O::Both),
-                        ("Even pages", P::Even, O::Both),
-                        ("Landscape pages", P::Both, O::Landscape),
-                        ("Portrait pages", P::Both, O::Portrait),
-                    ] {
-                        if ui.button(tl!(label)).clicked() {
-                            view.select_pages(&filter_pages(info, &all, parity, orient));
-                            ui.close();
+    let label = match view.selected.len() {
+        0 => crate::i18n::fmt(tl!("Page {p} of {n}"), &[("p", &(view.current + 1).to_string()), ("n", &n.to_string())]),
+        1 => tl!("1 page selected").to_string(),
+        k => crate::i18n::fmt(tl!("{n} pages selected"), &[("n", &k.to_string())]),
+    };
+    // The tools: (icon, what it does, whether it can now, the action).
+    let tools: [(&str, &str, bool, OrgAct); 10] = [
+        ("rotate-ccw", tl!("Rotate counterclockwise"), true, OrgAct::RotateCcw),
+        ("rotate-cw", tl!("Rotate clockwise"), true, OrgAct::RotateCw),
+        ("trash-2", tl!("Delete pages (Delete)"), targets.len() < n, OrgAct::Delete),
+        ("file-plus", tl!("Insert a blank page after the selection"), true, OrgAct::Blank),
+        ("file-input", tl!("Insert pages from a file…"), true, OrgAct::InsertFile),
+        ("replace", tl!("Replace pages…"), true, OrgAct::Replace),
+        ("file-output", tl!("Extract pages to a new document"), true, OrgAct::Extract),
+        ("scissors", tl!("Split into files…"), true, OrgAct::Split),
+        ("chevron-left", tl!("Move earlier"), first > 0, OrgAct::Earlier),
+        ("chevron-right", tl!("Move later"), last + 1 < n, OrgAct::Later),
+    ];
+    let mut act = None;
+    if phone {
+        // A phone: where you are and Select on a line, then the tools as a row of coloured
+        // buttons a finger wide that swipes sideways, and Save at its end.
+        egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin { left: 14, right: 6, top: 0, bottom: 6 }).show(ui, |ui| {
+            ui.horizontal(|ui| {
+                let width = (ui.available_width() - crate::phone::TARGET - 4.0).max(0.0);
+                let (r, said) = ui.allocate_exact_size(vec2(width, crate::phone::TARGET), Sense::hover());
+                said.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &label));
+                widgets::row_text(ui, r.left_center(), &label, theme::medium(14.5), t.text, width);
+                let sel = icons::button(ui, "list-checks", crate::phone::TARGET, false, tl!("Select pages"));
+                select_menu(view, info, &sel);
+            });
+            crate::phone_home::swipe_row(ui, "phone-organize-tools", |ui| {
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    for (icon, what, can, a) in tools {
+                        let hue = match a {
+                            OrgAct::RotateCcw | OrgAct::RotateCw => Color32::from_rgb(0x3A, 0x6F, 0xE8),
+                            OrgAct::Delete => Color32::from_rgb(0xE5, 0x48, 0x4D),
+                            OrgAct::Blank | OrgAct::InsertFile => Color32::from_rgb(0x16, 0xA3, 0x4A),
+                            OrgAct::Replace => Color32::from_rgb(0xF2, 0x9F, 0x05),
+                            OrgAct::Extract | OrgAct::Split => Color32::from_rgb(0x8B, 0x5C, 0xF6),
+                            OrgAct::Earlier | OrgAct::Later | OrgAct::Save => Color32::from_rgb(0x64, 0x74, 0x8B),
+                        };
+                        let (rect, resp) =
+                            ui.allocate_exact_size(Vec2::splat(crate::phone::TARGET), if editable && can { Sense::click() } else { Sense::hover() });
+                        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, editable && can, what));
+                        let press = theme::Press::track(ui, &resp);
+                        let chip = rect.shrink(3.0).translate(press.offset());
+                        crate::phone::icon_chip(ui, chip, icon, 20.0, if editable && can { hue } else { t.text_faint }, t);
+                        if resp.on_hover_text(what).clicked() {
+                            act = Some(a);
                         }
                     }
-                    if ui.button(tl!("None")).clicked() {
-                        view.select_pages(&[]);
-                        ui.close();
+                    if dirty {
+                        ui.add_space(6.0);
+                        if crate::phone::action_pill(ui, Some("save"), tl!("Save pages"), true, t).clicked() {
+                            act = Some(OrgAct::Save);
+                        }
                     }
+                    ui.add_space(8.0);
                 });
-                ui.add_space(8.0);
-                if ui.add_enabled_ui(first > 0, |ui| icons::button(ui, "chevron-left", 30.0, false, tl!("Move earlier"))).inner.clicked() {
-                    view.pending_edit = Some(Edit::MovePages { pages: targets.clone(), to: first - 1 });
-                }
-                if ui.add_enabled_ui(last + 1 < n, |ui| icons::button(ui, "chevron-right", 30.0, false, tl!("Move later"))).inner.clicked() {
-                    view.pending_edit = Some(Edit::MovePages { pages: targets.clone(), to: first + 1 });
-                }
-            });
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if widgets::ghost_button(ui, "x", tl!("Close")).on_hover_text(tl!("Back to the document")).clicked() {
-                    view.organize = false;
-                }
-                // What the grid shows is what is saved.
-                let save = ui.add_enabled_ui(dirty, |ui| widgets::pill_button(ui, tl!("Save pages"), true)).inner;
-                if save.on_hover_text(tl!("Save these pages as one PDF")).on_disabled_hover_text(tl!("No changes to save")).clicked() {
-                    view.pending_action = Some(ViewAction::Save);
-                }
-                ui.add_space(8.0);
-                // Page size in the grid (right to left: in, the percentage, out).
-                let zoom = view.grid_zoom;
-                if ui
-                    .add_enabled_ui(zoom < *GRID_ZOOM_RANGE.end(), |ui| icons::button(ui, "zoom-in", 30.0, false, tl!("Larger pages")))
-                    .inner
-                    .clicked()
-                {
-                    view.grid_zoom_request = Some(zoom * GRID_ZOOM_STEP);
-                }
-                let percent = egui::Button::new(egui::RichText::new(format!("{:.0}%", zoom * 100.0)).font(theme::medium(12.0)).color(t.text_muted))
-                    .frame(false);
-                let percent = ui.add_sized([44.0, 30.0], percent);
-                percent.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!("Reset page size")));
-                if percent.on_hover_text(tl!("Reset page size")).clicked() {
-                    view.grid_zoom_request = Some(1.0);
-                }
-                if ui
-                    .add_enabled_ui(zoom > *GRID_ZOOM_RANGE.start(), |ui| icons::button(ui, "zoom-out", 30.0, false, tl!("Smaller pages")))
-                    .inner
-                    .clicked()
-                {
-                    view.grid_zoom_request = Some(zoom / GRID_ZOOM_STEP);
-                }
             });
         });
-    });
+    } else {
+        egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin::symmetric(16, 8)).show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 4.0;
+                // Fixed width so the buttons never shift as the selection text changes.
+                ui.add_sized([150.0, 30.0], egui::Label::new(egui::RichText::new(&label).font(theme::medium(13.0)).color(t.text_muted)).truncate());
+                ui.add_enabled_ui(editable, |ui| {
+                    for (icon, what, can, a) in tools {
+                        // Select ▸ all, odd, even, landscape, portrait pages (Acrobat's page range
+                        // selection in Organize Pages) before moving earlier and later.
+                        if matches!(a, OrgAct::Earlier) {
+                            let sel = icons::button(ui, "list", 30.0, false, tl!("Select pages"));
+                            select_menu(view, info, &sel);
+                            ui.add_space(8.0);
+                        }
+                        if ui.add_enabled_ui(can, |ui| icons::button(ui, icon, 30.0, false, what)).inner.clicked() {
+                            act = Some(a);
+                        }
+                    }
+                });
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if widgets::ghost_button(ui, "x", tl!("Close")).on_hover_text(tl!("Back to the document")).clicked() {
+                        view.organize = false;
+                    }
+                    // What the grid shows is what is saved.
+                    let save = ui.add_enabled_ui(dirty, |ui| widgets::pill_button(ui, tl!("Save pages"), true)).inner;
+                    if save.on_hover_text(tl!("Save these pages as one PDF")).on_disabled_hover_text(tl!("No changes to save")).clicked() {
+                        act = Some(OrgAct::Save);
+                    }
+                    ui.add_space(8.0);
+                    // Page size in the grid (right to left: in, the percentage, out).
+                    let zoom = view.grid_zoom;
+                    if ui
+                        .add_enabled_ui(zoom < *GRID_ZOOM_RANGE.end(), |ui| icons::button(ui, "zoom-in", 30.0, false, tl!("Larger pages")))
+                        .inner
+                        .clicked()
+                    {
+                        view.grid_zoom_request = Some(zoom * GRID_ZOOM_STEP);
+                    }
+                    let percent =
+                        egui::Button::new(egui::RichText::new(format!("{:.0}%", zoom * 100.0)).font(theme::medium(12.0)).color(t.text_muted))
+                            .frame(false);
+                    let percent = ui.add_sized([44.0, 30.0], percent);
+                    percent.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!("Reset page size")));
+                    if percent.on_hover_text(tl!("Reset page size")).clicked() {
+                        view.grid_zoom_request = Some(1.0);
+                    }
+                    if ui
+                        .add_enabled_ui(zoom > *GRID_ZOOM_RANGE.start(), |ui| icons::button(ui, "zoom-out", 30.0, false, tl!("Smaller pages")))
+                        .inner
+                        .clicked()
+                    {
+                        view.grid_zoom_request = Some(zoom / GRID_ZOOM_STEP);
+                    }
+                });
+            });
+        });
+    }
+    if let Some(a) = act {
+        org_apply(view, info, &targets, a);
+    }
     // Keys act on the selection unless a text field or a dialog has them (Delete under
     // Preferences deleted the selected pages).
     if editable && unobstructed && !ui.ctx().egui_wants_keyboard_input() {
@@ -4192,13 +4572,19 @@ fn gap_button(ui: &mut egui::Ui, gap: usize, at: Pos2, height: f32, label: Strin
     resp.on_hover_text(label).clicked()
 }
 
-fn organize_grid(view: &mut DocView, info: &DocInfo, editable: bool, dirty: bool, unobstructed: bool, ui: &mut egui::Ui, t: &Tokens) {
+#[allow(clippy::too_many_arguments)]
+fn organize_grid(view: &mut DocView, info: &DocInfo, editable: bool, dirty: bool, unobstructed: bool, phone: bool, ui: &mut egui::Ui, t: &Tokens) {
     let ppp = ui.ctx().pixels_per_point();
+    // Two pages a row on a phone, from the first frame: its width holds one at the desktop's size.
+    if phone && !view.grid_fitted {
+        view.set_grid_zoom(grid_zoom_for_columns(ui.available_width(), 2));
+        view.grid_fitted = true;
+    }
     // The page image scales with the zoom; the padding and the page number don't.
     let cell = vec2(146.0 * view.grid_zoom + 44.0, 194.0 * view.grid_zoom + 88.0);
     let anchor = view.grid_anchor.take();
     let mut open_page = None;
-    organize_toolbar(view, info, editable, dirty, unobstructed, ui, t);
+    organize_toolbar(view, info, editable, dirty, unobstructed, phone, ui, t);
     let viewport = ui.available_rect_before_wrap();
     view.viewport_screen = viewport;
     let auto_delta = if unobstructed {
@@ -4555,6 +4941,19 @@ trailer << /Root 1 0 R >>
         assert_eq!(v.grid_zoom(), 0.5);
     }
 
+    #[test]
+    fn a_phones_page_grid_has_two_columns() {
+        for width in [320.0_f32, 360.0, 384.0, 412.0, 480.0] {
+            let zoom = grid_zoom_for_columns(width, 2);
+            let cell = 146.0 * zoom + 44.0;
+            assert_eq!(((width - 40.0) / cell).floor() as usize, 2, "{width} points wide");
+        }
+        // Too narrow for two at the smallest size, or nonsense: the zoom stays in range.
+        assert_eq!(grid_zoom_for_columns(100.0, 2), 0.5);
+        assert_eq!(grid_zoom_for_columns(f32::NAN, 2), 1.0);
+        assert_eq!(grid_zoom_for_columns(400.0, 0), grid_zoom_for_columns(400.0, 1));
+    }
+
     fn view(pages: usize, layout: PageLayout, continuous: bool) -> DocView {
         let info = pdfcraft_render::DocInfo {
             pages: (0..pages)
@@ -4605,8 +5004,10 @@ trailer << /Root 1 0 R >>
         assert_eq!(v.selected_text().as_deref(), Some("x"), "stale selections still copy");
     }
 
+    /// Mid-search, text layers go like any others (searched pages aren't asked for again), and
+    /// the search asks for the next pages it hasn't searched, a few at a time.
     #[test]
-    fn text_layers_stay_while_a_search_is_active() {
+    fn a_search_keeps_what_fits_and_asks_only_for_pages_it_has_not_searched() {
         let info = thumbnail_info(100);
         let mut v = DocView::new(DocId(1), &info, ViewDefaults::default());
         v.current = 50;
@@ -4614,9 +5015,51 @@ trailer << /Root 1 0 R >>
         for p in 0..100 {
             v.texts.insert(p, Arc::new(PageText::default()));
         }
-        v.find = Some(Find { query: "dup".into(), case_query: "dup".into(), matches: vec![(0, 0..1)], ..Default::default() });
+        v.find = Some(Find {
+            query: "dup".into(),
+            case_query: "dup".into(),
+            matches: vec![(0, 0..1)],
+            searched: (0..100).collect(),
+            ..Default::default()
+        });
         let _ = v.prepare_render_queue(&info, 1.0);
-        assert_eq!(v.texts.len(), 100, "evicting mid-search would churn the workers");
+        assert_eq!(v.texts.len(), 1 + 1 + MAX_CACHED_TEXT_PAGES, "visible, matched and nearest; the rest go");
+        assert!(v.search_demand(100).is_empty(), "every page searched: nothing asked again");
+        // A new query searches again, from the current page on, a few pages at a time.
+        if let Some(f) = v.find.as_mut() {
+            f.searched = (0..60).collect();
+        }
+        let expected: Vec<usize> = (60..100).filter(|p| !v.texts.contains_key(p)).take(SEARCH_AHEAD).collect();
+        assert!(!expected.is_empty());
+        assert_eq!(v.search_demand(100), expected, "not cached, not searched, from the current page on");
+        v.find = None;
+        assert!(v.search_demand(100).is_empty(), "no search, no demand");
+    }
+
+    /// A search through a long book keeps its matched pages' text only as far as the budget
+    /// goes, but always what is on screen.
+    #[test]
+    fn matched_pages_text_keeps_to_a_byte_budget() {
+        let info = thumbnail_info(400);
+        let mut v = DocView::new(DocId(1), &info, ViewDefaults::default());
+        v.current = 0;
+        v.frame_visible = HashSet::from([0]);
+        let glyph = pdfcraft_render::TextGlyph { text: "x".into(), rect: [0.0; 4], quad: [[0.0, 0.0]; 4], direction: [1.0, 0.0] };
+        let page = Arc::new(PageText { glyphs: vec![glyph; 5000], line_of: vec![0; 5000], space_before: vec![false; 5000] });
+        for p in 0..400 {
+            v.texts.insert(p, page.clone());
+        }
+        v.find = Some(Find {
+            query: "x".into(),
+            case_query: "x".into(),
+            matches: (0..400).map(|p| (p, 0..1)).collect(),
+            searched: (0..400).collect(),
+            ..Default::default()
+        });
+        let _ = v.prepare_render_queue(&info, 1.0);
+        let used: usize = v.texts.values().map(|t| text_bytes(t)).sum();
+        assert!(v.texts.contains_key(&0), "on screen");
+        assert!(v.texts.len() < 400 && used <= TEXT_BYTES + text_bytes(&page), "{} pages, {used} bytes", v.texts.len());
     }
 
     fn thumbnail_info(count: usize) -> DocInfo {

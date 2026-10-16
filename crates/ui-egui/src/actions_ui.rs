@@ -77,7 +77,7 @@ impl PdfCraftApp {
         match self.export_dir_override.clone() {
             Some(d) => self.run_action_into(action, files, d.into()),
             None => {
-                let dialog = rfd::AsyncFileDialog::new().set_title(tl!("Choose a folder for the results").to_string());
+                let dialog = crate::file_dialog::AsyncFileDialog::new().set_title(tl!("Choose a folder for the results").to_string());
                 self.ask_one(crate::pickers::Ask::Folder(dialog), None, move |app, dir| app.run_action_into(action, files, dir));
             }
         }
@@ -153,7 +153,7 @@ impl PdfCraftApp {
                     &[("d", &(done + 1).min(total.max(1)).to_string()), ("t", &total.max(1).to_string())],
                 );
                 if self.toast.as_ref().is_none_or(|t| t.0 != m) {
-                    self.notify(m);
+                    self.notify_progress(m);
                 }
                 if let Some(ctx) = &self.ctx {
                     ctx.request_repaint_after(std::time::Duration::from_millis(200));
@@ -186,7 +186,7 @@ impl PdfCraftApp {
             match self.action_files_override.clone() {
                 Some(p) => run(self, p.into_iter().map(std::path::PathBuf::from).collect()),
                 None => {
-                    let dialog = rfd::AsyncFileDialog::new().set_title(title).add_filter("PDF", &["pdf"]);
+                    let dialog = crate::file_dialog::AsyncFileDialog::new().set_title(title).add_filter("PDF", &["pdf"]);
                     self.ask(crate::pickers::Ask::Files(dialog), None, run);
                 }
             }
@@ -343,7 +343,7 @@ fn edit_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> bool {
     let all = Step::all();
     let add = &mut app.wizard.add;
     ui.horizontal(|ui| {
-        egui::ComboBox::from_id_salt("action-add-step").selected_text(tl!(all[(*add).min(all.len() - 1)].label())).width(240.0).show_ui(ui, |ui| {
+        crate::widgets::combo("action-add-step").selected_text(tl!(all[(*add).min(all.len() - 1)].label())).width(240.0).show_ui(ui, |ui| {
             for (i, s) in all.iter().enumerate() {
                 ui.selectable_value(add, i, tl!(s.label()));
             }

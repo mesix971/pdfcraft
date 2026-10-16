@@ -2301,3 +2301,148 @@ animation effects	Off	Изключени
 	The linked PDF opened, but its named destination was not applied.	Свързаният PDF се отвори, но именуваната му цел не беше приложена.
 	The linked PDF opened, but its page destination was out of range.	Свързаният PDF се отвори, но целевата му страница е извън обхвата.
 	Local cross-PDF links require the desktop app	Локалните връзки между PDF файлове изискват настолното приложение
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Вътрешна памет
+	Documents	Документи
+	PdfCraft files	Файлове на PdfCraft
+	SD card {name}	SD карта {name}
+	Couldn't create the folder {name}: {e}	Папката {name} не може да бъде създадена: {e}
+	Choose this folder	Избиране на тази папка
+	{name} already exists. Replace it?	{name} вече съществува. Да бъде ли заменен?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	За да отваряте и записвате файлове навсякъде на това устройство, разрешете на PdfCraft да управлява всички файлове.
+	Allow access	Разрешаване на достъпа
+	All files	Всички файлове
+	This folder is empty	Тази папка е празна
+	New folder	Нова папка
+
+# Printing through another app (Android)
+	Another app	Друго приложение
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Готовият за печат PDF се отваря в избраното от вас приложение, което го отпечатва със своите настройки за копия, двустранен печат и цвят.
+	Couldn't hand {name} to another app: {e}	{name} не може да бъде предаден на друго приложение: {e}
+phone bar	Edit	Редактиране
+	Send	Изпращане
+	Thinking…	Мисли…
+	Anthropic API key	API ключ за Anthropic
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	Въпросът ви и отвореният документ се изпращат до Anthropic (Claude) с вашия собствен API ключ, само когато поискате. Заявките се таксуват към акаунта ви в Anthropic.
+	Most pages sent per question	Най-много изпратени страници на въпрос
+	Translate page {n}	Превод на страница {n}
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} токена
+	The answer stopped at its length limit.	Отговорът спря при максималната си дължина.
+	Add your Anthropic API key to use the assistant.	Добавете своя API ключ за Anthropic, за да използвате асистента.
+	The API key was refused. Check it in the assistant's settings.	API ключът беше отхвърлен. Проверете го в настройките на асистента.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	Този документ има {pages} страници; асистентът чете най-много {max}. Увеличете ограничението в настройките на асистента.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	Този документ е твърде голям за асистента ({mb} MB, най-много {max} MB).
+	Too many requests right now. Try again in a moment.	Твърде много заявки в момента. Опитайте отново след малко.
+	The request was declined ({reason}).	Заявката беше отказана ({reason}).
+	Couldn't reach the AI service: {error}	Няма връзка с услугата за ИИ: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	API ключът не е валиден: поставете го отново в настройките на асистента.
+	The assistant gave no answer. Try asking differently.	Асистентът не даде отговор. Опитайте да попитате по друг начин.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Вашият акаунт в Anthropic не може да използва този модел или няма оставащ кредит: {error}
+	The AI service answered: {error}	Услугата за ИИ отговори: {error}
+	{tokens} tokens	{tokens} токена
+	New conversation	Нов разговор
+	Proposed changes	Предложени промени
+	Applied	Приложено
+	Discarded	Отхвърлено
+	The document has no page {page}.	Документът няма страница {page}.
+	The passage wasn't found on page {page}.	Пасажът не е намерен на страница {page}.
+	The document refused the change.	Документът отказа промяната.
+	Applied as one step: Undo takes them all back.	Прилагат се с една стъпка: „Отмени“ ги връща всички.
+	The passage appears more than once on page {page}.	Пасажът се среща повече от веднъж на страница {page}.
+	It overlaps another proposed change.	Тя се припокрива с друга предложена промяна.
+	A PDF on this device.	PDF на това устройство.
+	Add my name	Добави името ми
+	Add to Starred	Добави в любими
+	Add your name and a photo. Your name also signs your comments.	Добавете името си и снимка. Името ви подписва и коментарите ви.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Разрешете достъп до файловете си и PdfCraft ще покаже PDF файловете на това устройство.
+	An empty page to start from.	Празна страница за начало.
+	Change its text and pictures.	Променете текста и изображенията.
+	Choose a photo	Избери снимка
+	Files	Файлове
+	Fill in a form and sign it.	Попълнете формуляр и го подпишете.
+	From photos, scans or other files.	От снимки, сканирания или други файлове.
+	Hello, {name}	Здравейте, {name}
+	It shows on Home and signs your comments.	Показва се в началото и подписва коментарите ви.
+	Make PdfCraft yours	Направете PdfCraft свой
+	More for {name}	Още за {name}
+	No PDFs found.	Не са намерени PDF файлове.
+	No files match.	Няма съвпадащи файлове.
+	No recent files yet.	Все още няма скорошни файлове.
+	No starred files.	Няма любими файлове.
+	On this device	На това устройство
+	Open another file…	Отвори друг файл…
+	PDFs on this device	PDF файлове на това устройство
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft търси в „Изтегляния“, „Документи“ и в собствената си папка.
+	Photos and scans become the pages of a new PDF.	Снимките и сканиранията стават страници на нов PDF.
+	Pictures	Изображения
+	Places	Места
+	Profile	Профил
+	Remove from Starred	Премахни от любими
+	Remove the photo	Премахни снимката
+	Search files	Търсене на файлове
+	See your PDFs	Вижте своите PDF файлове
+	Set up	Настрой
+	Several PDFs and pictures in one document.	Няколко PDF файла и изображения в един документ.
+	Star a file from its menu to find it here.	Добавете файл в любими от менюто му, за да го намерите тук.
+	Starred	Любими
+	Summarize, ask and translate.	Обобщаване, въпроси, превод.
+	Summarize, question and correct your PDFs with Claude, with your own key.	Обобщавайте, питайте и коригирайте своите PDF файлове с Claude, със собствения си ключ.
+	Text, pictures and other files, converted to PDF.	Текст, изображения и други файлове, преобразувани в PDF.
+	The files you open show here.	Файловете, които отваряте, се показват тук.
+	What would you like to do?	Какво искате да направите?
+	Which document?	Кой документ?
+	Your AI assistant	Вашият ИИ асистент
+file state	Open	Отворен
+	Choose a PNG or JPEG picture.	Изберете изображение PNG или JPEG.
+	This picture is too large.	Това изображение е твърде голямо.
+	Couldn't use this picture: {e}	Това изображение не можа да бъде използвано: {e}
+	Couldn't use this picture.	Това изображение не можа да бъде използвано.
+	{n} MB	{n} МБ
+	{n} KB	{n} КБ
+decimal separator	.	,
+	Other folders…	Други папки…
+	Looking for photos…	Търсене на снимки…
+	See your photos	Вижте снимките си
+	Allow PdfCraft to see your photos, and choose one here.	Позволете на PdfCraft да вижда снимките ви и изберете една тук.
+	No photos found.	Не са намерени снимки.
+	PdfCraft shows the photos in Camera, Pictures and Download.	PdfCraft показва снимките в „Камера“, „Изображения“ и „Изтегляния“.
+	Automatic	Автоматично
+	Dark mode	Тъмен режим
+	Dark pages	Тъмни страници
+	Light text on a dark page, for reading at night.	Светъл текст на тъмна страница, за четене нощем.
+	Night	Нощ
+	Downloads	Изтегляния
+	Choose a file	Избиране на файл
+	Choose files	Избиране на файлове
+	Choose a folder	Избиране на папка
+	Tap to unlock	Докоснете, за да отключите
+	Browse folders	Разглеждане на папки
+	Combined from top to bottom. Use the arrows to change the order.	Обединяват се отгоре надолу. Използвайте стрелките, за да промените реда.
+	PDFs and pictures, combined into one PDF in the order you choose.	PDF файлове и снимки, обединени в един PDF в избрания от вас ред.
+	Smaller text	По-малък текст
+	Larger text	По-голям текст
+	Flip	Обръщане
+	Tap text or a picture to change it	Докоснете текст или картина, за да ги промените
+	Tap where the text goes	Докоснете мястото на текста
+	White	Бяло
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	Въпросът ви и отвореният документ се изпращат до избраната от вас услуга, със собствения ви API ключ, само когато поискате. Заявките се таксуват към акаунта ви в тази услуга.
+	Service	Услуга
+	Another service (OpenAI-compatible)	Друга услуга (съвместима с OpenAI)
+	API key	API ключ
+	On Google's free tier, what you send may be used to improve Google's products.	При безплатния план на Google изпратеното от вас може да се използва за подобряване на продуктите на Google.
+	Fill in for	Попълване за
+	Service address	Адрес на услугата
+	API key (if the service asks for one)	API ключ (ако услугата изисква)
+	The service reads PDF files	Услугата чете PDF файлове
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	Иначе се изпраща текстът на документа, страница по страница (без картините и сканираното).
+	Add your API key for {service} in the assistant's settings.	Добавете API ключа си за {service} в настройките на асистента.
+	Your {service} account can't use this model, or has no credit left: {error}	Вашият акаунт в {service} не може да използва този модел или няма оставащ кредит: {error}
+	Choose the model to ask in the assistant's settings.	Изберете модела, който да питате, в настройките на асистента.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	Този документ няма текст за изпращане (сканиран ли е?). Изберете услуга, която чете PDF файлове, или първо разпознайте текста му.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	Текстът на този документ е твърде дълъг за асистента ({chars} знака, най-много {max}).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Обобщавайте, питайте и коригирайте своите PDF файлове с Claude, ChatGPT или Gemini, със собствения си ключ.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	Адресът на услугата не е валиден: той започва с https:// (http:// само за това устройство или локалната мрежа).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	Този документ не позволява копиране на съдържанието му, затова не се изпраща до асистента.
+	Try again	Опитайте отново
+	Price per million tokens read / written	Цена за милион прочетени / написани токена

@@ -2,7 +2,7 @@
 //! (replaced blue, inserted green, deleted red), shades them on the newer document's pages, and
 //! offers a report or the differences as comments.
 
-use egui::{Align, Color32, Layout};
+use egui::Color32;
 use pdfcraft_engine::DocId;
 use pdfcraft_engine::compare::{Comparison, Kind};
 
@@ -48,15 +48,18 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
     let new_name = app.session.get(new).map(|d| d.name.clone()).unwrap_or_default();
     egui::Grid::new("compare-files").num_columns(2).spacing([12.0, 10.0]).show(ui, |ui| {
         ui.label(tl!("Old file:"));
+        widgets::grid_break(ui);
         let shown =
             others.iter().find(|(id, _)| Some(*id) == app.compare_old).map_or(tl!("Open the older version first").to_string(), |(_, n)| n.clone());
-        egui::ComboBox::from_id_salt("compare-old").selected_text(shown).width(320.0).show_ui(ui, |ui| {
+        let width = widgets::combo_width(ui, 320.0);
+        crate::widgets::combo("compare-old").selected_text(shown).width(width).show_ui(ui, |ui| {
             for (id, n) in &others {
                 ui.selectable_value(&mut app.compare_old, Some(*id), n);
             }
         });
         ui.end_row();
         ui.label(tl!("New file:"));
+        widgets::grid_break(ui);
         ui.label(egui::RichText::new(new_name).strong());
         ui.end_row();
     });
@@ -65,7 +68,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
     ui.add_space(10.0);
     let (mut go, mut cancel) = (false, false);
     ui.horizontal(|ui| {
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        widgets::buttons_row(ui, |ui| {
             if ui.add_enabled_ui(app.compare_old.is_some(), |ui| widgets::pill_button(ui, tl!("Compare"), true)).inner.clicked() {
                 go = true;
             }

@@ -262,19 +262,26 @@ impl PdfCraftApp {
             "view.read_mode" => self.switch_mode(if self.mode == Mode::Read { Mode::AllTools } else { Mode::Read }, false),
             "view.theme" => {
                 let next = if self.theme == ThemeKind::Light { ThemePreference::Dark } else { ThemePreference::Light };
+                self.theme_chosen = true;
                 self.set_theme_preference(next);
             }
             command if command.starts_with("measure.") => crate::measure_ui::command(self, command),
-            "view.theme.system" => self.set_theme_preference(ThemePreference::System),
-            "view.theme.light" => self.set_theme_preference(ThemePreference::Light),
-            "view.theme.dark" => self.set_theme_preference(ThemePreference::Dark),
+            "view.theme.system" | "view.theme.light" | "view.theme.dark" => {
+                self.theme_chosen = true;
+                self.set_theme_preference(match id {
+                    "view.theme.system" => ThemePreference::System,
+                    "view.theme.light" => ThemePreference::Light,
+                    _ => ThemePreference::Dark,
+                });
+            }
             "comment.list" => self.choose_right_panel(Some(RightPanel::Comments)),
             tool if crate::comments::CommentTool::from_command(tool).is_some() => {
                 let Some(tool) = crate::comments::CommentTool::from_command(tool) else { return false };
                 self.comment_prefs.group_tool[tool.group()] = tool;
                 self.quick_tool = crate::QuickTool::Comment(tool);
                 // Acrobat opens the Comments panel with the commenting tools, unless the user closed it.
-                if self.right.is_none() && !self.comments_panel_closed {
+                // The phone layout shows a panel instead of the page, so it never opens one by itself.
+                if self.right.is_none() && !self.comments_panel_closed && !self.phone_layout() {
                     self.choose_right_panel(Some(RightPanel::Comments));
                 }
                 // A text selection made before picking a markup tool is marked right away.
@@ -382,7 +389,11 @@ impl PdfCraftApp {
                 self.quick_tool = crate::QuickTool::EditText;
                 self.left = crate::LeftPanel::Tool("edit");
                 self.reveal_tools();
-                self.notify_tr("Click text or an image to edit it");
+                if self.phone_layout() {
+                    self.notify_tr("Tap text or a picture to change it");
+                } else {
+                    self.notify_tr("Click text or an image to edit it");
+                }
             }
             "edit.advanced_search" => {
                 if let Some(i) = self.active {

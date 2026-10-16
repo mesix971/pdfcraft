@@ -4,7 +4,6 @@
 
 use std::sync::{Arc, Mutex};
 
-use egui::{Align, Layout};
 use pdfcraft_engine::DocId;
 use pdfcraft_engine::ocr::{LANGUAGES, OcrPage, OcrSettings};
 
@@ -77,8 +76,11 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
     ui.add_space(8.0);
     let group = |ui: &mut egui::Ui, title: &str, body: &mut dyn FnMut(&mut egui::Ui)| {
         ui.label(egui::RichText::new(tl!(title)).font(theme::semibold(13.0)));
+        // The frame's margins are outside the width set inside it: on a phone, where the dialog is
+        // exactly the screen's width, take them off first.
+        let width = if widgets::phone_dialogs(ui.ctx()) { (ui.available_width() - 20.0).max(0.0) } else { ui.available_width() };
         egui::Frame::new().fill(t.hover).corner_radius(egui::CornerRadius::same(6)).inner_margin(egui::Margin::same(10)).show(ui, |ui| {
-            ui.set_width(ui.available_width());
+            ui.set_width(width);
             body(ui);
         });
         ui.add_space(8.0);
@@ -86,7 +88,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
     group(ui, "Pages", &mut |ui| {
         widgets::radio_value(ui, &mut d.pages, OcrPages::All, tl!("All pages"));
         widgets::radio_value(ui, &mut d.pages, OcrPages::Current, tl!("Current page"));
-        ui.horizontal(|ui| {
+        widgets::row(ui, |ui| {
             widgets::radio_value(ui, &mut d.pages, OcrPages::Range, tl!("From"));
             let on = d.pages == OcrPages::Range;
             ui.add_enabled(on, egui::DragValue::new(&mut d.from).range(1..=pages));
@@ -97,26 +99,36 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
     group(ui, "Settings", &mut |ui| {
         egui::Grid::new("ocr-settings").num_columns(2).spacing([12.0, 8.0]).show(ui, |ui| {
             ui.label(tl!("Document language"));
+            widgets::grid_break(ui);
             let name = LANGUAGES.iter().find(|l| l.0 == d.language).map_or("English", |l| l.1);
-            egui::ComboBox::from_id_salt("ocr-language").selected_text(tl!(name)).width(220.0).show_ui(ui, |ui| {
+            crate::widgets::combo("ocr-language").selected_text(tl!(name)).width(220.0).wrap_mode(widgets::combo_text(ui)).show_ui(ui, |ui| {
                 for (code, name) in LANGUAGES {
                     ui.selectable_value(&mut d.language, (*code).to_string(), tl!(*name));
                 }
             });
             ui.end_row();
             ui.label(tl!("Output"));
-            egui::ComboBox::from_id_salt("ocr-output").selected_text(tl!("Searchable Image (Exact)")).width(220.0).show_ui(ui, |ui| {
-                let _ = ui
-                    .selectable_label(true, tl!("Searchable Image (Exact)"))
-                    .on_hover_text(tl!("Adds invisible text over each word; the page image is not changed"));
-            });
+            widgets::grid_break(ui);
+            crate::widgets::combo("ocr-output")
+                .selected_text(tl!("Searchable Image (Exact)"))
+                .width(220.0)
+                .wrap_mode(widgets::combo_text(ui))
+                .show_ui(ui, |ui| {
+                    let _ = ui
+                        .selectable_label(true, tl!("Searchable Image (Exact)"))
+                        .on_hover_text(tl!("Adds invisible text over each word; the page image is not changed"));
+                });
             ui.end_row();
             ui.label(tl!("Downsample to"));
-            egui::ComboBox::from_id_salt("ocr-dpi").selected_text(format!("{} dpi", d.dpi)).width(220.0).show_ui(ui, |ui| {
-                for v in [600, 300, 150, 72] {
-                    ui.selectable_value(&mut d.dpi, v, format!("{v} dpi"));
-                }
-            });
+            widgets::grid_break(ui);
+            crate::widgets::combo("ocr-dpi").selected_text(format!("{} dpi", d.dpi)).width(220.0).wrap_mode(widgets::combo_text(ui)).show_ui(
+                ui,
+                |ui| {
+                    for v in [600, 300, 150, 72] {
+                        ui.selectable_value(&mut d.dpi, v, format!("{v} dpi"));
+                    }
+                },
+            );
             ui.end_row();
         });
         ui.add_space(4.0);
@@ -134,7 +146,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
     ui.add_space(6.0);
     let (mut go, mut cancel) = (false, false);
     ui.horizontal(|ui| {
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        widgets::buttons_row(ui, |ui| {
             if ui.add_enabled_ui(available, |ui| widgets::pill_button(ui, tl!("Recognize text"), true)).inner.clicked() {
                 go = true;
             }
@@ -206,7 +218,7 @@ impl PdfCraftApp {
         match self.export_dir_override.clone() {
             Some(d) => self.ocr_files_into(files, settings, d.into()),
             None => {
-                let dialog = rfd::AsyncFileDialog::new().set_title(tl!("Choose a folder for the searchable files").to_string());
+                let dialog = crate::file_dialog::AsyncFileDialog::new().set_title(tl!("Choose a folder for the searchable files").to_string());
                 self.ask_one(crate::pickers::Ask::Folder(dialog), None, move |app, dir| app.ocr_files_into(files, settings, dir));
             }
         }
@@ -303,7 +315,7 @@ impl PdfCraftApp {
                         &[("d", &(done + 1).min(total.max(1)).to_string()), ("t", &total.max(1).to_string())],
                     );
                     if self.toast.as_ref().is_none_or(|t| t.0 != m) {
-                        self.notify(m);
+                        self.notify_progress(m);
                     }
                     if let Some(ctx) = &self.ctx {
                         ctx.request_repaint_after(std::time::Duration::from_millis(200));
@@ -322,7 +334,7 @@ impl PdfCraftApp {
             );
             drop(s);
             if self.toast.as_ref().is_none_or(|t| t.0 != msg) {
-                self.notify(msg);
+                self.notify_progress(msg);
             }
             if let Some(ctx) = &self.ctx {
                 ctx.request_repaint_after(std::time::Duration::from_millis(200));

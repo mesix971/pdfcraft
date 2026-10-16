@@ -36,6 +36,8 @@ mod text_preview;
 mod upright_image;
 pub mod xfa;
 
+/// A document's reading flow (the phone's reading mode).
+pub use pdfcraft_export::{Flow, heading_level, page_flow};
 pub use signature_image::{ImageSignaturePreview, SignatureImage};
 pub use signature_scan::{PhotoRect, ScanError, SignaturePhoto, Turn};
 pub use text_preview::TextEditPreview;
@@ -772,8 +774,11 @@ fn display_bytes(editor: Option<&mut Editor>, bytes: &Arc<Vec<u8>>) -> Arc<Vec<u
     write_incremental(&display, &SaveOptions::default()).map(Arc::new).unwrap_or_else(|_| bytes.clone())
 }
 
+/// One render worker per core, but one, up to seven; three on a phone, whose cores also keep
+/// the screen smooth and whose battery pays for every one (the result: 2 to 7, or 1 to 3).
 fn render_threads() -> usize {
-    std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(2, 8) - 1
+    let most = if cfg!(target_os = "android") { 4 } else { 8 };
+    std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(2, most) - 1
 }
 
 /// Render `doc` with the layer visibility in its `info.layers`.
@@ -3176,21 +3181,29 @@ impl Session {
             check_permission(&edit, &p)?;
         }
         // Rewriting an OCR word (invisible text over a scan) also hides the scanned word: cover it
-        // in the paper's colour and draw the new text in the ink's.
-        let edit = match edit {
+        // in the paper's colour and draw the new text in the ink's. Also inside a batch (the AI
+        // assistant's changes are one), where each paragraph is sampled before the batch runs.
+        let cover = |page: usize, block: usize, style: &mut pdfcraft_edit::BlockStyle| {
+            // Only invisible text is sampled; the blocks are usually cached from opening it.
+            if style.cover.is_none()
+                && let Some(info) = doc.info.pages.get(page)
+                && let Some(b) = editor.text_blocks(page).ok().and_then(|b| b.get(block).filter(|b| b.invisible).cloned())
+                && let Some((paper, ink)) = guard(|| scan_colours::sample(&editor.cos, info, page, &b)).ok().flatten()
+            {
+                style.cover = Some(paper);
+                style.color = style.color.or(Some(ink));
+            }
+        };
+        let covered = |edit: Edit| match edit {
             Edit::EditTextBlock { page, block, text, mut style } => {
-                // Only invisible text is sampled; the blocks are usually cached from opening it.
-                if style.cover.is_none()
-                    && let Some(info) = doc.info.pages.get(page)
-                    && let Some(b) = editor.text_blocks(page).ok().and_then(|b| b.get(block).filter(|b| b.invisible).cloned())
-                    && let Some((paper, ink)) = guard(|| scan_colours::sample(&editor.cos, info, page, &b)).ok().flatten()
-                {
-                    style.cover = Some(paper);
-                    style.color = style.color.or(Some(ink));
-                }
+                cover(page, block, &mut style);
                 Edit::EditTextBlock { page, block, text, style }
             }
             other => other,
+        };
+        let edit = match edit {
+            Edit::Batch { label, edits } => Edit::Batch { label, edits: edits.into_iter().map(covered).collect() },
+            other => covered(other),
         };
         // Nothing to bake: leave undo history and the dirty flag alone.
         if matches!(&edit, Edit::FlattenFillSign) && !pdfcraft_annot::has_visible_fill_sign(&editor.cos) {

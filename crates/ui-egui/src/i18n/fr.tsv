@@ -2338,3 +2338,149 @@ animation effects	Off	Désactivés
 	The linked PDF opened, but its named destination was not applied.	Le PDF lié s'est ouvert, mais sa destination nommée n'a pas été appliquée.
 	The linked PDF opened, but its page destination was out of range.	Le PDF lié s'est ouvert, mais sa page de destination est hors limites.
 	Local cross-PDF links require the desktop app	Les liens locaux entre PDF nécessitent l'application de bureau
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Stockage interne
+	Documents	Documents
+	PdfCraft files	Fichiers PdfCraft
+	SD card {name}	Carte SD {name}
+	Couldn't create the folder {name}: {e}	Impossible de créer le dossier {name} : {e}
+	Choose this folder	Choisir ce dossier
+	{name} already exists. Replace it?	{name} existe déjà. Le remplacer ?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Pour ouvrir et enregistrer des fichiers n'importe où sur cet appareil, autorisez PdfCraft à gérer tous les fichiers.
+	Allow access	Autoriser l'accès
+	All files	Tous les fichiers
+	This folder is empty	Ce dossier est vide
+	New folder	Nouveau dossier
+
+# Printing through another app (Android)
+	Another app	Une autre application
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Le PDF prêt à imprimer s'ouvre dans l'application de votre choix, qui l'imprime avec ses propres réglages de copies, de recto verso et de couleur.
+	Couldn't hand {name} to another app: {e}	Impossible de transmettre {name} à une autre application : {e}
+phone bar	Edit	Modifier
+	Send	Envoyer
+	Thinking…	Réflexion…
+	Anthropic API key	Clé API Anthropic
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	Votre question et le document ouvert sont envoyés à Anthropic (Claude) avec votre propre clé API, uniquement quand vous le demandez. Les requêtes sont facturées sur votre compte Anthropic.
+	Most pages sent per question	Pages envoyées au maximum par question
+	Translate page {n}	Traduire la page {n}
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} jetons
+	The answer stopped at its length limit.	La réponse s'est arrêtée à sa longueur maximale.
+	Add your Anthropic API key to use the assistant.	Ajoutez votre clé API Anthropic pour utiliser l'assistant.
+	The API key was refused. Check it in the assistant's settings.	La clé API a été refusée. Vérifiez-la dans les réglages de l'assistant.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	Ce document a {pages} pages ; l'assistant en lit au plus {max}. Relevez la limite dans les réglages de l'assistant.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	Ce document est trop volumineux pour l'assistant ({mb} Mo, au plus {max} Mo).
+	Too many requests right now. Try again in a moment.	Trop de requêtes pour le moment. Réessayez dans un instant.
+	The request was declined ({reason}).	La requête a été refusée ({reason}).
+	Couldn't reach the AI service: {error}	Impossible de joindre le service d'IA : {error}
+	The API key isn't valid: paste it again in the assistant's settings.	La clé API n'est pas valide : collez-la à nouveau dans les réglages de l'assistant.
+	The assistant gave no answer. Try asking differently.	L'assistant n'a pas donné de réponse. Essayez de reformuler.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Votre compte Anthropic ne peut pas utiliser ce modèle, ou n'a plus de crédit : {error}
+	The AI service answered: {error}	Le service d'IA a répondu : {error}
+	{tokens} tokens	{tokens} jetons
+	New conversation	Nouvelle conversation
+	Proposed changes	Modifications proposées
+	Applied	Appliquée
+	Discarded	Abandonnée
+	The document has no page {page}.	Le document n'a pas de page {page}.
+	The passage wasn't found on page {page}.	Le passage est introuvable page {page}.
+	The document refused the change.	Le document a refusé la modification.
+	Applied as one step: Undo takes them all back.	Appliquées en une seule étape : Annuler les reprend toutes.
+	The passage appears more than once on page {page}.	Le passage apparaît plusieurs fois page {page}.
+	It overlaps another proposed change.	Elle chevauche une autre modification proposée.
+	A PDF on this device.	Un PDF de cet appareil.
+	Add my name	Ajouter mon nom
+	Add to Starred	Ajouter aux favoris
+	Add your name and a photo. Your name also signs your comments.	Ajoutez votre nom et une photo. Votre nom signe aussi vos commentaires.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Autorisez l'accès à vos fichiers et PdfCraft liste les PDF de cet appareil.
+	An empty page to start from.	Une page vierge pour commencer.
+	Change its text and pictures.	Modifier son texte et ses images.
+	Choose a photo	Choisir une photo
+	Files	Fichiers
+	Fill in a form and sign it.	Remplir un formulaire et le signer.
+	From photos, scans or other files.	À partir de photos, de scans ou d'autres fichiers.
+	Hello, {name}	Bonjour, {name}
+	It shows on Home and signs your comments.	Il s'affiche sur l'accueil et signe vos commentaires.
+	Make PdfCraft yours	Personnalisez PdfCraft
+	More for {name}	Plus d'options pour {name}
+	No PDFs found.	Aucun PDF trouvé.
+	No files match.	Aucun fichier ne correspond.
+	No recent files yet.	Aucun fichier récent pour l'instant.
+	No starred files.	Aucun fichier favori.
+	On this device	Sur l'appareil
+	Open another file…	Ouvrir un autre fichier…
+	PDFs on this device	PDF de cet appareil
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft cherche dans Téléchargements, Documents et son propre dossier.
+	Photos and scans become the pages of a new PDF.	Vos photos et scans deviennent les pages d'un nouveau PDF.
+	Pictures	Images
+	Places	Emplacements
+	Profile	Profil
+	Remove from Starred	Retirer des favoris
+	Remove the photo	Retirer la photo
+	Search files	Rechercher des fichiers
+	See your PDFs	Voir vos PDF
+	Set up	Configurer
+	Several PDFs and pictures in one document.	Plusieurs PDF et images dans un seul document.
+	Star a file from its menu to find it here.	Ajoutez un fichier aux favoris depuis son menu pour le retrouver ici.
+	Starred	Favoris
+	Summarize, ask and translate.	Résumer, interroger, traduire.
+	Summarize, question and correct your PDFs with Claude, with your own key.	Résumez, interrogez et corrigez vos PDF avec Claude, avec votre propre clé.
+	Text, pictures and other files, converted to PDF.	Texte, images et autres fichiers, convertis en PDF.
+	The files you open show here.	Les fichiers que vous ouvrez apparaissent ici.
+	What would you like to do?	Que voulez-vous faire ?
+	Which document?	Quel document ?
+	Your AI assistant	Votre assistant IA
+file state	Open	Ouvert
+	Choose a PNG or JPEG picture.	Choisissez une image PNG ou JPEG.
+	This picture is too large.	Cette image est trop volumineuse.
+	Couldn't use this picture: {e}	Impossible d'utiliser cette image : {e}
+	Couldn't use this picture.	Impossible d'utiliser cette image.
+	{n} MB	{n} Mo
+	{n} KB	{n} Ko
+decimal separator	.	,
+	Other folders…	Autres dossiers…
+	Looking for photos…	Recherche de photos…
+	See your photos	Voir vos photos
+	Allow PdfCraft to see your photos, and choose one here.	Autorisez PdfCraft à voir vos photos, puis choisissez-en une ici.
+	No photos found.	Aucune photo trouvée.
+	PdfCraft shows the photos in Camera, Pictures and Download.	PdfCraft affiche les photos de l'Appareil photo, d'Images et de Téléchargements.
+	Automatic	Automatique
+	Dark mode	Mode sombre
+	Dark pages	Pages sombres
+	Light text on a dark page, for reading at night.	Texte clair sur page sombre, pour lire la nuit.
+	Night	Nuit
+	Downloads	Téléchargements
+	Choose a file	Choisir un fichier
+	Choose files	Choisir des fichiers
+	Choose a folder	Choisir un dossier
+	Tap to unlock	Touchez pour déverrouiller
+	Browse folders	Parcourir les dossiers
+	Combined from top to bottom. Use the arrows to change the order.	Combinés de haut en bas. Utilisez les flèches pour changer l'ordre.
+	PDFs and pictures, combined into one PDF in the order you choose.	Des PDF et des photos, combinés en un seul PDF dans l'ordre de votre choix.
+@plural	{n} byte|{n} bytes	{n} octet|{n} octets
+	Smaller text	Texte plus petit
+	Larger text	Texte plus grand
+	Flip	Retourner
+	Tap text or a picture to change it	Touchez un texte ou une image pour le modifier
+	Tap where the text goes	Touchez l'endroit où mettre le texte
+	White	Blanc
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	Votre question et le document ouvert sont envoyés au service que vous choisissez, avec votre propre clé API, uniquement quand vous le demandez. Les requêtes sont facturées sur votre compte chez ce service.
+	Service	Service
+	Another service (OpenAI-compatible)	Autre service (compatible OpenAI)
+	API key	Clé API
+	On Google's free tier, what you send may be used to improve Google's products.	Avec l'offre gratuite de Google, ce que vous envoyez peut servir à améliorer les produits de Google.
+	Fill in for	Remplir pour
+	Service address	Adresse du service
+	API key (if the service asks for one)	Clé API (si le service en demande une)
+	The service reads PDF files	Le service lit les fichiers PDF
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	Sinon, le texte du document est envoyé, page par page (sans ses images ni ses scans).
+	Add your API key for {service} in the assistant's settings.	Ajoutez votre clé API {service} dans les réglages de l'assistant.
+	Your {service} account can't use this model, or has no credit left: {error}	Votre compte {service} ne peut pas utiliser ce modèle, ou n'a plus de crédit : {error}
+	Choose the model to ask in the assistant's settings.	Choisissez le modèle à interroger dans les réglages de l'assistant.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	Ce document n'a pas de texte à envoyer (est-ce un scan ?). Choisissez un service qui lit les fichiers PDF, ou reconnaissez d'abord son texte.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	Le texte de ce document est trop long pour l'assistant ({chars} caractères, au plus {max}).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Résumez, interrogez et corrigez vos PDF avec Claude, ChatGPT ou Gemini, avec votre propre clé.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	L'adresse du service n'est pas valide : elle commence par https:// (http:// seulement pour cet appareil ou le réseau local).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	Ce document n'autorise pas la copie de son contenu : il n'est pas envoyé à l'assistant.
+	Try again	Réessayer
+	Price per million tokens read / written	Prix par million de jetons lus / écrits

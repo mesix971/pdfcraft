@@ -222,7 +222,23 @@ fn listed_printers() -> Vec<spool::Printer> {
 
 /// A printer's name as the dialog shows it.
 fn printer_label(name: &str) -> String {
-    if name == crate::web_print::BROWSER_PRINTER { crate::web_print::browser_printer_label().to_string() } else { name.to_string() }
+    if name == crate::web_print::BROWSER_PRINTER {
+        crate::web_print::browser_printer_label().to_string()
+    } else if name == HOST_PRINTER {
+        tl!("Another app").to_string()
+    } else {
+        name.to_string()
+    }
+}
+
+/// The printer listed when the host prints through other apps ([`PdfCraftApp::host_print`]). An
+/// id, never shown; the dialog shows "Another app".
+pub(crate) const HOST_PRINTER: &str = "\u{1}host";
+
+/// Whether `printer` prints somewhere that chooses copies, two-sided printing and colour itself:
+/// the browser's print dialog, or the app the host hands the PDF to.
+fn prints_elsewhere(printer: Option<&str>) -> bool {
+    printer.is_some_and(|p| p == crate::web_print::BROWSER_PRINTER || p == HOST_PRINTER)
 }
 
 /// The printer the dialog preselects: the system default, else the first.
@@ -241,6 +257,14 @@ impl PdfCraftApp {
                 (self.print_draft.printers.clone(), true)
             }
             _ => (listed_printers(), false),
+        };
+        // The host's other apps come first, as the default: on Android they are how to print.
+        let printers = if self.host_print.is_some() {
+            let mut all = vec![spool::Printer { name: HOST_PRINTER.to_string(), default: true, two_sided: None }];
+            all.extend(printers.into_iter().filter(|p| p.name != HOST_PRINTER).map(|p| spool::Printer { default: false, ..p }));
+            all
+        } else {
+            printers
         };
         let default = default_printer(&printers);
         let current = self.views[i].current;
@@ -373,8 +397,24 @@ impl PdfCraftApp {
                     }
                 }
             }
+            Some(printer) if printer == HOST_PRINTER => self.print_with_host(&name, bytes),
             Some(printer) => self.send_to_printer(printer, bytes, self.print_draft.job(&name)),
             None => self.save_print_pdf(&name, bytes),
+        }
+    }
+
+    /// Hand the print-ready PDF to the host, which opens it in an app that prints
+    /// ([`PdfCraftApp::host_print`]).
+    fn print_with_host(&mut self, name: &str, bytes: Vec<u8>) -> bool {
+        let Some(print) = &self.host_print else { return false };
+        let stem = name.trim_end_matches(".pdf").trim_end_matches(".PDF");
+        let file = format!("{stem} (print).pdf");
+        match print(&file, bytes) {
+            Ok(()) => true,
+            Err(e) => {
+                self.notify_fmt("Couldn't hand {name} to another app: {e}", &[("name", &file), ("e", &e)]);
+                false
+            }
         }
     }
 
@@ -391,7 +431,7 @@ impl PdfCraftApp {
                 ctx.request_repaint();
             }
         });
-        self.notify(crate::i18n::fmt(tl!("Sending to {printer}…"), &[("printer", &printer)]));
+        self.notify_progress(crate::i18n::fmt(tl!("Sending to {printer}…"), &[("printer", &printer)]));
         self.print_tasks.jobs.push((printer, rx));
         true
     }
@@ -414,7 +454,7 @@ impl PdfCraftApp {
             Ok(job) => {
                 let n = job.total().to_string();
                 self.print_tasks.web_job = Some(job);
-                self.notify_fmt("Preparing {n} sheets for printing…", &[("n", &n)]);
+                self.notify_progress(crate::i18n::fmt(tl!("Preparing {n} sheets for printing…"), &[("n", &n)]));
                 if let Some(ctx) = &self.ctx {
                     ctx.request_repaint();
                 }
@@ -442,7 +482,7 @@ impl PdfCraftApp {
                 return;
             }
             let (done, total) = (job.done().to_string(), job.total().to_string());
-            self.notify_fmt("Preparing sheet {done} of {total} for printing…", &[("done", &done), ("total", &total)]);
+            self.notify_progress(crate::i18n::fmt(tl!("Preparing sheet {done} of {total} for printing…"), &[("done", &done), ("total", &total)]));
             if let Some(ctx) = &self.ctx {
                 ctx.request_repaint();
             }
@@ -453,7 +493,7 @@ impl PdfCraftApp {
         let urls = job.take_urls();
         self.print_tasks.web_last = Some((job.name.clone(), job.pdf.clone()));
         match crate::web_print::print_in_iframe(&html, urls, self.print_tasks.web_failed.clone(), self.ctx.clone()) {
-            Ok(()) => self.notify_tr("Opening the browser's print dialog…"),
+            Ok(()) => self.notify_progress(tl!("Opening the browser's print dialog…")),
             Err(e) => self.web_print_failed(&e),
         }
     }
@@ -493,7 +533,7 @@ impl PdfCraftApp {
             Some(p) => write(self, p.into()),
             None => {
                 let stem = name.trim_end_matches(".pdf").trim_end_matches(".PDF");
-                let dialog = rfd::AsyncFileDialog::new().add_filter("PDF", &["pdf"]).set_file_name(format!("{stem} (print).pdf"));
+                let dialog = crate::file_dialog::AsyncFileDialog::new().add_filter("PDF", &["pdf"]).set_file_name(format!("{stem} (print).pdf"));
                 self.ask_one(crate::pickers::Ask::Save(dialog), None, move |app, path| {
                     write(app, path);
                 })
@@ -582,7 +622,7 @@ fn driver_options_panel(ui: &mut egui::Ui, d: &mut PrintDraft, t: &Tokens) {
         ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new(tl!("Printer properties")).font(theme::semibold(13.0)));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            widgets::buttons_row(ui, |ui| {
                 if ui.button(tl!("Done")).clicked() {
                     *show = false;
                 }
@@ -609,7 +649,7 @@ fn driver_options_panel(ui: &mut egui::Ui, d: &mut PrintDraft, t: &Tokens) {
                         let current = choices.get(&o.key).cloned().unwrap_or_else(|| o.default.clone());
                         let label_of = |c: &str| o.choices.iter().find(|(k, _)| k == c).map_or_else(|| c.to_string(), |(_, l)| l.clone());
                         let mut pick = current.clone();
-                        egui::ComboBox::from_id_salt(("driver-option", &o.key)).selected_text(label_of(&current)).width(200.0).show_ui(ui, |ui| {
+                        crate::widgets::combo(("driver-option", &o.key)).selected_text(label_of(&current)).width(200.0).show_ui(ui, |ui| {
                             for (k, l) in &o.choices {
                                 ui.selectable_value(&mut pick, k.clone(), l.as_str());
                             }
@@ -631,7 +671,7 @@ fn driver_options_panel(ui: &mut egui::Ui, d: &mut PrintDraft, t: &Tokens) {
 
 fn combo<T: PartialEq + Copy>(ui: &mut egui::Ui, id: &str, value: &mut T, choices: &[(T, &str)], width: f32) {
     let shown = choices.iter().find(|c| c.0 == *value).map_or("", |c| c.1);
-    egui::ComboBox::from_id_salt(id).selected_text(shown).width(width).show_ui(ui, |ui| {
+    crate::widgets::combo(id).selected_text(shown).width(width).show_ui(ui, |ui| {
         for (v, label) in choices {
             ui.selectable_value(value, *v, *label);
         }
@@ -648,30 +688,35 @@ pub(crate) fn body(
     labels: &[String],
     thumb: &mut dyn FnMut(usize) -> Option<egui::TextureId>,
 ) -> (bool, bool) {
-    ui.set_width(820.0);
+    widgets::set_dialog_width(ui, 820.0);
     ui.label(egui::RichText::new(tl!("Print")).font(theme::semibold(18.0)));
     ui.add_space(8.0);
     let settings = d.settings(sizes.len(), labels);
     let sheets = settings.as_ref().ok().and_then(|s| print::layout(sizes, s).ok()).unwrap_or_default();
     d.sheet = d.sheet.min(sheets.len().saturating_sub(1));
-    ui.horizontal_top(|ui| {
+    // The settings beside the preview; on a phone, above it.
+    let layout =
+        if widgets::phone_dialogs(ui.ctx()) { egui::Layout::top_down(egui::Align::Min) } else { egui::Layout::left_to_right(egui::Align::Min) };
+    ui.with_layout(layout, |ui| {
         // Settings.
         ui.vertical(|ui| {
-            ui.set_width(470.0);
+            widgets::set_dialog_width(ui, 470.0);
             egui::Grid::new("print-top").num_columns(2).spacing([10.0, 8.0]).show(ui, |ui| {
                 ui.label(tl!("Printer:"));
+                widgets::grid_break(ui);
                 let before = d.printer.clone();
-                // The browser's print dialog sets copies, two-sided printing and colour itself.
-                let browser = d.printer.as_deref() == Some(crate::web_print::BROWSER_PRINTER);
-                ui.horizontal(|ui| {
+                // The browser's print dialog (or the app the host hands the PDF to) sets copies,
+                // two-sided printing and colour itself.
+                let browser = prints_elsewhere(d.printer.as_deref());
+                widgets::row(ui, |ui| {
                     let shown = d.printer.as_deref().map_or_else(|| tl!("Save as PDF").to_string(), printer_label);
-                    egui::ComboBox::from_id_salt("printer").selected_text(shown).width(260.0).show_ui(ui, |ui| {
+                    crate::widgets::combo("printer").selected_text(shown).width(260.0).show_ui(ui, |ui| {
                         if d.printers_loading {
                             ui.add_enabled(false, egui::Label::new(tl!("Looking for printers…")));
                         }
                         for p in &d.printers {
                             let name = printer_label(&p.name);
-                            let label = if p.default && p.name != crate::web_print::BROWSER_PRINTER {
+                            let label = if p.default && !prints_elsewhere(Some(&p.name)) {
                                 crate::i18n::fmt(tl!("{name} (default)"), &[("name", &name)])
                             } else {
                                 name
@@ -707,8 +752,9 @@ pub(crate) fn body(
                 }
                 ui.end_row();
                 ui.label(tl!("Copies:"));
+                widgets::grid_break(ui);
                 ui.add_enabled_ui(!browser, |ui| {
-                    ui.horizontal(|ui| {
+                    widgets::row(ui, |ui| {
                         ui.add(egui::DragValue::new(&mut d.copies).range(1..=999));
                         ui.add(widgets::checkbox(&mut d.collate, tl!("Collate")));
                         ui.add(widgets::checkbox(&mut d.grayscale, tl!("Print in grayscale")));
@@ -716,6 +762,7 @@ pub(crate) fn body(
                 });
                 ui.end_row();
                 ui.label(tl!("Two-sided:"));
+                widgets::grid_break(ui);
                 ui.add_enabled_ui(!browser, |ui| {
                     combo(
                         ui,
@@ -731,8 +778,9 @@ pub(crate) fn body(
                 });
                 ui.end_row();
                 ui.label(tl!("Paper:"));
+                widgets::grid_break(ui);
                 let paper_name = PAPERS.get(d.paper).map_or("US Letter", |p| p.0);
-                egui::ComboBox::from_id_salt("paper").selected_text(paper_name).width(260.0).show_ui(ui, |ui| {
+                crate::widgets::combo("paper").selected_text(paper_name).width(260.0).show_ui(ui, |ui| {
                     for (i, (name, _)) in PAPERS.iter().enumerate() {
                         ui.selectable_value(&mut d.paper, i, *name);
                     }
@@ -748,6 +796,16 @@ pub(crate) fn body(
             }
             if d.printer.as_deref() == Some(crate::web_print::BROWSER_PRINTER) {
                 ui.label(egui::RichText::new(tl!("Copies, two-sided printing and colour are chosen in the browser's print dialog.")).small().color(t.text_muted));
+            }
+            if d.printer.as_deref() == Some(HOST_PRINTER) {
+                ui.add(
+                    egui::Label::new(
+                        egui::RichText::new(tl!("The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings."))
+                            .small()
+                            .color(t.text_muted),
+                    )
+                    .wrap(),
+                );
             }
             if let Some(e) = &d.driver_error {
                 ui.label(egui::RichText::new(crate::i18n::fmt(tl!("Couldn't open the printer's preferences: {e}"), &[("e", e)])).small().color(t.text_muted));
@@ -772,7 +830,7 @@ pub(crate) fn body(
             }
             ui.add_space(6.0);
             widgets::section_title(ui, tl!("Pages to Print"));
-            ui.horizontal(|ui| {
+            widgets::row(ui, |ui| {
                 widgets::radio_value(ui, &mut d.which, Which::All, tl!("All"));
                 widgets::radio_value(ui, &mut d.which, Which::Current, tl!("Current page"));
                 widgets::radio_value(ui, &mut d.which, Which::Range, tl!("Pages"));
@@ -789,8 +847,9 @@ pub(crate) fn body(
                 let label = format!("{} ({})", tl!("Selected pages"), d.selected.len());
                 widgets::radio_value(ui, &mut d.which, Which::Selected, label);
             }
-            ui.horizontal(|ui| {
+            widgets::row(ui, |ui| {
                 ui.label(tl!("More options:"));
+                widgets::line_break(ui);
                 combo(
                     ui,
                     "subset",
@@ -798,6 +857,7 @@ pub(crate) fn body(
                     &[(Subset::All, tl!("All pages in range")), (Subset::Odd, tl!("Odd pages only")), (Subset::Even, tl!("Even pages only"))],
                     150.0,
                 );
+                widgets::line_break(ui);
                 ui.add(widgets::checkbox(&mut d.reverse, tl!("Reverse pages")));
             });
             ui.add_space(6.0);
@@ -818,12 +878,12 @@ pub(crate) fn body(
             ui.add_space(4.0);
             match d.handling {
                 Handling::Size => {
-                    ui.horizontal(|ui| {
+                    widgets::row(ui, |ui| {
                         widgets::radio_value(ui, &mut d.size, SizeMode::Fit, tl!("Fit"));
                         widgets::radio_value(ui, &mut d.size, SizeMode::Actual, tl!("Actual size"));
                         widgets::radio_value(ui, &mut d.size, SizeMode::Shrink, tl!("Shrink oversized pages"));
                     });
-                    ui.horizontal(|ui| {
+                    widgets::row(ui, |ui| {
                         let custom = matches!(d.size, SizeMode::Custom(_));
                         if ui.add(widgets::radio(custom, tl!("Custom scale:"))).clicked() {
                             d.size = SizeMode::Custom(d.custom_scale);
@@ -832,7 +892,7 @@ pub(crate) fn body(
                     });
                 }
                 Handling::Poster => {
-                    ui.horizontal(|ui| {
+                    widgets::row(ui, |ui| {
                         ui.label(tl!("Tile scale:"));
                         ui.add(egui::DragValue::new(&mut d.poster_scale).range(10.0..=1000.0).suffix(" %"));
                         ui.label(tl!("Overlap:"));
@@ -841,9 +901,10 @@ pub(crate) fn body(
                     });
                 }
                 Handling::Multiple => {
-                    ui.horizontal(|ui| {
+                    widgets::row(ui, |ui| {
                         ui.label(tl!("Pages per sheet:"));
                         combo(ui, "per-sheet", &mut d.per_sheet, &[(2, "2"), (4, "4"), (6, "6"), (9, "9"), (16, "16")], 60.0);
+                        widgets::line_break(ui);
                         ui.label(tl!("Page order:"));
                         combo(
                             ui,
@@ -859,7 +920,7 @@ pub(crate) fn body(
                             150.0,
                         );
                     });
-                    ui.horizontal(|ui| {
+                    widgets::row(ui, |ui| {
                         ui.add(widgets::checkbox(&mut d.border, tl!("Print page border")));
                         ui.add(widgets::checkbox(&mut d.auto_rotate, tl!("Auto-rotate pages")));
                     });
@@ -870,7 +931,7 @@ pub(crate) fn body(
                     }
                 }
                 Handling::Booklet => {
-                    ui.horizontal(|ui| {
+                    widgets::row(ui, |ui| {
                         ui.label(tl!("Booklet subset:"));
                         combo(
                             ui,
@@ -883,13 +944,14 @@ pub(crate) fn body(
                             ],
                             130.0,
                         );
+                        widgets::line_break(ui);
                         ui.label(tl!("Binding:"));
                         combo(ui, "binding", &mut d.binding, &[(Binding::Left, tl!("Left")), (Binding::Right, tl!("Right"))], 80.0);
                     });
                 }
             }
             ui.add_space(6.0);
-            ui.horizontal(|ui| {
+            widgets::row(ui, |ui| {
                 ui.label(tl!("Orientation:"));
                 widgets::radio_value(ui, &mut d.orientation, Orientation::Auto, tl!("Auto portrait/landscape"));
                 widgets::radio_value(ui, &mut d.orientation, Orientation::Portrait, tl!("Portrait"));
@@ -981,7 +1043,7 @@ pub(crate) fn body(
                 }
                 _ => {}
             }
-            ui.horizontal(|ui| {
+            widgets::row(ui, |ui| {
                 let n = sheets.len();
                 if ui.add_enabled(d.sheet > 0, egui::Button::new("‹")).on_hover_text(tl!("Previous sheet")).clicked() {
                     d.sheet -= 1;
@@ -1012,7 +1074,7 @@ pub(crate) fn body(
     });
     ui.add_space(12.0);
     let (mut go, mut cancel) = (false, false);
-    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+    widgets::buttons_row(ui, |ui| {
         let label = if d.printer.is_some() { "Print" } else { "Save as PDF" };
         if ui.add_enabled_ui(settings.is_ok() && !sheets.is_empty(), |ui| widgets::pill_button(ui, label, true)).inner.clicked() {
             go = true;

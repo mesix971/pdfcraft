@@ -81,8 +81,11 @@ pub(crate) fn options_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens)
     ui.add_space(8.0);
     let group = |ui: &mut egui::Ui, title: &str, body: &mut dyn FnMut(&mut egui::Ui)| {
         ui.label(egui::RichText::new(tl!(title)).font(theme::semibold(13.0)));
+        // The frame's margins are outside the width set inside it: on a phone, where the dialog is
+        // exactly the screen's width, take them off first.
+        let width = if widgets::phone_dialogs(ui.ctx()) { (ui.available_width() - 20.0).max(0.0) } else { ui.available_width() };
         egui::Frame::new().fill(t.hover).corner_radius(egui::CornerRadius::same(6)).inner_margin(egui::Margin::same(10)).show(ui, |ui| {
-            ui.set_width(ui.available_width());
+            ui.set_width(width);
             body(ui);
         });
         ui.add_space(8.0);
@@ -91,7 +94,7 @@ pub(crate) fn options_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens)
         ui.add(widgets::checkbox(&mut o.create_report, tl!("Create accessibility report")));
     });
     group(ui, "Page Range", &mut |ui| {
-        ui.horizontal(|ui| {
+        widgets::row(ui, |ui| {
             widgets::radio_value(ui, &mut o.all_pages, true, tl!("All pages in document"));
             widgets::radio_value(ui, &mut o.all_pages, false, tl!("Pages from"));
             ui.add_enabled(!o.all_pages, egui::DragValue::new(&mut o.from).range(1..=pages));
@@ -101,9 +104,10 @@ pub(crate) fn options_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens)
     });
     let on = o.rules.len();
     group(ui, &crate::i18n::fmt(tl!("Checking Options ({on} of 32 in all categories)"), &[("on", &on.to_string())]), &mut |ui| {
-        ui.horizontal(|ui| {
+        widgets::row(ui, |ui| {
             ui.label(tl!("Category:"));
-            egui::ComboBox::from_id_salt("a11y-category").selected_text(tl!(o.category.label())).width(260.0).show_ui(ui, |ui| {
+            let width = widgets::combo_width(ui, 260.0);
+            crate::widgets::combo("a11y-category").selected_text(tl!(o.category.label())).width(width).show_ui(ui, |ui| {
                 for c in Category::ALL {
                     ui.selectable_value(&mut o.category, c, tl!(c.label()));
                 }
@@ -121,7 +125,7 @@ pub(crate) fn options_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens)
             }
         }
         ui.add_space(4.0);
-        ui.horizontal(|ui| {
+        widgets::row(ui, |ui| {
             if ui.button(tl!("Select All")).clicked() {
                 o.rules.extend(Rule::ALL.into_iter().filter(|r| r.category() == o.category));
             }
@@ -135,7 +139,7 @@ pub(crate) fn options_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens)
     ui.add_space(10.0);
     let (mut start, mut cancel) = (false, false);
     ui.horizontal(|ui| {
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        widgets::buttons_row(ui, |ui| {
             if widgets::pill_button(ui, tl!("Start Checking"), true).clicked() {
                 start = true;
             }
@@ -147,14 +151,11 @@ pub(crate) fn options_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens)
     (start, cancel)
 }
 
-/// The red of failed checks (as for invalid signatures).
-const FAILED: egui::Color32 = egui::Color32::from_rgb(0xD7, 0x37, 0x3F);
-
 fn status_icon(t: &Tokens, s: Status) -> (&'static str, egui::Color32) {
     match s {
         Status::Passed => ("circle-check", egui::Color32::from_rgb(0x2D, 0x9D, 0x4F)),
-        Status::Failed => ("circle-x", FAILED),
-        Status::Manual => ("circle-help", egui::Color32::from_rgb(0xD9, 0x8E, 0x04)),
+        Status::Failed => ("circle-x", t.error),
+        Status::Manual => ("circle-help", t.warning),
         Status::Skipped => ("circle-dashed", t.text_faint),
     }
 }
@@ -247,7 +248,7 @@ pub(crate) fn panel(ui: &mut egui::Ui, t: &Tokens, state: &mut A11yState, doc: D
                     if open { tl!("Collapse") } else { tl!("Expand") },
                 )
                 .clicked();
-                let color = if issues > 0 { FAILED } else { t.text };
+                let color = if issues > 0 { t.error } else { t.text };
                 let l = ui.add(egui::Label::new(egui::RichText::new(&head).font(theme::semibold(13.0)).color(color)).sense(egui::Sense::click()));
                 toggle || l.clicked()
             })

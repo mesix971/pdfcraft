@@ -9,6 +9,11 @@ use crate::{PdfCraftApp, icons};
 const FIELD_MARGIN: egui::Margin = egui::Margin::symmetric(10, 6);
 /// Outer height of a single-line field, including its inset.
 const FIELD_MIN_HEIGHT: f32 = 30.0;
+/// On a phone: the height of a dialog's controls and buttons (a finger's: Android's 48 dp), and
+/// its text sizes.
+const PHONE_CONTROL: f32 = 48.0;
+const PHONE_TEXT: f32 = 14.5;
+const PHONE_SMALL: f32 = 13.0;
 /// Padding inside every modal.
 const DIALOG_PAD_X: i8 = 20;
 const DIALOG_PAD_Y: i8 = 16;
@@ -23,19 +28,184 @@ fn dialog_frame(ctx: &egui::Context) -> egui::Frame {
         .shadow(ctx.global_style().visuals.window_shadow)
 }
 
-/// A modal with the card fill, a 10-point corner and room around its contents.
-pub fn modal(ctx: &egui::Context, id: impl std::hash::Hash + std::fmt::Debug) -> egui::Modal {
-    egui::Modal::new(egui::Id::new(id)).frame(dialog_frame(ctx))
+/// Whether dialogs show as phone screens: the phone layout says so every frame
+/// ([`set_phone_dialogs`]).
+fn phone_dialogs_id() -> egui::Id {
+    egui::Id::new("pdfcraft-phone-dialogs")
 }
 
-/// Show [`modal`], outline its controls, and remember the card rect for layout checks.
+/// The widest a dialog may be: the phone screen's width in the phone layout, unlimited elsewhere.
+fn dialog_max_width_id() -> egui::Id {
+    egui::Id::new("pdfcraft-dialog-max-width")
+}
+
+/// Show every dialog as a phone screen (true in the phone layout): the whole screen, scrolling,
+/// no wider than the phone.
+pub fn set_phone_dialogs(ctx: &egui::Context, on: bool) {
+    ctx.data_mut(|d| d.insert_temp(phone_dialogs_id(), on));
+    PHONE_LISTS.with(|p| p.set(on));
+}
+
+thread_local! {
+    /// The phone layout, for the drop-down lists' rows: a list's popup style is given only the
+    /// style, not the context (set with [`set_phone_dialogs`], every frame, on the UI's thread).
+    static PHONE_LISTS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// A drop-down list. Every one goes through here (clippy.toml disallows
+/// `egui::ComboBox::from_id_salt`): on a phone its rows are a finger tall, as the dialogs' other
+/// controls are.
+pub fn combo(id_salt: impl egui::AsIdSalt) -> egui::ComboBox {
+    #[expect(clippy::disallowed_methods, reason = "the one place that makes drop-down lists")]
+    let list = egui::ComboBox::from_id_salt(id_salt);
+    list.popup_style(egui::style::StyleModifier::new(phone_list_rows))
+}
+
+/// On a phone: a drop-down list's rows a finger tall, their text a size up.
+fn phone_list_rows(style: &mut egui::Style) {
+    if !PHONE_LISTS.with(std::cell::Cell::get) {
+        return;
+    }
+    style.spacing.interact_size.y = PHONE_CONTROL;
+    style.spacing.button_padding = vec2(14.0, 10.0);
+    style.spacing.item_spacing.y = 2.0;
+    for (text, font) in style.text_styles.iter_mut() {
+        if matches!(text, egui::TextStyle::Body | egui::TextStyle::Button | egui::TextStyle::Monospace) {
+            font.size = font.size.max(PHONE_TEXT);
+        }
+    }
+}
+
+/// Whether dialogs are phone screens (the phone layout).
+pub(crate) fn phone_dialogs(ctx: &egui::Context) -> bool {
+    ctx.data(|d| d.get_temp::<bool>(phone_dialogs_id())).unwrap_or(false)
+}
+
+/// In a dialog [`row`]: on a phone, go on to the next line (before a ComboBox or another child
+/// that can't move there by itself, or to keep a group of controls together).
+pub fn line_break(ui: &mut egui::Ui) {
+    if phone_dialogs(ui.ctx()) && ui.layout().main_wrap() {
+        ui.end_row();
+    }
+}
+
+/// The width for a `width`-wide ComboBox in a dialog row: on a phone, at most the line's (going on
+/// to the next line first when this one hasn't room for it).
+pub fn combo_width(ui: &mut egui::Ui, width: f32) -> f32 {
+    if !phone_dialogs(ui.ctx()) {
+        return width;
+    }
+    // What is left of this line (`available_width` is a wrapping line's whole width).
+    if ui.available_size_before_wrap().x < width {
+        line_break(ui);
+    }
+    width.min(ui.available_size_before_wrap().x).max(60.0)
+}
+
+/// How a dialog ComboBox shows a choice too long for it: on a phone it wraps (the box can't grow
+/// past the screen); elsewhere as the layout has it.
+pub fn combo_text(ui: &egui::Ui) -> egui::TextWrapMode {
+    if phone_dialogs(ui.ctx()) { egui::TextWrapMode::Wrap } else { ui.wrap_mode() }
+}
+
+/// A dialog's buttons, from the right: on a phone they go on to more lines when they don't fit.
+pub fn buttons_row<R>(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui) -> R) -> egui::InnerResponse<R> {
+    let wrap = phone_dialogs(ui.ctx());
+    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center).with_main_wrap(wrap), add)
+}
+
+/// Controls that share a row on a wide window and stack on a phone, where a long label (a
+/// checkbox's) then wraps in the screen's width.
+pub fn row_or_stack<R>(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui) -> R) -> egui::InnerResponse<R> {
+    if phone_dialogs(ui.ctx()) { ui.vertical(add) } else { ui.horizontal(add) }
+}
+
+/// After a label in a two-column dialog grid: on a phone the controls go on the next row, under
+/// the label, so they get the screen's whole width (a grid can't wrap).
+pub fn grid_break(ui: &mut egui::Ui) {
+    if phone_dialogs(ui.ctx()) {
+        ui.end_row();
+    }
+}
+
+/// A row of controls in a dialog: one line on a wide window; on a phone it wraps whole controls
+/// onto the next line instead of running past the screen's edge.
+pub fn row<R>(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui) -> R) -> egui::InnerResponse<R> {
+    if phone_dialogs(ui.ctx()) {
+        ui.horizontal_wrapped(|ui| {
+            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
+            add(ui)
+        })
+    } else {
+        ui.horizontal(add)
+    }
+}
+
+/// A setting in a dialog: its label, then its controls, which get the label's response (to be
+/// `labelled_by` it). On a wide window they share a row; on a phone the controls go under the
+/// label and wrap whole, never in the middle of a word.
+pub fn setting_row<R>(ui: &mut egui::Ui, label: &str, controls: impl FnOnce(&mut egui::Ui, &Response) -> R) -> R {
+    if phone_dialogs(ui.ctx()) {
+        ui.add_space(4.0);
+        let label = ui.label(label);
+        ui.horizontal_wrapped(|ui| {
+            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
+            controls(ui, &label)
+        })
+        .inner
+    } else {
+        ui.horizontal(|ui| {
+            let label = ui.label(label);
+            controls(ui, &label)
+        })
+        .inner
+    }
+}
+
+/// Set a dialog's width: `width`, or the phone screen's when that is narrower.
+pub fn set_dialog_width(ui: &mut egui::Ui, width: f32) {
+    let max = ui.ctx().data(|d| d.get_temp::<f32>(dialog_max_width_id())).unwrap_or(f32::INFINITY);
+    ui.set_width(width.min(max));
+}
+
+/// A modal with the card fill, a 10-point corner and room around its contents. In the phone
+/// layout it is a screen of its own instead: the whole content area, square, without a border.
+pub fn modal(ctx: &egui::Context, id: impl std::hash::Hash + std::fmt::Debug) -> egui::Modal {
+    let id = egui::Id::new(id);
+    if !phone_dialogs(ctx) {
+        return egui::Modal::new(id).frame(dialog_frame(ctx));
+    }
+    let t = Tokens::get(ctx);
+    let frame = egui::Frame::new().fill(t.card).inner_margin(egui::Margin::symmetric(PHONE_PAD_X, PHONE_PAD_Y));
+    // Anchored to the content area's top-left corner (the area under the system bars).
+    let area = egui::Modal::default_area(id.with("area")).anchor(Align2::LEFT_TOP, egui::Vec2::ZERO);
+    egui::Modal::new(id).frame(frame).area(area)
+}
+
+/// Padding inside a dialog shown as a phone screen.
+const PHONE_PAD_X: i8 = 16;
+const PHONE_PAD_Y: i8 = 14;
+
+/// Show [`modal`], outline its controls, and remember the card rect for layout checks. In the
+/// phone layout the dialog fills the screen and scrolls, and [`set_dialog_width`] keeps it on it.
 pub fn show_modal<R>(ctx: &egui::Context, id: &str, content: impl FnOnce(&mut egui::Ui) -> R) -> egui::ModalResponse<R> {
     let stored = egui::Id::new(id);
+    let phone = phone_dialogs(ctx);
+    let screen = ctx.content_rect();
+    let (width, height) = (screen.width() - 2.0 * f32::from(PHONE_PAD_X), screen.height() - 2.0 * f32::from(PHONE_PAD_Y));
+    ctx.data_mut(|d| d.insert_temp(dialog_max_width_id(), if phone { width.max(1.0) } else { f32::INFINITY }));
     modal(ctx, id).show(ctx, |ui| {
         begin_dialog(ui);
-        let inner = content(ui);
+        let inner = if phone {
+            ui.set_width(width.max(1.0));
+            ui.set_min_height(height.max(1.0));
+            egui::ScrollArea::vertical().id_salt(stored.with("scroll")).max_height(height.max(1.0)).auto_shrink([false, true]).show(ui, content).inner
+        } else {
+            content(ui)
+        };
         // The frame's stroke sits outside this content rect; the stored card is the fill.
-        let card = ui.min_rect().expand2(egui::vec2(f32::from(DIALOG_PAD_X), f32::from(DIALOG_PAD_Y)));
+        let (pad_x, pad_y) = if phone { (PHONE_PAD_X, PHONE_PAD_Y) } else { (DIALOG_PAD_X, DIALOG_PAD_Y) };
+        let card = ui.min_rect().expand2(egui::vec2(f32::from(pad_x), f32::from(pad_y)));
         ui.ctx().data_mut(|d| d.insert_temp(stored.with("card"), card));
         inner
     })
@@ -58,6 +228,24 @@ pub fn begin_dialog(ui: &mut egui::Ui) {
     }
     ui.visuals_mut().selection.stroke = Stroke::new(1.5, t.accent);
     ui.spacing_mut().interact_size.y = FIELD_MIN_HEIGHT;
+    // A phone: radio buttons, check boxes, lists and values a finger tall, room between them,
+    // and text a size up (every dialog starts here).
+    if phone_dialogs(ui.ctx()) {
+        let s = ui.spacing_mut();
+        s.interact_size.y = PHONE_CONTROL;
+        s.icon_width = 20.0;
+        s.icon_width_inner = 11.0;
+        s.icon_spacing = 7.0;
+        s.item_spacing = vec2(8.0, 10.0);
+        s.button_padding = vec2(12.0, 8.0);
+        for (style, font) in ui.style_mut().text_styles.iter_mut() {
+            match style {
+                egui::TextStyle::Body | egui::TextStyle::Button | egui::TextStyle::Monospace => font.size = font.size.max(PHONE_TEXT),
+                egui::TextStyle::Small => font.size = font.size.max(PHONE_SMALL),
+                _ => {}
+            }
+        }
+    }
 }
 
 /// A single-line field tall enough to read and to click.
@@ -90,6 +278,16 @@ pub(crate) fn fit_line(text: &str, max_width: f32, mut width_of: impl FnMut(&str
             return candidate;
         }
     }
+}
+
+/// Add text field `edit` named `name` for screen readers: its hint isn't a name (AccessKit's
+/// placeholder, gone once there is text), and a field beside no label has none. The name takes
+/// no room.
+pub(crate) fn named_edit(ui: &mut egui::Ui, edit: egui::TextEdit<'_>, name: &str) -> Response {
+    let at = Rect::from_min_size(ui.cursor().min, egui::Vec2::ZERO);
+    let label = ui.interact(at, ui.id().with(("field-name", name)), Sense::hover());
+    label.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, name));
+    ui.add(edit).labelled_by(label.id)
 }
 
 pub(crate) fn text_width(ui: &egui::Ui, text: &str, font: &egui::FontId) -> f32 {
@@ -131,9 +329,11 @@ pub fn mode_tab(ui: &mut egui::Ui, label: &str, active: bool) -> Response {
 /// Rounded pill button; `primary` fills with the accent.
 pub fn pill_button(ui: &mut egui::Ui, label: &str, primary: bool) -> Response {
     let t = Tokens::get(ui.ctx());
-    let font = theme::medium(12.5);
+    // A phone's dialogs: a finger tall, the label a size up.
+    let phone = phone_dialogs(ui.ctx());
+    let font = theme::medium(if phone { PHONE_TEXT } else { 12.5 });
     let w = ui.fonts_mut(|f| f.layout_no_wrap(label.to_owned(), font.clone(), t.text).size().x);
-    let (rect, resp) = ui.allocate_exact_size(vec2(w + 26.0, 28.0), Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(if phone { vec2(w + 32.0, PHONE_CONTROL) } else { vec2(w + 26.0, 28.0) }, Sense::click());
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), label));
     let press = theme::Press::track(ui, &resp);
     let (fill, stroke, text) = if primary {
@@ -141,7 +341,7 @@ pub fn pill_button(ui: &mut egui::Ui, label: &str, primary: bool) -> Response {
     } else {
         (press.fill(t.card, t.hover, t.pressed), Stroke::new(1.0, t.border), t.text)
     };
-    ui.painter().rect(rect, CornerRadius::same(14), fill, stroke, egui::StrokeKind::Inside);
+    ui.painter().rect(rect, CornerRadius::same(if phone { 20 } else { 14 }), fill, stroke, egui::StrokeKind::Inside);
     ui.painter().text(rect.translate(press.offset()).center(), Align2::CENTER_CENTER, label, font, text);
     theme::hand(resp)
 }
@@ -245,26 +445,28 @@ pub fn radio_value<'a, V: PartialEq>(ui: &mut egui::Ui, current: &mut V, alterna
 /// - for a checkbox, a corner radius small enough to keep the box square.
 fn toggle<'a>(widget: impl egui::Widget + 'a, radius: Option<u8>) -> impl egui::Widget + 'a {
     move |ui: &mut egui::Ui| {
-        ui.scope(|ui| {
-            let t = Tokens::get(ui.ctx());
-            let w = &mut ui.visuals_mut().widgets;
-            if let Some(radius) = radius {
-                for v in [&mut w.noninteractive, &mut w.inactive, &mut w.hovered, &mut w.active, &mut w.open] {
-                    v.corner_radius = CornerRadius::same(radius);
-                }
+        // Styled in place and put back after, not in a `scope`: a scoped widget never moves to
+        // the next row of a wrapping layout, so a phone dialog's options would run off the screen.
+        let t = Tokens::get(ui.ctx());
+        let saved = ui.visuals().widgets.clone();
+        let w = &mut ui.visuals_mut().widgets;
+        if let Some(radius) = radius {
+            for v in [&mut w.noninteractive, &mut w.inactive, &mut w.hovered, &mut w.active, &mut w.open] {
+                v.corner_radius = CornerRadius::same(radius);
             }
-            if !t.dark() && w.inactive.bg_fill == t.field {
-                w.inactive.bg_fill = t.hover;
-            }
-            if w.inactive.bg_stroke.is_empty() {
-                w.inactive.bg_stroke = Stroke::new(1.0, t.border);
-            }
-            if w.hovered.bg_stroke.is_empty() {
-                w.hovered.bg_stroke = Stroke::new(1.0, t.text_muted);
-            }
-            ui.add(widget)
-        })
-        .inner
+        }
+        if !t.dark() && w.inactive.bg_fill == t.field {
+            w.inactive.bg_fill = t.hover;
+        }
+        if w.inactive.bg_stroke.is_empty() {
+            w.inactive.bg_stroke = Stroke::new(1.0, t.border);
+        }
+        if w.hovered.bg_stroke.is_empty() {
+            w.hovered.bg_stroke = Stroke::new(1.0, t.text_muted);
+        }
+        let response = ui.add(widget);
+        ui.visuals_mut().widgets = saved;
+        response
     }
 }
 
@@ -272,8 +474,22 @@ pub fn section_title(ui: &mut egui::Ui, text: &str) {
     let t = Tokens::get(ui.ctx());
     ui.add_space(10.0);
     // Section titles across every panel go through here, so one translation point covers them.
-    ui.label(egui::RichText::new(tl!(text).to_uppercase()).font(theme::semibold(10.5)).color(t.text_faint).extra_letter_spacing(0.6));
+    let title = tl!(text);
+    let r = ui.label(egui::RichText::new(crate::i18n::upper(title)).font(theme::semibold(10.5)).color(t.text_faint).extra_letter_spacing(0.6));
+    // Named as written, not in capitals: a screen reader may spell those out.
+    heading(ui, &r, title);
     ui.add_space(2.0);
+}
+
+/// Make `resp` a heading named `name` for screen readers, which jump from heading to heading.
+pub(crate) fn heading(ui: &egui::Ui, resp: &Response, name: &str) {
+    // Where it is, as any widget's node says.
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, name));
+    ui.ctx().accesskit_node_builder(resp.id, |node| {
+        node.set_role(egui::accesskit::Role::Heading);
+        node.set_label(name);
+        node.clear_value();
+    });
 }
 
 /// Paint one line of `text` left-aligned and vertically centred on `pos`, cut with "…" so it is
@@ -375,43 +591,105 @@ fn wrapped_lines(ui: &egui::Ui, text: &str, font: &egui::FontId, width: f32, tru
     lines
 }
 
-/// Transient message at the bottom centre.
+/// How long a notice shows, in seconds.
+const TOAST_SECS: f64 = 3.5;
+/// How many earlier notices may show above the latest one.
+pub(crate) const EARLIER_TOASTS: usize = 2;
+/// On a phone, how far above the screen's bottom edge the notices and the progress card sit: over
+/// the bars along the bottom (a tool's, Home's tabs).
+const TOAST_PHONE_BARS: f32 = 72.0;
+
+/// Transient messages at the bottom centre: the latest, and above it those it came after that
+/// are still showing. The latest may offer Undo for the edit it reports.
 pub fn toast(app: &mut PdfCraftApp, ctx: &egui::Context) {
-    let Some((msg, start)) = app.toast.clone() else { return };
     let now = ctx.input(|i| i.time);
-    let start = if start == 0.0 { now } else { start };
-    app.toast = Some((msg.clone(), start));
-    if now - start > 3.5 {
+    for (_, start) in app.toast.iter_mut().chain(app.toast_earlier.iter_mut()) {
+        if *start == 0.0 {
+            *start = now;
+        }
+    }
+    if app.toast.as_ref().is_some_and(|(_, start)| now - start > TOAST_SECS) {
         app.toast = None;
+    }
+    app.toast_earlier.retain(|(_, start)| now - start <= TOAST_SECS);
+    if app.toast.is_none() && app.toast_earlier.is_empty() {
+        app.toast_undo = None;
         return;
     }
-    let t = Tokens::get(ctx);
     let screen = ctx.content_rect();
     // Above the progress notice while a job runs.
     let card = if app.progress_notice.is_some() { ctx.data(|d| d.get_temp::<f32>(egui::Id::new(PROGRESS_HEIGHT))).unwrap_or(0.0) } else { 0.0 };
-    let lift = if card > 0.0 { 28.0 + card + 10.0 } else { 28.0 };
-    egui::Area::new(egui::Id::new("toast"))
-        .order(egui::Order::Tooltip)
-        .pivot(Align2::CENTER_BOTTOM)
-        .fixed_pos(screen.center_bottom() - vec2(0.0, lift))
-        .show(ctx, |ui| {
-            egui::Frame::NONE
-                .fill(if t.dark() { Color32::from_rgb(0xEC, 0xEC, 0xEF) } else { Color32::from_rgb(0x2A, 0x2A, 0x2F) })
-                .corner_radius(CornerRadius::same(8))
-                .inner_margin(egui::Margin::symmetric(16, 10))
-                .show(ui, |ui| {
-                    // An Area remembers its previous content width. A short notice
-                    // must not force the next validation message into a narrow column.
-                    // Allow natural short labels; wrap longer ones within the viewport,
-                    // including the frame's 32 points and 16-point outside margins.
-                    ui.set_max_width((screen.width() - 64.0).clamp(1.0, 560.0));
-                    ui.add(
-                        egui::Label::new(egui::RichText::new(msg).color(if t.dark() { Color32::from_rgb(0x22, 0x22, 0x26) } else { Color32::WHITE }))
-                            .wrap(),
-                    );
-                });
+    // On a phone, above the bars along the bottom (a tool's, Home's tabs), as the progress card is.
+    let bars = if app.phone_layout() { TOAST_PHONE_BARS } else { 0.0 };
+    let lift = if card > 0.0 { 28.0 + card + 10.0 } else { 28.0 } + bars;
+    // Undo while the document is still as the edit left it (and is the one shown).
+    let undo = app.toast.is_some()
+        && app.toast_undo.is_some_and(|(id, generation)| {
+            app.active_ids().is_some_and(|(_, shown)| shown == id) && app.session.get(id).is_some_and(|d| d.edit_generation() == generation)
         });
+    let mut bottom = screen.center_bottom() - vec2(0.0, lift);
+    let mut undo_clicked = false;
+    if let Some((msg, _)) = &app.toast {
+        let (rect, clicked) = toast_card(ctx, egui::Id::new("toast"), bottom, msg, undo, app.phone_layout());
+        undo_clicked = clicked;
+        bottom.y = rect.top() - 8.0;
+    }
+    for (k, (msg, _)) in app.toast_earlier.iter().rev().enumerate() {
+        let (rect, _) = toast_card(ctx, egui::Id::new(("toast-earlier", k)), bottom, msg, false, false);
+        bottom.y = rect.top() - 8.0;
+    }
+    if undo_clicked {
+        app.toast = None;
+        app.toast_undo = None;
+        app.undo();
+    }
     ctx.request_repaint_after(std::time::Duration::from_millis(100));
+}
+
+/// A notice's text, said by screen readers when it shows (a live region, polite: after what they
+/// are saying).
+fn spoken(ui: &egui::Ui, text: &Response) {
+    ui.ctx().accesskit_node_builder(text.id, |node| node.set_live(egui::accesskit::Live::Polite));
+}
+
+/// One notice's card, its bottom centre at `bottom`, with Undo when `undo` (a finger tall on a
+/// phone). Returns where it is and whether Undo was clicked.
+fn toast_card(ctx: &egui::Context, id: egui::Id, bottom: egui::Pos2, msg: &str, undo: bool, phone: bool) -> (Rect, bool) {
+    let t = Tokens::get(ctx);
+    let screen = ctx.content_rect();
+    let ink = if t.dark() { Color32::from_rgb(0x22, 0x22, 0x26) } else { Color32::WHITE };
+    // The card inverts the theme: its action takes the other theme's accent text.
+    let action = Tokens::for_kind(if t.dark() { theme::ThemeKind::Light } else { theme::ThemeKind::Dark }).accent_text;
+    let mut clicked = false;
+    let shown = egui::Area::new(id).order(egui::Order::Tooltip).pivot(Align2::CENTER_BOTTOM).fixed_pos(bottom).show(ctx, |ui| {
+        egui::Frame::NONE
+            .fill(if t.dark() { Color32::from_rgb(0xEC, 0xEC, 0xEF) } else { Color32::from_rgb(0x2A, 0x2A, 0x2F) })
+            .corner_radius(CornerRadius::same(8))
+            .inner_margin(egui::Margin::symmetric(16, 10))
+            .show(ui, |ui| {
+                // An Area remembers its previous content width. A short notice
+                // must not force the next validation message into a narrow column.
+                // Allow natural short labels; wrap longer ones within the viewport,
+                // including the frame's 32 points and 16-point outside margins.
+                ui.set_max_width((screen.width() - 64.0).clamp(1.0, 560.0));
+                let message = egui::Label::new(egui::RichText::new(msg).color(ink)).wrap();
+                if !undo {
+                    let said = ui.add(message);
+                    spoken(ui, &said);
+                    return;
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let button = egui::Button::new(egui::RichText::new(tl!("Undo")).strong().color(action))
+                        .frame(false)
+                        .min_size(vec2(0.0, if phone { PHONE_CONTROL } else { 0.0 }));
+                    clicked = theme::hand(ui.add(button)).clicked();
+                    ui.add_space(12.0);
+                    let said = ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| ui.add(message)).inner;
+                    spoken(ui, &said);
+                });
+            });
+    });
+    (shown.response.rect, clicked)
 }
 
 /// A background job's progress, shown at the bottom centre until the job is done.
@@ -442,6 +720,8 @@ pub fn progress_notice(app: &PdfCraftApp, ctx: &egui::Context) -> bool {
         (Color32::from_rgb(0x2A, 0x2A, 0x2F), Color32::WHITE)
     };
     let fraction = if p.fraction.is_finite() { p.fraction.clamp(0.0, 1.0) } else { 0.0 };
+    // On a phone, above the bars along the bottom, as the notices are.
+    let lift = 28.0 + if app.phone_layout() { TOAST_PHONE_BARS } else { 0.0 };
     let animated = crate::motion::animated(ctx);
     let shown = ctx.animate_value_with_time(egui::Id::new("progress-notice-bar"), fraction, if animated { 0.3 } else { 0.0 });
     let now = ctx.input(|i| i.time);
@@ -449,7 +729,7 @@ pub fn progress_notice(app: &PdfCraftApp, ctx: &egui::Context) -> bool {
     let area = egui::Area::new(egui::Id::new("progress-notice"))
         .order(egui::Order::Tooltip)
         .pivot(Align2::CENTER_BOTTOM)
-        .fixed_pos(screen.center_bottom() - vec2(0.0, 28.0))
+        .fixed_pos(screen.center_bottom() - vec2(0.0, lift))
         .show(ctx, |ui| {
             egui::Frame::NONE.fill(fill).corner_radius(CornerRadius::same(10)).inner_margin(egui::Margin::symmetric(16, 12)).show(ui, |ui| {
                 let width = 340.0_f32.min(screen.width() - 64.0).max(160.0);
@@ -571,9 +851,12 @@ pub fn split_pill(ui: &mut egui::Ui, icon: &str, label: &str, more: &str) -> (Re
 /// A pill button with an icon (primary = filled accent).
 pub fn icon_pill(ui: &mut egui::Ui, icon: &str, label: &str, primary: bool) -> Response {
     let t = Tokens::get(ui.ctx());
-    let font = theme::medium(12.5);
+    // A phone's dialogs: a finger tall, the label a size up.
+    let phone = phone_dialogs(ui.ctx());
+    let font = theme::medium(if phone { PHONE_TEXT } else { 12.5 });
     let w = ui.fonts_mut(|f| f.layout_no_wrap(label.to_owned(), font.clone(), t.text).size().x);
-    let (rect, resp) = ui.allocate_exact_size(vec2(w + 46.0, 30.0), Sense::click());
+    let height = if phone { PHONE_CONTROL } else { 30.0 };
+    let (rect, resp) = ui.allocate_exact_size(vec2(w + 46.0, height), Sense::click());
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), label));
     let press = theme::Press::track(ui, &resp);
     let (fill, stroke, text) = if primary {
@@ -581,9 +864,9 @@ pub fn icon_pill(ui: &mut egui::Ui, icon: &str, label: &str, primary: bool) -> R
     } else {
         (press.fill(t.card, t.hover, t.pressed), Stroke::new(1.0, t.border), t.text)
     };
-    ui.painter().rect(rect, CornerRadius::same(15), fill, stroke, egui::StrokeKind::Inside);
+    ui.painter().rect(rect, CornerRadius::same((height / 2.0) as u8), fill, stroke, egui::StrokeKind::Inside);
     let body = rect.translate(press.offset());
-    crate::icons::paint(ui, Rect::from_min_size(body.min + vec2(12.0, 7.0), vec2(16.0, 16.0)), icon, 15.0, text);
+    crate::icons::paint(ui, Rect::from_min_size(body.min + vec2(12.0, (height - 16.0) / 2.0), vec2(16.0, 16.0)), icon, 15.0, text);
     ui.painter().text(body.left_center() + vec2(34.0, 0.0), Align2::LEFT_CENTER, label, font, text);
     theme::hand(resp)
 }
@@ -699,6 +982,25 @@ mod tests {
             output.drop_without_applying_deltas();
         }
         ctx.memory(|memory| memory.area_rect(egui::Id::new("toast")).unwrap())
+    }
+
+    /// A job's progress steps take each other's place, and its outcome the last step's, while a
+    /// notice from before stays above them.
+    #[test]
+    fn progress_steps_replace_each_other_and_the_outcome_the_last() {
+        let mut app = PdfCraftApp::new();
+        app.notify("Saved");
+        app.notify_progress("Recognizing text… page 1 of 3");
+        app.notify_progress("Recognizing text… page 2 of 3");
+        app.notify("Recognized 3 pages");
+        assert_eq!(app.toast.as_ref().map(|t| t.0.as_str()), Some("Recognized 3 pages"));
+        let earlier: Vec<&str> = app.toast_earlier.iter().map(|t| t.0.as_str()).collect();
+        assert_eq!(earlier, ["Saved"]);
+        app.notify("Copied");
+        assert_eq!(app.toast_earlier.len(), 2, "an outcome stacks like any notice");
+        // An error that no longer holds goes, with every notice before it.
+        app.clear_notices();
+        assert!(app.toast.is_none() && app.toast_earlier.is_empty());
     }
 
     #[test]

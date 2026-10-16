@@ -2338,3 +2338,148 @@ animation effects	Off	オフ
 	The linked PDF opened, but its named destination was not applied.	リンク先の PDF を開きましたが、名前付き移動先は適用されませんでした。
 	The linked PDF opened, but its page destination was out of range.	リンク先の PDF を開きましたが、移動先のページが範囲外です。
 	Local cross-PDF links require the desktop app	PDF 間のローカルリンクにはデスクトップアプリが必要です
+
+# In-app file browser (Android's file pickers)
+	Internal storage	内部ストレージ
+	Documents	ドキュメント
+	PdfCraft files	PdfCraft のファイル
+	SD card {name}	SD カード {name}
+	Couldn't create the folder {name}: {e}	フォルダー {name} を作成できませんでした: {e}
+	Choose this folder	このフォルダーを選択
+	{name} already exists. Replace it?	{name} は既に存在します。置き換えますか?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	このデバイスのどこにでもファイルを開いて保存するには、PdfCraft にすべてのファイルの管理を許可してください。
+	Allow access	アクセスを許可
+	All files	すべてのファイル
+	This folder is empty	このフォルダーは空です
+	New folder	新しいフォルダー
+
+# Printing through another app (Android)
+	Another app	別のアプリ
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	印刷用の PDF は選択したアプリで開き、そのアプリの部数・両面・カラーの設定で印刷されます。
+	Couldn't hand {name} to another app: {e}	{name} を別のアプリに渡せませんでした: {e}
+phone bar	Edit	編集
+	Send	送信
+	Thinking…	考えています…
+	Anthropic API key	Anthropic API キー
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	質問と開いている文書は、あなたが依頼したときにだけ、あなた自身の API キーで Anthropic (Claude) に送信されます。リクエストの料金はあなたの Anthropic アカウントに請求されます。
+	Most pages sent per question	1 回の質問で送るページ数の上限
+	Translate page {n}	{n} ページを翻訳
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} トークン
+	The answer stopped at its length limit.	回答は最大長で途切れました。
+	Add your Anthropic API key to use the assistant.	アシスタントを使うには Anthropic API キーを追加してください。
+	The API key was refused. Check it in the assistant's settings.	API キーが拒否されました。アシスタントの設定で確認してください。
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	この文書は {pages} ページあります。アシスタントが読めるのは {max} ページまでです。アシスタントの設定で上限を上げてください。
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	この文書はアシスタントには大きすぎます ({mb} MB、上限 {max} MB)。
+	Too many requests right now. Try again in a moment.	現在リクエストが多すぎます。少し待ってからもう一度お試しください。
+	The request was declined ({reason}).	リクエストは拒否されました ({reason})。
+	Couldn't reach the AI service: {error}	AI サービスに接続できませんでした: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	API キーが無効です。アシスタントの設定でもう一度貼り付けてください。
+	The assistant gave no answer. Try asking differently.	アシスタントから回答がありませんでした。質問の仕方を変えてみてください。
+	Your Anthropic account can't use this model, or has no credit left: {error}	お使いの Anthropic アカウントではこのモデルを使用できないか、クレジットが残っていません: {error}
+	The AI service answered: {error}	AI サービスからの応答: {error}
+	{tokens} tokens	{tokens} トークン
+	New conversation	新しい会話
+	Proposed changes	提案された変更
+	Applied	適用済み
+	Discarded	破棄済み
+	The document has no page {page}.	この文書には {page} ページがありません。
+	The passage wasn't found on page {page}.	{page} ページにその箇所が見つかりませんでした。
+	The document refused the change.	文書が変更を受け付けませんでした。
+	Applied as one step: Undo takes them all back.	1 回の操作で適用されます。「取り消し」ですべて元に戻ります。
+	The passage appears more than once on page {page}.	{page} ページにその箇所が複数あります。
+	It overlaps another proposed change.	ほかの提案された変更と重なっています。
+	A PDF on this device.	このデバイス上の PDF。
+	Add my name	名前を追加
+	Add to Starred	お気に入りに追加
+	Add your name and a photo. Your name also signs your comments.	名前と写真を追加してください。名前はコメントの署名にも使われます。
+	Allow access to your files and PdfCraft lists the PDFs on this device.	ファイルへのアクセスを許可すると、PdfCraft がこのデバイス上の PDF を一覧表示します。
+	An empty page to start from.	白紙のページから始めます。
+	Change its text and pictures.	テキストや画像を変更します。
+	Choose a photo	写真を選択
+	Files	ファイル
+	Fill in a form and sign it.	フォームに入力して署名します。
+	From photos, scans or other files.	写真、スキャン、その他のファイルから。
+	Hello, {name}	こんにちは、{name} さん
+	It shows on Home and signs your comments.	ホームに表示され、コメントの署名にも使われます。
+	Make PdfCraft yours	PdfCraft を自分らしく
+	More for {name}	{name} のその他の操作
+	No PDFs found.	PDF が見つかりませんでした。
+	No files match.	一致するファイルはありません。
+	No recent files yet.	最近使ったファイルはまだありません。
+	No starred files.	お気に入りのファイルはありません。
+	On this device	このデバイス
+	Open another file…	別のファイルを開く…
+	PDFs on this device	このデバイス上の PDF
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft はダウンロード、ドキュメント、独自のフォルダーを探します。
+	Photos and scans become the pages of a new PDF.	写真やスキャンが新しい PDF のページになります。
+	Pictures	画像
+	Places	場所
+	Profile	プロフィール
+	Remove from Starred	お気に入りから削除
+	Remove the photo	写真を削除
+	Search files	ファイルを検索
+	See your PDFs	PDF を表示
+	Set up	設定する
+	Several PDFs and pictures in one document.	複数の PDF と画像を 1 つの文書に。
+	Star a file from its menu to find it here.	ファイルのメニューからお気に入りに追加すると、ここに表示されます。
+	Starred	お気に入り
+	Summarize, ask and translate.	要約、質問、翻訳。
+	Summarize, question and correct your PDFs with Claude, with your own key.	自分のキーを使い、Claude で PDF を要約・質問・修正できます。
+	Text, pictures and other files, converted to PDF.	テキスト、画像、その他のファイルを PDF に変換。
+	The files you open show here.	開いたファイルがここに表示されます。
+	What would you like to do?	何をしますか？
+	Which document?	どの文書ですか？
+	Your AI assistant	AI アシスタント
+file state	Open	開いています
+	Choose a PNG or JPEG picture.	PNG または JPEG の画像を選択してください。
+	This picture is too large.	この画像は大きすぎます。
+	Couldn't use this picture: {e}	この画像を使用できませんでした: {e}
+	Couldn't use this picture.	この画像を使用できませんでした。
+	{n} MB	{n} MB
+	{n} KB	{n} KB
+decimal separator	.	.
+	Other folders…	ほかのフォルダー…
+	Looking for photos…	写真を探しています…
+	See your photos	写真を表示
+	Allow PdfCraft to see your photos, and choose one here.	PdfCraft に写真へのアクセスを許可して、ここで 1 枚選んでください。
+	No photos found.	写真が見つかりませんでした。
+	PdfCraft shows the photos in Camera, Pictures and Download.	PdfCraft はカメラ、画像、ダウンロードの写真を表示します。
+	Automatic	自動
+	Dark mode	ダークモード
+	Dark pages	ダークページ
+	Light text on a dark page, for reading at night.	暗いページに明るい文字。夜の読書に。
+	Night	夜間
+	Downloads	ダウンロード
+	Choose a file	ファイルを選択
+	Choose files	ファイルを選択（複数可）
+	Choose a folder	フォルダーを選択
+	Tap to unlock	タップしてロックを解除
+	Browse folders	フォルダーを参照
+	Combined from top to bottom. Use the arrows to change the order.	上から順に結合されます。矢印で順番を変更できます。
+	PDFs and pictures, combined into one PDF in the order you choose.	PDF や画像を、選んだ順番で 1 つの PDF に結合します。
+	Smaller text	文字を小さく
+	Larger text	文字を大きく
+	Flip	反転
+	Tap text or a picture to change it	テキストや画像をタップして変更
+	Tap where the text goes	テキストを置く場所をタップ
+	White	白
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	質問と開いている文書は、依頼したときにだけ、あなた自身の API キーで、選んだサービスに送信されます。リクエストはそのサービスのあなたのアカウントに請求されます。
+	Service	サービス
+	Another service (OpenAI-compatible)	その他のサービス（OpenAI 互換）
+	API key	API キー
+	On Google's free tier, what you send may be used to improve Google's products.	Google の無料枠では、送信した内容が Google の製品改善に使われることがあります。
+	Fill in for	入力例:
+	Service address	サービスのアドレス
+	API key (if the service asks for one)	API キー（サービスが求める場合）
+	The service reads PDF files	サービスが PDF ファイルを読める
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	読めない場合は、文書のテキストをページごとに送信します（画像やスキャンは含みません）。
+	Add your API key for {service} in the assistant's settings.	アシスタントの設定で {service} の API キーを追加してください。
+	Your {service} account can't use this model, or has no credit left: {error}	お使いの {service} アカウントではこのモデルを使用できないか、クレジットが残っていません: {error}
+	Choose the model to ask in the assistant's settings.	アシスタントの設定で、質問するモデルを選んでください。
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	この文書には送信できるテキストがありません（スキャンですか？）。PDF ファイルを読めるサービスを選ぶか、先にテキストを認識してください。
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	この文書のテキストはアシスタントには長すぎます（{chars} 文字、最大 {max} 文字）。
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	自分のキーを使い、Claude・ChatGPT・Gemini で PDF を要約・質問・修正できます。
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	サービスのアドレスが正しくありません。https:// で始まります（http:// はこの端末またはローカルネットワークのみ）。
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	この文書は内容のコピーを許可していないため、アシスタントには送信されません。
+	Try again	再試行
+	Price per million tokens read / written	100万トークンあたりの価格（読み取り / 書き込み）

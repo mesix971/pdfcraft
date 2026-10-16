@@ -71,7 +71,7 @@ fn safe_name(s: &str) -> String {
 /// `%LOCALAPPDATA%\PdfCraft\Clipboard` (Windows), or `$XDG_CACHE_HOME/pdfcraft/clipboard` /
 /// `~/.cache/pdfcraft/clipboard` (others). Never the shared temporary folder, where another user
 /// could plant a link or a folder of their own.
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 fn clipboard_dir() -> Option<std::path::PathBuf> {
     use std::path::PathBuf;
     if let Some(dir) = crate::portable::data_dir() {
@@ -89,7 +89,7 @@ fn clipboard_dir() -> Option<std::path::PathBuf> {
 
 /// Whether `name` is a file Copy Image in Original Format writes: `<stem> p<page> img<index>.<ext>`
 /// with a JPEG or PNG extension. Only such files are ever removed from the clipboard folder.
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 fn is_copied_image_name(name: &str) -> bool {
     let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
     let Some((rest, ext)) = name.rsplit_once('.') else { return false };
@@ -104,7 +104,7 @@ fn is_copied_image_name(name: &str) -> bool {
 /// Makes `dir` (a real folder, not a link, owned by us and private to us on Unix), removes the
 /// earlier copies PdfCraft wrote there, and writes `bytes` as a new file `name`. Links are never
 /// followed and nothing else in the folder is touched.
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 fn write_clipboard_file(dir: &std::path::Path, name: &str, bytes: &[u8]) -> Result<std::path::PathBuf, String> {
     use std::io::Write;
     if !is_copied_image_name(name) || name.contains(['/', '\\']) {
@@ -192,7 +192,7 @@ impl PdfCraftApp {
 
     /// Writes `bytes` to PdfCraft's private clipboard folder ([`clipboard_dir`]), replacing the
     /// previous copy, and puts that file on the system clipboard.
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
     fn put_file_on_clipboard(&self, name: &str, bytes: &[u8]) -> Result<(), String> {
         if !self.system_clipboard {
             return Ok(());
@@ -202,10 +202,13 @@ impl PdfCraftApp {
         arboard::Clipboard::new().and_then(|mut c| c.set().file_list(&[path])).map_err(|e| e.to_string())
     }
 
-    #[cfg(target_arch = "wasm32")]
+    /// The web and Android: a file goes on the clipboard only through the system's own pickers
+    /// and providers, which PdfCraft can't use there yet.
+    #[cfg(any(target_arch = "wasm32", target_os = "android"))]
     fn put_file_on_clipboard(&self, _name: &str, _bytes: &[u8]) -> Result<(), String> {
         if self.system_clipboard {
-            return Err("the web version can't put files on the clipboard yet; use Save Image As".to_string());
+            let who = if cfg!(target_os = "android") { "PdfCraft for Android" } else { "the web version" };
+            return Err(format!("{who} can't put files on the clipboard yet; use Save Image As"));
         }
         Ok(())
     }
@@ -214,7 +217,7 @@ impl PdfCraftApp {
 #[cfg(test)]
 mod tests {
     use super::safe_name;
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
     use super::{is_copied_image_name, write_clipboard_file};
 
     #[test]
@@ -225,7 +228,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
     fn copied_image_names_are_recognised() {
         assert!(is_copied_image_name("Report p1 img2.jpg"));
         assert!(is_copied_image_name("a p12 img3.png"));
@@ -236,7 +239,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
     fn clipboard_folder_only_replaces_our_own_copies() {
         let dir = std::env::temp_dir().join(format!("pdfcraft-clipboard-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);

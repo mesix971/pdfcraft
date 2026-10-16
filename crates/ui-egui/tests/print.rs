@@ -83,7 +83,7 @@ fn print_dialog_lays_out_sheets_and_saves_a_pdf() {
     assert!(h.state_mut().execute("print.dialog"));
     h.run_steps(3);
     assert_eq!(h.state().dialog, Some(Dialog::Print));
-    h.get_by_label("Pages to Print".to_uppercase().as_str());
+    h.get_by_role_and_label(egui::accesskit::Role::Heading, "Pages to Print");
     h.get_by_label("Sheet 1 of 1");
     // Two copies of the one page, as a 2-up poster-free layout: Multiple.
     h.get_by_label("Multiple").click();
@@ -213,6 +213,44 @@ fn a_failed_save_as_pdf_keeps_the_dialog_open() {
     assert_eq!(h.state().dialog, Some(Dialog::Print), "the dialog stays open, with its settings");
     let toast = h.state().toast.as_ref().map(|(m, _)| m.clone()).unwrap_or_default();
     assert!(toast.contains("Could not save"), "the user is told why: {toast:?}");
+}
+
+/// Android has no spooler: "Another app" comes first, and Print hands it the print-ready PDF.
+#[test]
+fn another_app_prints_where_the_host_has_no_spooler() {
+    type Got = std::sync::Arc<std::sync::Mutex<Vec<(String, Vec<u8>)>>>;
+    let mut h = harness();
+    let got: Got = Default::default();
+    let into = got.clone();
+    h.state_mut().host_print = Some(Box::new(move |name, bytes| {
+        into.lock().unwrap().push((name.to_string(), bytes));
+        Ok(())
+    }));
+    assert!(h.state_mut().execute("print.dialog"));
+    h.run_steps(3);
+    assert_eq!(h.state().print_draft.printer.as_deref(), Some("\u{1}host"), "another app is the default");
+    h.get_by_label_contains("opens in the app you choose");
+    h.query_all_by_label("Print").find(|n| n.accesskit_node().role() == egui::accesskit::Role::Button).expect("the Print button").click();
+    h.run_steps(3);
+    assert_eq!(h.state().dialog, None);
+    let got = got.lock().unwrap();
+    let (name, bytes) = got.first().expect("handed over");
+    assert_eq!(name, "form (print).pdf");
+    let doc = pdfcraft_cos::Document::open(std::sync::Arc::new(bytes.clone())).unwrap();
+    assert_eq!(pdfcraft_model::pages(&doc).len(), 1, "the print-ready PDF");
+}
+
+#[test]
+fn an_app_that_cant_take_the_pdf_keeps_the_dialog_open() {
+    let mut h = harness();
+    h.state_mut().host_print = Some(Box::new(|_, _| Err("no app can open PDFs".into())));
+    assert!(h.state_mut().execute("print.dialog"));
+    h.run_steps(3);
+    h.query_all_by_label("Print").find(|n| n.accesskit_node().role() == egui::accesskit::Role::Button).expect("the Print button").click();
+    h.run_steps(3);
+    assert_eq!(h.state().dialog, Some(Dialog::Print));
+    let toast = h.state().toast.as_ref().map(|(m, _)| m.clone()).unwrap_or_default();
+    assert!(toast.contains("no app can open PDFs"), "the user is told why: {toast:?}");
 }
 
 /// Properties… shows the printer driver's own options (CUPS) and sends only those changed.

@@ -153,7 +153,7 @@ pub(crate) fn extras_panel(ui: &mut egui::Ui, e: &mut Extras) -> bool {
         }
         let zero = tl!("Line spacing").to_string();
         let label = |v: f64| if v == 0.0 { zero.clone() } else { format!("{v:.2}×") };
-        egui::ComboBox::from_id_salt("line-spacing").selected_text(label(e.line_spacing)).width(110.0).show_ui(ui, |ui| {
+        crate::widgets::combo("line-spacing").selected_text(label(e.line_spacing)).width(110.0).show_ui(ui, |ui| {
             for v in [1.0, 1.15, 1.5, 2.0] {
                 ui.selectable_value(&mut e.line_spacing, v, label(v));
             }
@@ -352,6 +352,37 @@ pub struct BlockDrag {
     /// Where the drag started (screen).
     start: Pos2,
     grip: Grip,
+}
+
+impl BlockDrag {
+    /// Paragraph `block` of `page`, picked up by a long press at `start` (the phone's Edit): it
+    /// moves with the finger, and lands where it is let go.
+    pub(crate) fn carried(page: usize, block: usize, generation: u64, start: Pos2) -> Self {
+        BlockDrag { page, block, generation, start, grip: Grip::Move }
+    }
+}
+
+impl ImageSelection {
+    /// Picture `index` of `page`, picked up by a long press at `start` (the phone's Edit).
+    pub(crate) fn carried(page: usize, index: usize, start: Pos2) -> Self {
+        ImageSelection { page, index, drag: Some((start, None)) }
+    }
+
+    /// Picture `index` of `page`, resized by a finger on the corner at `start`, the `opposite`
+    /// one staying put (the phone's Edit).
+    pub(crate) fn resizing(page: usize, index: usize, start: Pos2, opposite: Pos2) -> Self {
+        ImageSelection { page, index, drag: Some((start, Some(opposite))) }
+    }
+
+    /// It is being moved or resized.
+    pub(crate) fn dragging(&self) -> bool {
+        self.drag.is_some()
+    }
+
+    /// Stop moving or resizing it, where it was.
+    pub(crate) fn cancel_drag(&mut self) {
+        self.drag = None;
+    }
 }
 
 /// How far an edge grip reaches either side of a box's edge (screen pixels).
@@ -625,6 +656,7 @@ pub(crate) fn page_input(
     lines: &[pdfcraft_engine::TextBlock],
     view: &mut DocView,
     allow_interaction: bool,
+    in_place: bool,
 ) -> bool {
     let info = &doc.info;
     if view.block_drag.is_some_and(|d| d.generation != doc.edit_generation()) {
@@ -737,7 +769,8 @@ pub(crate) fn page_input(
             source_rect: l.rect.map(|v| v as f32),
             multiline: l.rows.len() > 1,
             source: Some((l.clone(), source_lines)),
-            fonts: install_source_fonts(ui.ctx(), doc, page),
+            // The phone types it on a screen of its own, in the interface's font.
+            fonts: if in_place { install_source_fonts(ui.ctx(), doc, page) } else { BTreeMap::new() },
             overflow: false,
             max_width,
             size: (l.size as f32 * scale).clamp(8.0, 72.0),

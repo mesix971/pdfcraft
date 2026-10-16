@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use egui::{Align, Color32, CornerRadius, Layout, Pos2, Rect, Stroke, vec2};
+use egui::{Color32, CornerRadius, Pos2, Rect, Stroke, vec2};
 use pdfcraft_engine::sign::{self, Appearance, Certificate, DigitalId, Modification, Name, PrivateKey};
 use pdfcraft_engine::{SignOptions, SignatureImage, SignatureInfo, SignatureStatus};
 
@@ -182,10 +182,10 @@ pub(crate) fn page_input(ui: &egui::Ui, resp: &egui::Response, xf: &PageXform, p
     }
 }
 
-/// Where new digital IDs are saved: next to the recovery folder (`…/PdfCraft/Digital IDs`, or
-/// `PdfCraftData/Digital IDs` in portable mode).
+/// Where new digital IDs are saved: `Digital IDs` in PdfCraft's own data folder
+/// ([`crate::portable::app_data_dir`]; `PdfCraftData/Digital IDs` in portable mode).
 fn id_dir() -> Option<PathBuf> {
-    crate::recovery::RecoveryStore::default_dir().and_then(|d| d.parent().map(|p| p.join("Digital IDs")))
+    crate::portable::app_data_dir().map(|d| d.join("Digital IDs"))
 }
 
 /// Save a new digital ID as `<stem>.p12`, or `<stem> 2.p12`, … when the name is taken. The file
@@ -440,7 +440,7 @@ impl PdfCraftApp {
             Some(p) => sign_and_save(self, PathBuf::from(p)),
             #[cfg(not(target_arch = "wasm32"))]
             None => {
-                let dialog = rfd::AsyncFileDialog::new().add_filter("PDF", &["pdf"]).set_file_name(format!("{stem}_signed.pdf"));
+                let dialog = crate::file_dialog::AsyncFileDialog::new().add_filter("PDF", &["pdf"]).set_file_name(format!("{stem}_signed.pdf"));
                 // The signature's page, rectangle and field refer to the document as it is now:
                 // the pick is dropped (with a notice) if it is edited or switched away from
                 // meanwhile. Once the picker shows, the dialog closes; an error from here on
@@ -471,7 +471,7 @@ impl PdfCraftApp {
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn pick_sign_graphic_image(&mut self) {
         let epoch = self.dialog_epoch();
-        let dialog = rfd::AsyncFileDialog::new().add_filter(tl!("Image"), &["png", "jpg", "jpeg"]);
+        let dialog = crate::file_dialog::AsyncFileDialog::new().add_filter(tl!("Image"), &["png", "jpg", "jpeg"]);
         self.ask_one(crate::pickers::Ask::File(dialog), None, move |app, path| {
             if app.dialog_epoch() != epoch || app.dialog != Some(crate::Dialog::Sign) {
                 return;
@@ -555,7 +555,7 @@ fn title(ui: &mut egui::Ui, text: &str) {
 
 fn error(ui: &mut egui::Ui, err: &Option<String>) {
     if let Some(e) = err.as_ref().filter(|e| !e.is_empty()) {
-        ui.colored_label(Color32::from_rgb(0xD7, 0x37, 0x3F), tl!(e));
+        ui.colored_label(crate::theme::Tokens::get(ui.ctx()).error, tl!(e));
         ui.add_space(4.0);
     }
 }
@@ -635,7 +635,7 @@ fn choose(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> bool {
             d.step = SignStep::Configure;
             d.error = None;
         }
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        widgets::buttons_row(ui, |ui| {
             if ui.add_enabled_ui(d.selected.is_some(), |ui| widgets::pill_button(ui, tl!("Continue"), true)).inner.clicked() {
                 d.step = SignStep::SignAs;
                 d.error = None;
@@ -676,7 +676,7 @@ fn configure(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> bool {
             ui.add(crate::widgets::line(&mut n.country).hint_text("US").char_limit(2).desired_width(60.0)).labelled_by(l.id);
             ui.end_row();
             ui.label(tl!("Key Algorithm"));
-            egui::ComboBox::from_id_salt("key-alg").selected_text(KEY_ALGORITHMS[n.key].0).show_ui(ui, |ui| {
+            crate::widgets::combo("key-alg").selected_text(KEY_ALGORITHMS[n.key].0).show_ui(ui, |ui| {
                 for (i, (label, _)) in KEY_ALGORITHMS.iter().enumerate() {
                     ui.selectable_value(&mut n.key, i, *label);
                 }
@@ -717,7 +717,7 @@ fn configure(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> bool {
             d.step = SignStep::Choose;
             d.error = None;
         }
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        widgets::buttons_row(ui, |ui| {
             if widgets::pill_button(ui, if d.new_id.create { tl!("Save") } else { tl!("Continue") }, true).clicked() {
                 go = true;
             }
@@ -743,7 +743,7 @@ fn configure(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> bool {
     // The picker answers on a later frame, into the draft if the same dialog is still open.
     #[cfg(not(target_arch = "wasm32"))]
     if browse {
-        let dialog = rfd::AsyncFileDialog::new().add_filter(tl!("Digital ID"), &["p12", "pfx"]);
+        let dialog = crate::file_dialog::AsyncFileDialog::new().add_filter(tl!("Digital ID"), &["p12", "pfx"]);
         let epoch = app.dialog_epoch();
         app.ask_one(crate::pickers::Ask::File(dialog), None, move |app, p| {
             // Not one closed meanwhile, or opened again since.
@@ -876,7 +876,7 @@ fn sign_as(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> bool {
                 3 => tl!("Annotations, form fill-in, and digital signatures"),
                 _ => tl!("Form fill-in and digital signatures"),
             };
-            egui::ComboBox::from_id_salt("certify-p").selected_text(label(p)).width(300.0).show_ui(ui, |ui| {
+            crate::widgets::combo("certify-p").selected_text(label(p)).width(300.0).show_ui(ui, |ui| {
                 for v in [1u8, 2, 3] {
                     ui.selectable_value(&mut p, v, label(v));
                 }
@@ -917,7 +917,7 @@ fn sign_as(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> bool {
             d.step = SignStep::Choose;
             d.error = None;
         }
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        widgets::buttons_row(ui, |ui| {
             if widgets::pill_button(ui, tl!("Sign"), true).clicked() {
                 go = true;
             }
@@ -949,7 +949,7 @@ fn sign_as(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> bool {
 /// The message bar for signed documents: (icon, colour, template, argument).
 /// The template renders through [`crate::i18n::tr_fmt`] at the call site, so the bar follows
 /// the UI language; names inside `argument` stay as they are.
-pub(crate) fn banner(sigs: &[SignatureInfo]) -> Option<(&'static str, Color32, &'static str, String)> {
+pub(crate) fn banner(sigs: &[SignatureInfo], t: &Tokens) -> Option<(&'static str, Color32, &'static str, String)> {
     let signed: Vec<&SignatureInfo> = sigs.iter().filter(|s| s.signed).collect();
     if signed.is_empty() {
         return None;
@@ -969,23 +969,23 @@ pub(crate) fn banner(sigs: &[SignatureInfo]) -> Option<(&'static str, Color32, &
         return Some(("badge-check", Color32::from_rgb(0x14, 0x73, 0xE6), "Certified by {by}", by.unwrap_or_default()));
     }
     Some(if signed.iter().any(|s| s.status == SignatureStatus::Invalid) {
-        ("circle-x", Color32::from_rgb(0xD7, 0x37, 0x3F), "At least one signature is invalid.", String::new())
+        ("circle-x", t.error, "At least one signature is invalid.", String::new())
     } else if signed.iter().all(|s| s.status == SignatureStatus::Valid) {
         ("circle-check", Color32::from_rgb(0x2D, 0x9D, 0x78), "Signed and all signatures are valid.", String::new())
     } else {
-        ("triangle-alert", Color32::from_rgb(0xE6, 0x86, 0x19), "At least one signature has problems.", String::new())
+        ("triangle-alert", t.warning, "At least one signature has problems.", String::new())
     })
 }
 
-fn status_icon(s: &SignatureInfo) -> (&'static str, Color32) {
+fn status_icon(s: &SignatureInfo, t: &Tokens) -> (&'static str, Color32) {
     if !s.signed {
         return ("pen-line", Color32::from_gray(0x80));
     }
     match (s.status, &s.modification) {
         (SignatureStatus::Valid, Modification::None) => ("circle-check", Color32::from_rgb(0x2D, 0x9D, 0x78)),
         (SignatureStatus::Valid, _) => ("circle-check", Color32::from_rgb(0x2D, 0x9D, 0x78)),
-        (SignatureStatus::Unknown, _) => ("triangle-alert", Color32::from_rgb(0xE6, 0x86, 0x19)),
-        (SignatureStatus::Invalid, _) => ("circle-x", Color32::from_rgb(0xD7, 0x37, 0x3F)),
+        (SignatureStatus::Unknown, _) => ("triangle-alert", t.warning),
+        (SignatureStatus::Invalid, _) => ("circle-x", t.error),
     }
 }
 
@@ -1024,7 +1024,7 @@ pub(crate) fn panel(ui: &mut egui::Ui, t: &Tokens, sigs: &[SignatureInfo], expan
     ordered.sort_by_key(|s| (!s.signed, s.revision));
     for s in ordered {
         let open = expanded.contains(&s.field);
-        let (icon, color) = status_icon(s);
+        let (icon, color) = status_icon(s, t);
         let (template, name) = match (s.signed, s.certify.is_some(), s.signer.as_deref()) {
             (false, ..) => ("Unsigned signature field: {name}", s.field.as_str()),
             (true, true, Some(signer)) => ("Rev. {rev}: Certified by {name}", signer),
@@ -1283,7 +1283,7 @@ pub(crate) fn cert_viewer(ui: &mut egui::Ui, v: &mut CertViewer, trusted: &[Cert
     });
     ui.add_space(10.0);
     let mut close = false;
-    ui.horizontal(|ui| ui.with_layout(Layout::right_to_left(Align::Center), |ui| close = widgets::pill_button(ui, tl!("OK"), true).clicked()));
+    ui.horizontal(|ui| widgets::buttons_row(ui, |ui| close = widgets::pill_button(ui, tl!("OK"), true).clicked()));
     (close, action)
 }
 
@@ -1295,6 +1295,16 @@ pub fn certificate_pem(c: &Certificate) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// New digital IDs go to PdfCraft's own data folder, the one the recovery folder is in.
+    #[test]
+    fn digital_ids_are_kept_in_pdfcrafts_data_folder() {
+        // No home folder to find (a bare CI environment): nothing to compare.
+        let Some(data) = crate::portable::app_data_dir() else { return };
+        assert_eq!(id_dir(), Some(data.join("Digital IDs")));
+        let recovery = crate::recovery::RecoveryStore::default_dir();
+        assert_eq!(recovery.as_deref().and_then(std::path::Path::parent), Some(data.as_path()));
+    }
 
     /// A fresh folder per call: tests run in parallel.
     fn scratch() -> PathBuf {

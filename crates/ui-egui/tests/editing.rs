@@ -2553,7 +2553,7 @@ fn the_format_panel_restyles_the_paragraph_being_edited() {
     h.run_steps(3);
     assert!(h.state().views[0].line_editor.is_some());
     // The Format text panel shows the paragraph's look; making it bold applies at once.
-    h.get_by_label("FORMAT TEXT");
+    h.get_by_role_and_label(Role::Heading, "Format text");
     h.get_by_label("B").click();
     h.run_steps(4);
     let s = h.state();

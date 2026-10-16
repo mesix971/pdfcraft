@@ -204,32 +204,10 @@ fn rg_stroke(c: Rgb) -> String {
 
 /// `/DA` of a text box: (text colour, font size). Defaults to black 12 pt.
 pub fn parse_da(d: &Dict) -> (Rgb, f64) {
-    let da = d.get(b"DA").and_then(|o| o.as_string()).map(|s| String::from_utf8_lossy(&s.bytes).into_owned()).unwrap_or_default();
-    let toks: Vec<&str> = da.split_whitespace().collect();
-    let mut col = [0.0; 3];
-    let mut size = 12.0;
-    let num = |i: usize| toks.get(i).and_then(|t| t.parse::<f64>().ok());
-    for (i, t) in toks.iter().enumerate() {
-        match *t {
-            "rg" if i >= 3 => {
-                if let (Some(r), Some(g), Some(b)) = (num(i - 3), num(i - 2), num(i - 1)) {
-                    col = [r, g, b];
-                }
-            }
-            "g" if i >= 1 => {
-                if let Some(g) = num(i - 1) {
-                    col = [g; 3];
-                }
-            }
-            "Tf" if i >= 1 => {
-                if let Some(s) = num(i - 1).filter(|s| *s > 0.0) {
-                    size = s;
-                }
-            }
-            _ => {}
-        }
-    }
-    (col.map(|x| x.clamp(0.0, 1.0)), size.min(400.0))
+    let da = d.get(b"DA").and_then(|o| o.as_string()).map(|s| pdfcraft_content::DefaultAppearance::parse(&s.bytes)).unwrap_or_default();
+    let color = da.fill.map_or([0.0; 3], |(fill, _)| fill.rgb());
+    let size = da.font.map(|(_, size)| size).filter(|s| *s > 0.0).unwrap_or(12.0);
+    (color, size.min(400.0))
 }
 
 fn ext_gstate(opacity: f64, multiply: bool) -> Option<Dict> {

@@ -2343,3 +2343,148 @@ animation effects	Off	Izklopljeni
 	The linked PDF opened, but its named destination was not applied.	Povezani PDF se je odprl, vendar njegov poimenovani cilj ni bil uporabljen.
 	The linked PDF opened, but its page destination was out of range.	Povezani PDF se je odprl, vendar je ciljna stran zunaj obsega.
 	Local cross-PDF links require the desktop app	Lokalne povezave med PDF-ji zahtevajo namizno aplikacijo
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Notranji pomnilnik
+	Documents	Dokumenti
+	PdfCraft files	Datoteke PdfCraft
+	SD card {name}	Kartica SD {name}
+	Couldn't create the folder {name}: {e}	Mape {name} ni bilo mogoče ustvariti: {e}
+	Choose this folder	Izberi to mapo
+	{name} already exists. Replace it?	{name} že obstaja. Ga želite zamenjati?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Če želite odpirati in shranjevati datoteke kjer koli v tej napravi, dovolite PdfCraftu upravljanje vseh datotek.
+	Allow access	Dovoli dostop
+	All files	Vse datoteke
+	This folder is empty	Ta mapa je prazna
+	New folder	Nova mapa
+
+# Printing through another app (Android)
+	Another app	Druga aplikacija
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	PDF, pripravljen za tisk, se odpre v aplikaciji, ki jo izberete, in ta ga natisne s svojimi nastavitvami kopij, obojestranskega tiska in barve.
+	Couldn't hand {name} to another app: {e}	{name} ni bilo mogoče predati drugi aplikaciji: {e}
+phone bar	Edit	Uredi
+	Send	Pošlji
+	Thinking…	Razmišljam…
+	Anthropic API key	Ključ API za Anthropic
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	Vaše vprašanje in odprti dokument se pošljeta podjetju Anthropic (Claude) z vašim lastnim ključem API, samo ko to zahtevate. Zahteve se zaračunajo vašemu računu Anthropic.
+	Most pages sent per question	Največ poslanih strani na vprašanje
+	Translate page {n}	Prevedi stran {n}
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} žetonov
+	The answer stopped at its length limit.	Odgovor se je ustavil pri največji dolžini.
+	Add your Anthropic API key to use the assistant.	Za uporabo pomočnika dodajte svoj ključ API za Anthropic.
+	The API key was refused. Check it in the assistant's settings.	Ključ API je bil zavrnjen. Preverite ga v nastavitvah pomočnika.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	Ta dokument ima {pages} strani; pomočnik prebere največ {max}. Povišajte omejitev v nastavitvah pomočnika.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	Ta dokument je prevelik za pomočnika ({mb} MB, največ {max} MB).
+	Too many requests right now. Try again in a moment.	Trenutno je preveč zahtev. Poskusite znova čez trenutek.
+	The request was declined ({reason}).	Zahteva je bila zavrnjena ({reason}).
+	Couldn't reach the AI service: {error}	Storitve UI ni mogoče doseči: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	Ključ API ni veljaven: znova ga prilepite v nastavitvah pomočnika.
+	The assistant gave no answer. Try asking differently.	Pomočnik ni dal odgovora. Poskusite vprašati drugače.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Vaš račun Anthropic ne more uporabljati tega modela ali nima več dobroimetja: {error}
+	The AI service answered: {error}	Storitev UI je odgovorila: {error}
+	{tokens} tokens	{tokens} žetonov
+	New conversation	Nov pogovor
+	Proposed changes	Predlagane spremembe
+	Applied	Uporabljeno
+	Discarded	Zavrženo
+	The document has no page {page}.	Dokument nima strani {page}.
+	The passage wasn't found on page {page}.	Odlomka na strani {page} ni bilo mogoče najti.
+	The document refused the change.	Dokument je spremembo zavrnil.
+	Applied as one step: Undo takes them all back.	Uporabijo se v enem koraku: Razveljavi jih vse povrne.
+	The passage appears more than once on page {page}.	Odlomek se na strani {page} pojavi večkrat.
+	It overlaps another proposed change.	Prekriva se z drugo predlagano spremembo.
+	A PDF on this device.	PDF v tej napravi.
+	Add my name	Dodaj moje ime
+	Add to Starred	Dodaj med priljubljene
+	Add your name and a photo. Your name also signs your comments.	Dodajte svoje ime in fotografijo. Vaše ime podpisuje tudi vaše komentarje.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Dovolite dostop do datotek in PdfCraft bo prikazal PDF-je v tej napravi.
+	An empty page to start from.	Prazna stran za začetek.
+	Change its text and pictures.	Spremenite besedilo in slike.
+	Choose a photo	Izberi fotografijo
+	Files	Datoteke
+	Fill in a form and sign it.	Izpolnite obrazec in ga podpišite.
+	From photos, scans or other files.	Iz fotografij, skenov ali drugih datotek.
+	Hello, {name}	Pozdravljeni, {name}
+	It shows on Home and signs your comments.	Prikaže se na začetni strani in podpisuje vaše komentarje.
+	Make PdfCraft yours	Prilagodite si PdfCraft
+	More for {name}	Več za {name}
+	No PDFs found.	Ni najdenih PDF-jev.
+	No files match.	Nobena datoteka se ne ujema.
+	No recent files yet.	Nedavnih datotek še ni.
+	No starred files.	Ni priljubljenih datotek.
+	On this device	V tej napravi
+	Open another file…	Odpri drugo datoteko…
+	PDFs on this device	PDF-ji v tej napravi
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft išče v mapah Prenosi, Dokumenti in v svoji mapi.
+	Photos and scans become the pages of a new PDF.	Fotografije in skeni postanejo strani novega PDF-ja.
+	Pictures	Slike
+	Places	Mesta
+	Profile	Profil
+	Remove from Starred	Odstrani iz priljubljenih
+	Remove the photo	Odstrani fotografijo
+	Search files	Iskanje datotek
+	See your PDFs	Oglejte si svoje PDF-je
+	Set up	Nastavi
+	Several PDFs and pictures in one document.	Več PDF-jev in slik v enem dokumentu.
+	Star a file from its menu to find it here.	Datoteko dodajte med priljubljene v njenem meniju, da jo najdete tukaj.
+	Starred	Priljubljene
+	Summarize, ask and translate.	Povzemite, vprašajte, prevedite.
+	Summarize, question and correct your PDFs with Claude, with your own key.	Povzemajte, sprašujte in popravljajte svoje PDF-je s Claudom, z lastnim ključem.
+	Text, pictures and other files, converted to PDF.	Besedilo, slike in druge datoteke, pretvorjene v PDF.
+	The files you open show here.	Datoteke, ki jih odprete, so prikazane tukaj.
+	What would you like to do?	Kaj želite narediti?
+	Which document?	Kateri dokument?
+	Your AI assistant	Vaš pomočnik UI
+file state	Open	Odprto
+	Choose a PNG or JPEG picture.	Izberite sliko PNG ali JPEG.
+	This picture is too large.	Ta slika je prevelika.
+	Couldn't use this picture: {e}	Te slike ni bilo mogoče uporabiti: {e}
+	Couldn't use this picture.	Te slike ni bilo mogoče uporabiti.
+	{n} MB	{n} MB
+	{n} KB	{n} KB
+decimal separator	.	,
+	Other folders…	Druge mape…
+	Looking for photos…	Iskanje fotografij…
+	See your photos	Oglejte si svoje fotografije
+	Allow PdfCraft to see your photos, and choose one here.	Dovolite PdfCraftu dostop do fotografij in tukaj izberite eno.
+	No photos found.	Ni najdenih fotografij.
+	PdfCraft shows the photos in Camera, Pictures and Download.	PdfCraft prikazuje fotografije iz map Kamera, Slike in Prenosi.
+	Automatic	Samodejno
+	Dark mode	Temni način
+	Dark pages	Temne strani
+	Light text on a dark page, for reading at night.	Svetlo besedilo na temni strani, za branje ponoči.
+	Night	Noč
+	Downloads	Prenosi
+	Choose a file	Izberi datoteko
+	Choose files	Izberi datoteke
+	Choose a folder	Izberi mapo
+	Tap to unlock	Tapnite za odklepanje
+	Browse folders	Prebrskaj mape
+	Combined from top to bottom. Use the arrows to change the order.	Združijo se od zgoraj navzdol. Vrstni red spremenite s puščicami.
+	PDFs and pictures, combined into one PDF in the order you choose.	Datoteke PDF in slike, združene v en PDF v vrstnem redu, ki ga izberete.
+	Smaller text	Manjše besedilo
+	Larger text	Večje besedilo
+	Flip	Zrcali
+	Tap text or a picture to change it	Tapnite besedilo ali sliko, da ju spremenite
+	Tap where the text goes	Tapnite, kam naj gre besedilo
+	White	Bela
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	Vaše vprašanje in odprti dokument se pošljeta storitvi, ki jo izberete, z vašim lastnim ključem API, samo ko to zahtevate. Zahteve se zaračunajo vašemu računu pri tej storitvi.
+	Service	Storitev
+	Another service (OpenAI-compatible)	Druga storitev (združljiva z OpenAI)
+	API key	Ključ API
+	On Google's free tier, what you send may be used to improve Google's products.	Pri brezplačni ravni Googla se lahko to, kar pošljete, uporabi za izboljšanje Googlovih izdelkov.
+	Fill in for	Izpolni za
+	Service address	Naslov storitve
+	API key (if the service asks for one)	Ključ API (če ga storitev zahteva)
+	The service reads PDF files	Storitev bere datoteke PDF
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	Sicer se pošlje besedilo dokumenta, stran za stranjo (brez slik in skenov).
+	Add your API key for {service} in the assistant's settings.	Dodajte svoj ključ API za {service} v nastavitvah pomočnika.
+	Your {service} account can't use this model, or has no credit left: {error}	Vaš račun {service} ne more uporabljati tega modela ali nima več dobroimetja: {error}
+	Choose the model to ask in the assistant's settings.	V nastavitvah pomočnika izberite model, ki ga vprašate.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	Ta dokument nima besedila za pošiljanje (je to sken?). Izberite storitev, ki bere datoteke PDF, ali najprej prepoznajte njegovo besedilo.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	Besedilo tega dokumenta je predolgo za pomočnika ({chars} znakov, največ {max}).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Povzemajte, sprašujte in popravljajte svoje PDF-je s Claudom, ChatGPT ali Gemini, z lastnim ključem.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	Naslov storitve ni veljaven: začne se s https:// (http:// samo za to napravo ali lokalno omrežje).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	Ta dokument ne dovoli kopiranja vsebine, zato se ne pošlje pomočniku.
+	Try again	Poskusi znova
+	Price per million tokens read / written	Cena na milijon prebranih / napisanih žetonov

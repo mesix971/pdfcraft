@@ -55,8 +55,14 @@ impl Unit {
     /// Myanmar, millimetres everywhere else; inches when the region can't be told. Used on first
     /// start, before the user picks one in Preferences.
     pub fn system() -> Unit {
-        static SYSTEM: std::sync::OnceLock<Unit> = std::sync::OnceLock::new();
-        *SYSTEM.get_or_init(|| detect().unwrap_or_default())
+        *SYSTEM_UNIT.get_or_init(|| detect().unwrap_or_default())
+    }
+
+    /// Tell [`Unit::system`] the system's locale (`en_US`, `fr-FR`) where the environment doesn't
+    /// carry one (Android). Only counts before the first call; a tag without a region is ignored.
+    /// Returns whether it was taken.
+    pub fn seed_system_locale(tag: &str) -> bool {
+        unit_for_tag(tag).is_some_and(|unit| SYSTEM_UNIT.set(unit).is_ok())
     }
 
     /// A page size given in points, e.g. "210.0 × 297.0 mm".
@@ -65,6 +71,9 @@ impl Unit {
         format!("{:.d$} × {:.d$} {}", width_pt * k, height_pt * k, self.label())
     }
 }
+
+/// The system's unit, found once (see [`Unit::system`]).
+static SYSTEM_UNIT: std::sync::OnceLock<Unit> = std::sync::OnceLock::new();
 
 /// The unit for a locale tag's region: `en_US.UTF-8`, `en-US`, `bg-BG`, `zh-Hans-CN`, `en_GB@euro`.
 /// `None` without a region (`C`, `POSIX`, `en`).

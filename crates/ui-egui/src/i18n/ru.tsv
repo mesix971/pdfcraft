@@ -2251,3 +2251,149 @@ animation effects	Off	Выкл
 	The linked PDF opened, but its named destination was not applied.	Связанный PDF открыт, но его именованное назначение не применено.
 	The linked PDF opened, but its page destination was out of range.	Связанный PDF открыт, но страница назначения вне допустимого диапазона.
 	Local cross-PDF links require the desktop app	Локальные ссылки между PDF работают только в настольном приложении
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Внутренняя память
+	Documents	Документы
+	PdfCraft files	Файлы PdfCraft
+	SD card {name}	SD-карта {name}
+	Couldn't create the folder {name}: {e}	Не удалось создать папку {name}: {e}
+	Choose this folder	Выбрать эту папку
+	{name} already exists. Replace it?	{name} уже существует. Заменить?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Чтобы открывать и сохранять файлы в любом месте на этом устройстве, разрешите PdfCraft управлять всеми файлами.
+	Allow access	Разрешить доступ
+	All files	Все файлы
+	This folder is empty	Эта папка пуста
+	New folder	Новая папка
+
+# Printing through another app (Android)
+	Another app	Другое приложение
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	Готовый к печати PDF откроется в выбранном вами приложении, которое напечатает его со своими настройками копий, двусторонней печати и цвета.
+	Couldn't hand {name} to another app: {e}	Не удалось передать {name} другому приложению: {e}
+phone bar	Edit	Изменить
+	Send	Отправить
+	Thinking…	Думаю…
+	Anthropic API key	API-ключ Anthropic
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	Ваш вопрос и открытый документ отправляются в Anthropic (Claude) с вашим собственным API-ключом, только когда вы просите. Запросы оплачиваются с вашего аккаунта Anthropic.
+	Most pages sent per question	Максимум страниц на вопрос
+	Translate page {n}	Перевести страницу {n}
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} токенов
+	The answer stopped at its length limit.	Ответ оборвался на максимальной длине.
+	Add your Anthropic API key to use the assistant.	Добавьте свой API-ключ Anthropic, чтобы пользоваться ассистентом.
+	The API key was refused. Check it in the assistant's settings.	API-ключ отклонён. Проверьте его в настройках ассистента.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	В этом документе {pages} стр.; ассистент читает не более {max}. Увеличьте лимит в настройках ассистента.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	Этот документ слишком велик для ассистента ({mb} МБ, не более {max} МБ).
+	Too many requests right now. Try again in a moment.	Сейчас слишком много запросов. Повторите попытку чуть позже.
+	The request was declined ({reason}).	Запрос отклонён ({reason}).
+	Couldn't reach the AI service: {error}	Не удалось связаться с ИИ-сервисом: {error}
+	Model	Модель
+	The API key isn't valid: paste it again in the assistant's settings.	API-ключ недействителен: вставьте его заново в настройках ассистента.
+	The assistant gave no answer. Try asking differently.	Ассистент не дал ответа. Попробуйте сформулировать вопрос иначе.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Ваш аккаунт Anthropic не может использовать эту модель или на нём закончились средства: {error}
+	The AI service answered: {error}	ИИ-сервис ответил: {error}
+	{tokens} tokens	{tokens} токенов
+	New conversation	Новый разговор
+	Proposed changes	Предложенные изменения
+	Applied	Применено
+	Discarded	Отклонено
+	The document has no page {page}.	В документе нет страницы {page}.
+	The passage wasn't found on page {page}.	Фрагмент не найден на странице {page}.
+	The document refused the change.	Документ не принял изменение.
+	Applied as one step: Undo takes them all back.	Применяются одним шагом: «Отменить» отменяет их все.
+	The passage appears more than once on page {page}.	Фрагмент встречается на странице {page} несколько раз.
+	It overlaps another proposed change.	Оно пересекается с другим предложенным изменением.
+	A PDF on this device.	PDF на этом устройстве.
+	Add my name	Указать имя
+	Add to Starred	Добавить в избранное
+	Add your name and a photo. Your name also signs your comments.	Добавьте имя и фото. Имя также подписывает ваши комментарии.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Разрешите доступ к файлам, и PdfCraft покажет PDF на этом устройстве.
+	An empty page to start from.	Пустая страница для начала.
+	Change its text and pictures.	Изменить текст и изображения.
+	Choose a photo	Выбрать фото
+	Files	Файлы
+	Fill in a form and sign it.	Заполнить форму и подписать.
+	From photos, scans or other files.	Из фото, сканов или других файлов.
+	Hello, {name}	Здравствуйте, {name}
+	It shows on Home and signs your comments.	Оно отображается на главной и подписывает ваши комментарии.
+	Make PdfCraft yours	Настройте PdfCraft под себя
+	More for {name}	Ещё для «{name}»
+	No PDFs found.	PDF не найдены.
+	No files match.	Нет подходящих файлов.
+	No recent files yet.	Недавних файлов пока нет.
+	No starred files.	Нет избранных файлов.
+	On this device	На устройстве
+	Open another file…	Открыть другой файл…
+	PDFs on this device	PDF на этом устройстве
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft ищет в папках «Загрузки», «Документы» и в своей папке.
+	Photos and scans become the pages of a new PDF.	Фото и сканы становятся страницами нового PDF.
+	Pictures	Изображения
+	Places	Расположения
+	Profile	Профиль
+	Remove from Starred	Убрать из избранного
+	Remove the photo	Удалить фото
+	Search files	Поиск файлов
+	See your PDFs	Ваши PDF
+	Set up	Настроить
+	Several PDFs and pictures in one document.	Несколько PDF и изображений в одном документе.
+	Star a file from its menu to find it here.	Добавьте файл в избранное через его меню, чтобы найти его здесь.
+	Starred	Избранное
+	Summarize, ask and translate.	Резюме, вопросы, перевод.
+	Summarize, question and correct your PDFs with Claude, with your own key.	Кратко излагайте, расспрашивайте и исправляйте свои PDF с Claude, используя свой ключ.
+	Text, pictures and other files, converted to PDF.	Текст, изображения и другие файлы, преобразованные в PDF.
+	The files you open show here.	Здесь появляются открытые вами файлы.
+	What would you like to do?	Что вы хотите сделать?
+	Which document?	Какой документ?
+	Your AI assistant	Ваш ИИ-ассистент
+file state	Open	Открыт
+	Choose a PNG or JPEG picture.	Выберите изображение PNG или JPEG.
+	This picture is too large.	Это изображение слишком велико.
+	Couldn't use this picture: {e}	Не удалось использовать это изображение: {e}
+	Couldn't use this picture.	Не удалось использовать это изображение.
+	{n} MB	{n} МБ
+	{n} KB	{n} КБ
+decimal separator	.	,
+	Other folders…	Другие папки…
+	Looking for photos…	Поиск фото…
+	See your photos	Ваши фото
+	Allow PdfCraft to see your photos, and choose one here.	Разрешите PdfCraft доступ к фото и выберите одно здесь.
+	No photos found.	Фото не найдены.
+	PdfCraft shows the photos in Camera, Pictures and Download.	PdfCraft показывает фото из папок «Камера», «Изображения» и «Загрузки».
+	Automatic	Автоматически
+	Dark mode	Тёмный режим
+	Dark pages	Тёмные страницы
+	Light text on a dark page, for reading at night.	Светлый текст на тёмной странице, для чтения ночью.
+	Night	Ночь
+	Downloads	Загрузки
+	Choose a file	Выбор файла
+	Choose files	Выбор файлов
+	Choose a folder	Выбор папки
+	Tap to unlock	Нажмите, чтобы разблокировать
+	Browse folders	Просмотреть папки
+	Combined from top to bottom. Use the arrows to change the order.	Объединяются сверху вниз. Порядок меняется стрелками.
+	PDFs and pictures, combined into one PDF in the order you choose.	PDF-файлы и изображения, объединённые в один PDF в выбранном вами порядке.
+	Smaller text	Текст меньше
+	Larger text	Текст больше
+	Flip	Отразить
+	Tap text or a picture to change it	Коснитесь текста или изображения, чтобы изменить его
+	Tap where the text goes	Коснитесь места для текста
+	White	Белый
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	Ваш вопрос и открытый документ отправляются в выбранный вами сервис с вашим собственным API-ключом и только по вашему запросу. Запросы оплачиваются с вашего аккаунта в этом сервисе.
+	Service	Сервис
+	Another service (OpenAI-compatible)	Другой сервис (совместимый с OpenAI)
+	API key	API-ключ
+	On Google's free tier, what you send may be used to improve Google's products.	На бесплатном тарифе Google отправленные вами данные могут использоваться для улучшения продуктов Google.
+	Fill in for	Заполнить для
+	Service address	Адрес сервиса
+	API key (if the service asks for one)	API-ключ (если сервис его просит)
+	The service reads PDF files	Сервис читает PDF-файлы
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	Иначе отправляется текст документа, страница за страницей (без изображений и сканов).
+	Add your API key for {service} in the assistant's settings.	Добавьте свой API-ключ {service} в настройках ассистента.
+	Your {service} account can't use this model, or has no credit left: {error}	Ваш аккаунт {service} не может использовать эту модель или на нём закончились средства: {error}
+	Choose the model to ask in the assistant's settings.	Выберите модель для вопросов в настройках ассистента.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	В этом документе нет текста для отправки (это скан?). Выберите сервис, который читает PDF-файлы, или сначала распознайте его текст.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	Текст этого документа слишком длинный для ассистента ({chars} знаков, не более {max}).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Кратко излагайте, расспрашивайте и исправляйте свои PDF с Claude, ChatGPT или Gemini, используя свой ключ.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	Неверный адрес сервиса: он начинается с https:// (http:// только для этого устройства или локальной сети).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	Этот документ не разрешает копировать своё содержимое, поэтому он не отправляется ассистенту.
+	Try again	Повторить
+	Price per million tokens read / written	Цена за миллион прочитанных / написанных токенов

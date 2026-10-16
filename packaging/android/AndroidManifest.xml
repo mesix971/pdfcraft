@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PdfCraft for Android. `cargo xtask android` fills in the version and builds the APK
+     (apps/pdfcraft-android/README.md). The app is native code in a NativeActivity: no Java.
+
+     The SDK levels come from `cargo xtask android` (minimum 26, Android 8.0; target 36, Android
+     16, as Google Play asks). From Android 15 the app is drawn under the status and navigation
+     bars (edge-to-edge): the shell reads the window's insets and paints the bars' grounds itself
+     (apps/pdfcraft-android/src/shell.rs). From Android 16 the Back key reaches an app only when
+     `enableOnBackInvokedCallback` is false: a NativeActivity can't take the callbacks that replace
+     it, and Back closes what is open in PdfCraft (a menu, a sheet) before it leaves. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="ai.storyteller.pdfcraft"
+    android:installLocation="auto">
+
+    <!-- Open and save documents anywhere on shared storage: the storage permissions up to
+         Android 10, "all files access" from Android 11 (the app asks in its file browser). -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- The profile photo's grid: the device's photos, asked for as other apps ask (Android 13 and
+         later; the storage permission above before). -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <!-- Bring PdfCraft forward when another app opens a document in it while it runs. -->
+    <uses-permission android:name="android.permission.REORDER_TASKS" />
+    <!-- The AI assistant only (crates/ai): the service the user chose, with the user's own API
+         key, and only when the user asks a question. Without a key PdfCraft sends nothing;
+         everything else works offline. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- wgpu draws with Vulkan, or OpenGL ES 3 where Vulkan is missing. -->
+    <uses-feature android:glEsVersion="0x00030000" android:required="true" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
+    <application
+        android:label="PdfCraft"
+        android:icon="@mipmap/ic_launcher"
+        android:hasCode="false"
+        android:allowBackup="false"
+        android:requestLegacyExternalStorage="true"
+        android:resizeableActivity="true"
+        android:enableOnBackInvokedCallback="false"
+        android:appCategory="productivity">
+
+        <!-- standard: a NativeActivity never hears of an intent sent to it while it runs, so a
+             document opened from another app then starts a second Activity, which hands the
+             document to the running PdfCraft, brings it forward and finishes
+             (apps/pdfcraft-android/src/shell.rs, hand_off). configChanges: turning the device or
+             folding it resizes the window; it never restarts the app and its open documents. -->
+        <activity
+            android:name="android.app.NativeActivity"
+            android:exported="true"
+            android:launchMode="standard"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboard|keyboardHidden|navigation|uiMode|locale|layoutDirection|fontScale|touchscreen|colorMode|mcc|mnc">
+
+            <meta-data android:name="android.app.lib_name" android:value="pdfcraft_android" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- "Open with PdfCraft" from file managers, mail and the browser's downloads. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.EDIT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+
+            <!-- "Share to PdfCraft". -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

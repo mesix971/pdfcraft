@@ -34,6 +34,15 @@ pub(crate) use crate::icon::NoIcon as PlatformIcon;
 
 static HAS_FOCUS: AtomicBool = AtomicBool::new(true);
 
+/// While set, key events (all but Back) are left to the activity's own views instead of going to
+/// the app: an Android text view the app shows over its window has the keyboard, and gets every
+/// input method's keys (Delete, Enter) that way. PdfCraft patch (13), see vendor/README.md.
+pub(crate) static KEYS_TO_VIEWS: AtomicBool = AtomicBool::new(false);
+
+/// While set, the app shows and hides the soft keyboard itself, and `set_ime_allowed` leaves it
+/// alone. PdfCraft patch (13), see vendor/README.md.
+pub(crate) static APP_SOFT_KEYBOARD: AtomicBool = AtomicBool::new(false);
+
 /// Returns the minimum `Option<Duration>`, taking into account that `None`
 /// equates to an infinite timeout, not a zero timeout (so can't just use
 /// `Option::min`)
@@ -154,6 +163,16 @@ pub(crate) struct PlatformSpecificEventLoopAttributes {
 impl Default for PlatformSpecificEventLoopAttributes {
     fn default() -> Self {
         Self { android_app: Default::default(), ignore_volume_keys: true }
+    }
+}
+
+// PdfCraft patch: Android runs `android_main` again, on a new thread with a new `AndroidApp`,
+// for every new Activity instance in a process (after the previous one finished, or beside it).
+// Each instance needs its own event loop, so dropping one allows the next to be created; without
+// this, relaunching an app whose process Android kept alive failed with `RecreationAttempt`.
+impl<T: 'static> Drop for EventLoop<T> {
+    fn drop(&mut self) {
+        crate::event_loop::EventLoopBuilder::<()>::allow_event_loop_recreation();
     }
 }
 
@@ -423,6 +442,11 @@ impl<T: 'static> EventLoop<T> {
                 }
             },
             InputEvent::KeyEvent(key) => {
+                // PdfCraft patch (13): the app's text view takes the keys (Back stays the app's,
+                // which closes what is open rather than the activity).
+                if KEYS_TO_VIEWS.load(Ordering::Relaxed) && key.key_code() != Keycode::Back {
+                    return InputStatus::Unhandled;
+                }
                 match key.key_code() {
                     // Flag keys related to volume as unhandled. While winit does not have a way for
                     // applications to configure what keys to flag as handled,
@@ -916,6 +940,13 @@ impl Window {
     pub fn set_ime_cursor_area(&self, _position: Position, _size: Size) {}
 
     pub fn set_ime_allowed(&self, allowed: bool) {
+        // PdfCraft patch (13): an app that shows and hides the soft keyboard itself, or whose text
+        // view has the keys, keeps it. Shown here, it would go to the window; hidden here, when
+        // the app's text input goes off and on, the hide could land after the app's own show and
+        // leave the field without a keyboard.
+        if APP_SOFT_KEYBOARD.load(Ordering::Relaxed) || KEYS_TO_VIEWS.load(Ordering::Relaxed) {
+            return;
+        }
         if allowed {
             self.app.show_soft_input(true);
         } else {

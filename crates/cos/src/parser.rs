@@ -322,20 +322,11 @@ impl<'a> Lexer<'a> {
         let tok = self.token();
         let s = std::str::from_utf8(tok).map_err(|_| self.err("bad number"))?;
         if s.contains('.') {
-            // Tolerate forms like "--5", "5-" or "1.2.3" by parsing the longest valid prefix.
+            // Tolerate forms like "--5", "5-" or "1.2.3" by reading the longest valid prefix,
+            // found in one pass (trying ever shorter prefixes made a long malformed token cost
+            // its length squared).
             let cleaned: String = s.trim_start_matches('+').replacen("--", "-", 1);
-            let mut end = cleaned.len();
-            while end > 0 {
-                // Only cut at character boundaries: a token can hold multi-byte UTF-8 (fuzzing
-                // found ".—", which panicked here).
-                if cleaned.is_char_boundary(end)
-                    && let Ok(v) = cleaned[..end].parse::<f64>()
-                {
-                    return Ok(Object::Real(v));
-                }
-                end -= 1;
-            }
-            return Ok(Object::Real(0.0));
+            return Ok(Object::Real(real_prefix(&cleaned).parse::<f64>().unwrap_or(0.0)));
         }
         match s.trim_start_matches('+').parse::<i64>() {
             Ok(v) => Ok(Object::Int(v)),
@@ -456,9 +447,53 @@ fn find_endstream(data: &[u8], from: usize) -> Option<usize> {
     Some(end)
 }
 
+/// The longest prefix of `s` that reads as a number: a sign, digits with at most one point, and
+/// an exponent if digits follow it (which PDF doesn't write, but files do). Only ASCII, so the
+/// cut is always at a character boundary.
+fn real_prefix(s: &str) -> &str {
+    let b = s.as_bytes();
+    let digits = |mut at: usize| {
+        while b.get(at).is_some_and(u8::is_ascii_digit) {
+            at += 1;
+        }
+        at
+    };
+    let mut end = usize::from(matches!(b.first(), Some(b'-' | b'+')));
+    end = digits(end);
+    if b.get(end) == Some(&b'.') {
+        end = digits(end + 1);
+    }
+    if matches!(b.get(end), Some(b'e' | b'E')) {
+        let sign = usize::from(matches!(b.get(end + 1), Some(b'-' | b'+')));
+        let exp = digits(end + 1 + sign);
+        if exp > end + 1 + sign {
+            end = exp;
+        }
+    }
+    s.get(..end).unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Malformed reals read as their longest valid prefix, and a long one costs its length, not
+    /// its length squared.
+    #[test]
+    fn malformed_reals_read_their_longest_prefix_quickly() {
+        let real = |t: &str| Lexer::new(t.as_bytes(), 0).object().unwrap();
+        assert_eq!(real("1.2.3"), Object::Real(1.2));
+        assert_eq!(real("--5.5"), Object::Real(-5.5));
+        assert_eq!(real("+.5"), Object::Real(0.5));
+        assert_eq!(real("5.-"), Object::Real(5.0));
+        assert_eq!(real("1.5e3x"), Object::Real(1500.0));
+        assert_eq!(real("1.5ex"), Object::Real(1.5));
+        assert_eq!(real("-."), Object::Real(0.0));
+        let long = format!("1{}", ".x".repeat(200_000));
+        let started = std::time::Instant::now();
+        assert_eq!(real(&long), Object::Real(1.0));
+        assert!(started.elapsed() < std::time::Duration::from_secs(2), "{:?}", started.elapsed());
+    }
 
     #[test]
     fn numbers_with_multibyte_garbage_do_not_panic() {

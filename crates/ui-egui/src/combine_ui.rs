@@ -3,6 +3,9 @@
 //! being combined. Rows are selected like files in a file manager (click, Ctrl/⌘+click,
 //! Shift+click), moved with the toolbar, the keyboard or by dragging, and sorted by clicking a
 //! column heading; PDFs dropped on the tab join the list. Every change to the list can be undone.
+//! The phone layout has a list of its own ([`phone`]).
+
+pub(crate) mod phone;
 
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap};
@@ -16,9 +19,6 @@ use pdfcraft_engine::SourceProblem;
 use crate::theme::{self, Tokens};
 use crate::{PdfCraftApp, icons, widgets};
 
-/// Same reds and ambers as the signature status (`sign_ui`).
-pub(crate) const ERROR: Color32 = Color32::from_rgb(0xD7, 0x37, 0x3F);
-pub(crate) const WARNING: Color32 = Color32::from_rgb(0xE6, 0x86, 0x19);
 /// Undo steps kept for the list (each holds the list itself; the files' bytes are shared).
 const HISTORY: usize = 100;
 
@@ -869,7 +869,7 @@ pub(crate) fn page(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                         } else {
                             crate::i18n::fmt(tl!("{n} files need attention"), &[("n", &bad.to_string())])
                         };
-                        ui.label(egui::RichText::new(text).color(ERROR));
+                        ui.label(egui::RichText::new(text).color(t.error));
                     });
                 }
             });
@@ -914,10 +914,10 @@ fn skip_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
         left_out.push((f.name.as_str(), f.problem.as_deref().unwrap_or_default()));
     }
     let mut choice: Option<bool> = None;
-    let modal = egui::Modal::new(egui::Id::new("combine-skip")).show(ctx, |ui| {
-        ui.set_width(460.0);
+    let modal = widgets::show_modal(ctx, "combine-skip", |ui| {
+        widgets::set_dialog_width(ui, 460.0);
         ui.horizontal(|ui| {
-            ui.add(icons::image("triangle-alert", 22.0, ERROR));
+            ui.add(icons::image("triangle-alert", 22.0, t.error));
             ui.add(egui::Label::new(egui::RichText::new(tl!("Leave out files that can't be read?")).font(theme::semibold(16.0))).wrap());
         });
         ui.add_space(6.0);
@@ -934,7 +934,7 @@ fn skip_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
             ui.label(egui::RichText::new(crate::i18n::fmt(tl!("and {n} more"), &[("n", &more)])).color(t.text_muted));
         }
         ui.add_space(14.0);
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        widgets::buttons_row(ui, |ui| {
             if widgets::pill_button(ui, tl!("Combine the rest"), true).clicked() {
                 choice = Some(true);
             }
@@ -973,7 +973,7 @@ fn unlock_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
     let (mut submit, mut cancel) = (false, false);
     let area = egui::Area::new(egui::Id::new("combine-unlock")).order(egui::Order::Foreground).fixed_pos(prompt.at).show(ctx, |ui| {
         egui::Frame::popup(ui.style()).inner_margin(egui::Margin::same(14)).show(ui, |ui| {
-            ui.set_width(340.0);
+            ui.set_width(340.0_f32.min(ctx.content_rect().width() - 56.0).max(200.0));
             ui.horizontal(|ui| {
                 ui.add(icons::image("lock", 16.0, t.icon));
                 ui.add(egui::Label::new(egui::RichText::new(&title).font(theme::semibold(14.0))).truncate());
@@ -986,7 +986,12 @@ fn unlock_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 crate::widgets::begin_dialog(ui);
-                let field = ui.add(crate::widgets::line(&mut prompt.input.0).password(!prompt.show).hint_text(tl!("Password")).desired_width(290.0));
+                let field = ui.add(
+                    crate::widgets::line(&mut prompt.input.0)
+                        .password(!prompt.show)
+                        .hint_text(tl!("Password"))
+                        .desired_width((ui.available_width() - 36.0).clamp(120.0, 290.0)),
+                );
                 if !prompt.focused {
                     field.request_focus();
                     prompt.focused = true;
@@ -1003,7 +1008,7 @@ fn unlock_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
                 }
             });
             if let Some(e) = &prompt.error {
-                ui.label(egui::RichText::new(e).color(ERROR));
+                ui.label(egui::RichText::new(e).color(t.error));
             }
             ui.add_space(6.0);
             ui.label(egui::RichText::new(tl!("The password is only used to read the file; it isn't saved.")).small().color(t.text_faint));
@@ -1470,7 +1475,7 @@ fn table_body(
                                     crate::widgets::line(&mut f.range).frame(egui::Frame::NONE).hint_text(tl!("All pages")).desired_width(88.0),
                                 );
                                 // A visible field on plain and striped rows alike; red when the range is wrong.
-                                let border = if check.is_err() { Stroke::new(1.5, ERROR) } else { Stroke::new(1.0, t.border) };
+                                let border = if check.is_err() { Stroke::new(1.5, t.error) } else { Stroke::new(1.0, t.border) };
                                 ui.painter().rect_stroke(edit.rect, CornerRadius::same(4), border, egui::StrokeKind::Inside);
                                 if let Err(e) = &check {
                                     edit.clone().on_hover_text(e);
@@ -1490,7 +1495,7 @@ fn table_body(
                                     (Ok(k), _) => crate::i18n::fmt(tl!("{k} of {n}"), &[("k", &k.to_string()), ("n", &f.pages.to_string())]),
                                     (Err(_), _) => crate::i18n::fmt(tl!("? of {n}"), &[("n", &f.pages.to_string())]),
                                 };
-                                ui.label(egui::RichText::new(count).small().color(if check.is_err() { ERROR } else { t.text_faint }));
+                                ui.label(egui::RichText::new(count).small().color(if check.is_err() { t.error } else { t.text_faint }));
                             }
                             SortKey::Size => {
                                 ui.label(egui::RichText::new(crate::panels::human_size(f.bytes.len())).color(t.text_muted));
@@ -1527,8 +1532,8 @@ fn table_body(
                                     ));
                                 }
                                 let (icon, colour, first) = match (errors.first(), warnings.first()) {
-                                    (Some(e), _) => ("circle-x", ERROR, e.clone()),
-                                    (None, Some(w)) => ("triangle-alert", WARNING, w.clone()),
+                                    (Some(e), _) => ("circle-x", t.error, e.clone()),
+                                    (None, Some(w)) => ("triangle-alert", t.warning, w.clone()),
                                     (None, None) => return,
                                 };
                                 let all = errors.iter().chain(&warnings).cloned().collect::<Vec<_>>().join("\n");
@@ -1544,7 +1549,7 @@ fn table_body(
                                     }
                                 }
                                 ui.add(
-                                    egui::Label::new(egui::RichText::new(first).color(if colour == ERROR { ERROR } else { t.text }))
+                                    egui::Label::new(egui::RichText::new(first).color(if colour == t.error { t.error } else { t.text }))
                                         .truncate()
                                         .selectable(false),
                                 )
@@ -2513,7 +2518,7 @@ impl PdfCraftApp {
         #[cfg(not(target_arch = "wasm32"))]
         {
             let title = if recursive { tl!("Add folder and subfolders") } else { tl!("Add folder") };
-            let dialog = rfd::AsyncFileDialog::new().set_title(title);
+            let dialog = crate::file_dialog::AsyncFileDialog::new().set_title(title);
             self.ask_one(crate::pickers::Ask::Folder(dialog), None, move |app, dir| app.add_folder_to_combine(&dir, recursive));
         }
         #[cfg(target_arch = "wasm32")]

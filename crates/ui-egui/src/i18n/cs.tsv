@@ -2412,3 +2412,148 @@ animation effects	Off	Vypnuto
 	The linked PDF opened, but its named destination was not applied.	Odkazovaný PDF se otevřel, ale jeho pojmenovaný cíl nebyl použit.
 	The linked PDF opened, but its page destination was out of range.	Odkazovaný PDF se otevřel, ale cílová stránka je mimo rozsah.
 	Local cross-PDF links require the desktop app	Místní odkazy mezi soubory PDF vyžadují desktopovou aplikaci
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Interní úložiště
+	Documents	Dokumenty
+	PdfCraft files	Soubory PdfCraft
+	SD card {name}	Karta SD {name}
+	Couldn't create the folder {name}: {e}	Složku {name} se nepodařilo vytvořit: {e}
+	Choose this folder	Vybrat tuto složku
+	{name} already exists. Replace it?	{name} již existuje. Nahradit?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Chcete-li otevírat a ukládat soubory kdekoli v tomto zařízení, povolte aplikaci PdfCraft spravovat všechny soubory.
+	Allow access	Povolit přístup
+	All files	Všechny soubory
+	This folder is empty	Tato složka je prázdná
+	New folder	Nová složka
+
+# Printing through another app (Android)
+	Another app	Jiná aplikace
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	PDF připravené k tisku se otevře ve vybrané aplikaci, která ho vytiskne s vlastním nastavením kopií, oboustranného tisku a barev.
+	Couldn't hand {name} to another app: {e}	{name} se nepodařilo předat jiné aplikaci: {e}
+phone bar	Edit	Upravit
+	Send	Odeslat
+	Thinking…	Přemýšlím…
+	Anthropic API key	Klíč API Anthropic
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	Vaše otázka a otevřený dokument se odešlou společnosti Anthropic (Claude) s vaším vlastním klíčem API, jen když o to požádáte. Požadavky se účtují na váš účet Anthropic.
+	Most pages sent per question	Nejvýše odeslaných stran na otázku
+	Translate page {n}	Přeložit stranu {n}
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} tokenů
+	The answer stopped at its length limit.	Odpověď skončila na své maximální délce.
+	Add your Anthropic API key to use the assistant.	Pro použití asistenta přidejte svůj klíč API Anthropic.
+	The API key was refused. Check it in the assistant's settings.	Klíč API byl odmítnut. Zkontrolujte ho v nastavení asistenta.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	Tento dokument má {pages} stran; asistent čte nejvýše {max}. Zvyšte limit v nastavení asistenta.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	Tento dokument je pro asistenta příliš velký ({mb} MB, nejvýše {max} MB).
+	Too many requests right now. Try again in a moment.	Právě je příliš mnoho požadavků. Zkuste to za chvíli znovu.
+	The request was declined ({reason}).	Požadavek byl odmítnut ({reason}).
+	Couldn't reach the AI service: {error}	Nelze se spojit se službou AI: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	Klíč API není platný: vložte ho znovu v nastavení asistenta.
+	The assistant gave no answer. Try asking differently.	Asistent nedal žádnou odpověď. Zkuste se zeptat jinak.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Váš účet Anthropic nemůže tento model používat, nebo už nemá žádný kredit: {error}
+	The AI service answered: {error}	Služba AI odpověděla: {error}
+	{tokens} tokens	{tokens} tokenů
+	New conversation	Nová konverzace
+	Proposed changes	Navrhované změny
+	Applied	Použito
+	Discarded	Zahozeno
+	The document has no page {page}.	Dokument nemá stránku {page}.
+	The passage wasn't found on page {page}.	Pasáž nebyla na stránce {page} nalezena.
+	The document refused the change.	Dokument změnu odmítl.
+	Applied as one step: Undo takes them all back.	Použijí se v jednom kroku: Zpět je vrátí všechny.
+	The passage appears more than once on page {page}.	Pasáž se na stránce {page} vyskytuje vícekrát.
+	It overlaps another proposed change.	Překrývá se s jinou navrhovanou změnou.
+	A PDF on this device.	PDF v tomto zařízení.
+	Add my name	Přidat své jméno
+	Add to Starred	Přidat k oblíbeným
+	Add your name and a photo. Your name also signs your comments.	Přidejte své jméno a fotku. Vaše jméno také podepisuje vaše komentáře.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Povolte přístup k souborům a PdfCraft zobrazí PDF v tomto zařízení.
+	An empty page to start from.	Prázdná stránka na začátek.
+	Change its text and pictures.	Změňte jeho text a obrázky.
+	Choose a photo	Vybrat fotku
+	Files	Soubory
+	Fill in a form and sign it.	Vyplňte formulář a podepište ho.
+	From photos, scans or other files.	Z fotek, skenů nebo jiných souborů.
+	Hello, {name}	Dobrý den, {name}
+	It shows on Home and signs your comments.	Zobrazuje se na úvodní stránce a podepisuje vaše komentáře.
+	Make PdfCraft yours	Přizpůsobte si PdfCraft
+	More for {name}	Další pro {name}
+	No PDFs found.	Nebyly nalezeny žádné PDF.
+	No files match.	Žádné soubory neodpovídají.
+	No recent files yet.	Zatím žádné nedávné soubory.
+	No starred files.	Žádné oblíbené soubory.
+	On this device	V tomto zařízení
+	Open another file…	Otevřít jiný soubor…
+	PDFs on this device	PDF v tomto zařízení
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft hledá ve složkách Stažené, Dokumenty a ve své vlastní složce.
+	Photos and scans become the pages of a new PDF.	Z fotek a skenů se stanou stránky nového PDF.
+	Pictures	Obrázky
+	Places	Umístění
+	Profile	Profil
+	Remove from Starred	Odebrat z oblíbených
+	Remove the photo	Odebrat fotku
+	Search files	Hledat soubory
+	See your PDFs	Zobrazte své PDF
+	Set up	Nastavit
+	Several PDFs and pictures in one document.	Více PDF a obrázků v jednom dokumentu.
+	Star a file from its menu to find it here.	Přidejte soubor k oblíbeným v jeho nabídce a najdete ho zde.
+	Starred	Oblíbené
+	Summarize, ask and translate.	Shrnout, zeptat se, přeložit.
+	Summarize, question and correct your PDFs with Claude, with your own key.	Shrnujte, ptejte se a opravujte své PDF s Claudem, s vlastním klíčem.
+	Text, pictures and other files, converted to PDF.	Text, obrázky a jiné soubory převedené do PDF.
+	The files you open show here.	Soubory, které otevřete, se zobrazí zde.
+	What would you like to do?	Co chcete udělat?
+	Which document?	Který dokument?
+	Your AI assistant	Váš asistent AI
+file state	Open	Otevřeno
+	Choose a PNG or JPEG picture.	Vyberte obrázek PNG nebo JPEG.
+	This picture is too large.	Tento obrázek je příliš velký.
+	Couldn't use this picture: {e}	Tento obrázek nelze použít: {e}
+	Couldn't use this picture.	Tento obrázek nelze použít.
+	{n} MB	{n} MB
+	{n} KB	{n} kB
+decimal separator	.	,
+	Other folders…	Další složky…
+	Looking for photos…	Hledání fotek…
+	See your photos	Zobrazte své fotky
+	Allow PdfCraft to see your photos, and choose one here.	Povolte aplikaci PdfCraft přístup k fotkám a vyberte jednu tady.
+	No photos found.	Nebyly nalezeny žádné fotky.
+	PdfCraft shows the photos in Camera, Pictures and Download.	PdfCraft zobrazuje fotky ze složek Fotoaparát, Obrázky a Stažené.
+	Automatic	Automaticky
+	Dark mode	Tmavý režim
+	Dark pages	Tmavé stránky
+	Light text on a dark page, for reading at night.	Světlý text na tmavé stránce, pro čtení v noci.
+	Night	Noc
+	Downloads	Stažené soubory
+	Choose a file	Vybrat soubor
+	Choose files	Vybrat soubory
+	Choose a folder	Vybrat složku
+	Tap to unlock	Klepnutím odemknete
+	Browse folders	Procházet složky
+	Combined from top to bottom. Use the arrows to change the order.	Spojují se shora dolů. Pořadí změníte šipkami.
+	PDFs and pictures, combined into one PDF in the order you choose.	PDF a obrázky spojené do jednoho PDF v pořadí, které zvolíte.
+	Smaller text	Menší text
+	Larger text	Větší text
+	Flip	Převrátit
+	Tap text or a picture to change it	Klepnutím na text nebo obrázek je změníte
+	Tap where the text goes	Klepněte, kam má text přijít
+	White	Bílá
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	Vaše otázka a otevřený dokument se odesílají službě, kterou si zvolíte, s vaším vlastním klíčem API, a jen když o to požádáte. Požadavky se účtují na váš účet u této služby.
+	Service	Služba
+	Another service (OpenAI-compatible)	Jiná služba (kompatibilní s OpenAI)
+	API key	Klíč API
+	On Google's free tier, what you send may be used to improve Google's products.	V bezplatné úrovni Googlu může být to, co odešlete, použito ke zlepšení produktů Googlu.
+	Fill in for	Vyplnit pro
+	Service address	Adresa služby
+	API key (if the service asks for one)	Klíč API (pokud ho služba vyžaduje)
+	The service reads PDF files	Služba čte soubory PDF
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	Jinak se odešle text dokumentu, stránku po stránce (bez obrázků a skenů).
+	Add your API key for {service} in the assistant's settings.	Přidejte svůj klíč API pro {service} v nastavení asistenta.
+	Your {service} account can't use this model, or has no credit left: {error}	Váš účet {service} nemůže tento model používat, nebo už nemá žádný kredit: {error}
+	Choose the model to ask in the assistant's settings.	Zvolte model, kterého se ptát, v nastavení asistenta.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	Tento dokument nemá žádný text k odeslání (je to sken?). Zvolte službu, která čte soubory PDF, nebo nejprve rozpoznejte jeho text.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	Text tohoto dokumentu je pro asistenta příliš dlouhý ({chars} znaků, nejvýše {max}).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Shrnujte, ptejte se a opravujte své PDF s Claudem, ChatGPT nebo Gemini, s vlastním klíčem.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	Adresa služby není platná: začíná na https:// (http:// jen pro toto zařízení nebo místní síť).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	Tento dokument nedovoluje kopírovat svůj obsah, proto se asistentovi neodesílá.
+	Try again	Zkusit znovu
+	Price per million tokens read / written	Cena za milion přečtených / napsaných tokenů

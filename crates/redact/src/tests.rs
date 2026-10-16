@@ -587,6 +587,25 @@ fn overlay_text_takes_its_font_size_colour_alignment_and_repeats() {
     assert!(fonts.contains(b"PCCour") && !fonts.contains(b"PCTimes"));
 }
 
+/// A mark whose box comes from the file as huge, its overlay repeated: the overlay keeps to a
+/// bounded number of copies (a crafted box asked for billions, and the app was killed).
+#[test]
+fn a_huge_repeated_overlay_stays_bounded() {
+    let big = 1_000_000_000_000u64;
+    let mut doc = pdf(vec![
+        b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_vec(),
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] /Resources << >> /Annots [4 0 R] >>".to_vec(),
+        format!("<< /Type /Annot /Subtype /Redact /Rect [0 0 {big} {big}] /QuadPoints [0 {big} {big} {big} 0 0 {big} 0] /IC [0 0 0] /OverlayText (X) /Repeat true /DA (/Helv 99999999 Tf 0 g) >>")
+            .into_bytes(),
+    ]);
+    assert_eq!(marks(&doc)[0].look.size, 400.0, "a size from the file kept within reason");
+    apply(&mut doc, None).unwrap();
+    let c = content(&reopen(&doc), 0);
+    assert!(c.len() < 4 << 20, "{} bytes", c.len());
+    assert!(c.contains("(X X X"), "still repeated");
+}
+
 /// Overlay text the standard fonts can't draw: refused when it is marked, and for a mark another
 /// program made, refused when it is applied, before anything is redacted, rather than burnt into
 /// the page as `?`.

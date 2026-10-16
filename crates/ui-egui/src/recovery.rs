@@ -8,6 +8,11 @@
 //!
 //! Encrypted documents are stored encrypted (the working file is), so recovery never writes
 //! plaintext of a protected document to disk. The web build has no recovery store yet.
+//!
+//! Several PdfCraft windows may run at once (another process each), sharing the folder. Each
+//! holds a lock on `instances/<pid>.lock` while it runs, and an entry (its key carries the
+//! process id) whose process still holds its lock is that process's: never offered for recovery
+//! nor removed by another one's clean quit.
 
 use std::path::{Path, PathBuf};
 
@@ -45,17 +50,9 @@ impl RecoveryStore {
     /// (macOS), `%LOCALAPPDATA%\PdfCraft\Recovery` (Windows), or
     /// `$XDG_DATA_HOME/pdfcraft/recovery` / `~/.local/share/pdfcraft/recovery` (others).
     pub fn default_dir() -> Option<PathBuf> {
-        if let Some(dir) = crate::portable::data_dir() {
-            return Some(dir.join("Recovery"));
-        }
-        let env = |k: &str| std::env::var_os(k).filter(|v| !v.is_empty()).map(PathBuf::from);
-        if cfg!(target_os = "macos") {
-            env("HOME").map(|h| h.join("Library/Application Support/PdfCraft/Recovery"))
-        } else if cfg!(windows) {
-            env("LOCALAPPDATA").map(|d| d.join("PdfCraft").join("Recovery"))
-        } else {
-            env("XDG_DATA_HOME").or_else(|| env("HOME").map(|h| h.join(".local/share"))).map(|d| d.join("pdfcraft/recovery"))
-        }
+        // Lowercase beside the lowercase data folder of the platforms that name it so.
+        let lower = crate::portable::data_dir().is_none() && !cfg!(any(target_os = "macos", windows));
+        crate::portable::app_data_dir().map(|d| d.join(if lower { "recovery" } else { "Recovery" }))
     }
 
     pub fn dir(&self) -> &Path {
@@ -74,6 +71,45 @@ impl RecoveryStore {
     pub fn remove(&self, key: &str) {
         let _ = std::fs::remove_file(self.dir.join(format!("{key}.json")));
         let _ = std::fs::remove_file(self.dir.join(format!("{key}.pdf")));
+    }
+
+    /// Mark this process as running: a lock on its file in `instances`, held as long as the
+    /// returned file is. `None` where the system can't lock files (other instances' entries are
+    /// then taken as left behind, as before).
+    pub fn claim(&self) -> Option<std::fs::File> {
+        let dir = self.dir.join("instances");
+        std::fs::create_dir_all(&dir).ok()?;
+        let file =
+            std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(dir.join(format!("{}.lock", std::process::id()))).ok()?;
+        file.try_lock().ok()?;
+        Some(file)
+    }
+
+    /// Whether entry `key` belongs to another PdfCraft that is still running: its process (named
+    /// in the key) holds its lock. One whose process is gone, or ours, is not.
+    fn running_elsewhere(&self, key: &str) -> bool {
+        // "<time>-<pid>-<document>[-<serial>]" (see `autosave_jobs`).
+        let Some(pid) = key.split('-').nth(1).and_then(|p| p.parse::<u32>().ok()) else { return false };
+        if pid == std::process::id() {
+            return false;
+        }
+        let path = self.dir.join("instances").join(format!("{pid}.lock"));
+        let Ok(file) = std::fs::OpenOptions::new().write(true).open(&path) else { return false };
+        match file.try_lock() {
+            Err(std::fs::TryLockError::WouldBlock) => true,
+            // Ours now: that process is gone, and so is its lock file.
+            Ok(()) => {
+                drop(file);
+                let _ = std::fs::remove_file(&path);
+                false
+            }
+            Err(std::fs::TryLockError::Error(_)) => false,
+        }
+    }
+
+    /// Snapshots left behind (by this process before, or by one that has ended), newest first.
+    pub fn left_behind(&self) -> Vec<RecoveryMeta> {
+        self.list().into_iter().filter(|m| !self.running_elsewhere(&m.key)).collect()
     }
 
     /// Snapshots, newest first. Listing never removes files; missing metadata uses the file name.
@@ -131,9 +167,10 @@ impl RecoveryStore {
         std::fs::read(self.dir.join(format!("{key}.pdf")))
     }
 
-    /// Remove every entry (clean quit, or "Discard all"), and metadata left without a snapshot.
+    /// Remove every entry (clean quit, or "Discard all"), and metadata left without a snapshot;
+    /// not another running PdfCraft's.
     pub fn clear(&self) {
-        for m in self.list() {
+        for m in self.left_behind() {
             self.remove(&m.key);
         }
         let Ok(dir) = std::fs::read_dir(&self.dir) else { return };
@@ -150,6 +187,75 @@ impl RecoveryStore {
     }
 }
 
+/// Autosaves written off the UI thread: a large document takes a while to write and sync, and
+/// the periodic autosave would freeze the window meanwhile. One writer, so writes land in order;
+/// an entry forgotten meanwhile (its document saved, discarded or closed) is never left behind: the
+/// writer checks the forgotten keys before it writes, and again after, removing what was forgotten
+/// during the write. It doesn't hold their lock while it writes: saving or closing a document takes
+/// it, and would wait for a large write.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) struct Autosaver {
+    jobs: std::sync::mpsc::Sender<Job>,
+    forgotten: std::sync::Arc<std::sync::Mutex<std::collections::HashSet<String>>>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+enum Job {
+    Write(RecoveryStore, RecoveryMeta, std::sync::Arc<Vec<u8>>),
+    /// Answered once every job sent before it is done.
+    Flush(std::sync::mpsc::Sender<()>),
+    /// Tests: the writer waits here until told to go on, so what comes meanwhile is decided first.
+    #[cfg(test)]
+    Hold(std::sync::mpsc::Receiver<()>),
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn forgotten_keys(m: &std::sync::Mutex<std::collections::HashSet<String>>) -> std::sync::MutexGuard<'_, std::collections::HashSet<String>> {
+    // A writer that panicked left the set as it was: still the right one.
+    m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl Autosaver {
+    fn start() -> Option<Self> {
+        let (jobs, rx) = std::sync::mpsc::channel::<Job>();
+        let forgotten = std::sync::Arc::<std::sync::Mutex<std::collections::HashSet<String>>>::default();
+        let gone = forgotten.clone();
+        let spawned = std::thread::Builder::new().name("pdfcraft-autosave".into()).spawn(move || {
+            for job in rx {
+                match job {
+                    Job::Write(store, meta, bytes) => {
+                        if forgotten_keys(&gone).contains(&meta.key) {
+                            continue;
+                        }
+                        #[cfg(test)]
+                        tests::before_write(&store);
+                        if let Err(e) = store.write(&meta, &bytes) {
+                            log::warn!("autosave failed: {e}");
+                        }
+                        // Forgotten while it was written: its removal may have come first.
+                        if forgotten_keys(&gone).contains(&meta.key) {
+                            store.remove(&meta.key);
+                        }
+                    }
+                    Job::Flush(done) => {
+                        let _ = done.send(());
+                    }
+                    #[cfg(test)]
+                    Job::Hold(go_on) => {
+                        let _ = go_on.recv();
+                    }
+                }
+            }
+        });
+        spawned.map_err(|e| log::warn!("autosave writer: {e}")).ok()?;
+        Some(Self { jobs, forgotten })
+    }
+}
+
+/// Tells apart the entries this process makes ("<time>-<pid>-<document>-<serial>").
+static AUTOSAVE_SERIAL: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 fn now_secs() -> u64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
@@ -157,40 +263,101 @@ fn now_secs() -> u64 {
 impl PdfCraftApp {
     /// Turn on autosave into `store`, and look for documents a previous session left behind.
     pub fn enable_recovery(&mut self, store: RecoveryStore) {
-        self.recoverable = store.list();
+        self.recovery_lock = store.claim();
+        self.recoverable = store.left_behind();
         if !self.recoverable.is_empty() {
             self.dialog = Some(crate::Dialog::Recovery);
         }
         self.recovery = Some(store);
     }
 
-    /// Write snapshots of documents changed since the last autosave (called periodically).
-    pub fn autosave_now(&mut self) {
-        let Some(store) = self.recovery.clone() else { return };
+    /// The snapshots due: documents changed since the last autosave, each with its entry.
+    fn autosave_jobs(&mut self) -> Vec<(RecoveryMeta, std::sync::Arc<Vec<u8>>)> {
+        if self.recovery.is_none() {
+            return Vec::new();
+        }
+        let mut jobs = Vec::new();
         for snap in self.session.autosave_snapshots() {
-            let key = self.recovery_keys.entry(snap.doc).or_insert_with(|| format!("{}-{}-{}", now_secs(), std::process::id(), snap.doc.0)).clone();
-            let meta = RecoveryMeta { key, name: snap.name, path: snap.path, saved_at: now_secs(), encrypted: snap.encrypted };
-            if let Err(e) = store.write(&meta, &snap.bytes) {
+            // Never a key used before, even within the same second for the same document: an
+            // entry forgotten is never written again.
+            let serial = AUTOSAVE_SERIAL.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let key = self
+                .recovery_keys
+                .entry(snap.doc)
+                .or_insert_with(|| format!("{}-{}-{}-{serial}", now_secs(), std::process::id(), snap.doc.0))
+                .clone();
+            jobs.push((RecoveryMeta { key, name: snap.name, path: snap.path, saved_at: now_secs(), encrypted: snap.encrypted }, snap.bytes));
+        }
+        jobs
+    }
+
+    /// Hand `jobs` to the writer (started the first time); written here where it can't run.
+    fn autosave_in_background(&mut self, jobs: Vec<(RecoveryMeta, std::sync::Arc<Vec<u8>>)>) {
+        let Some(store) = self.recovery.clone() else { return };
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if self.autosaver.is_none() {
+                self.autosaver = Autosaver::start();
+            }
+            if let Some(writer) = &self.autosaver {
+                for (meta, bytes) in jobs {
+                    if let Err(std::sync::mpsc::SendError(Job::Write(store, meta, bytes))) = writer.jobs.send(Job::Write(store.clone(), meta, bytes))
+                        && let Err(e) = store.write(&meta, &bytes)
+                    {
+                        log::warn!("autosave failed: {e}");
+                    }
+                }
+                return;
+            }
+        }
+        for (meta, bytes) in jobs {
+            if let Err(e) = store.write(&meta, &bytes) {
                 log::warn!("autosave failed: {e}");
             }
         }
     }
 
-    /// Drop a document's recovery entry (it was saved, discarded or closed).
-    pub(crate) fn forget_recovery(&mut self, doc: pdfcraft_engine::DocId) {
-        if let (Some(store), Some(key)) = (&self.recovery, self.recovery_keys.remove(&doc)) {
-            store.remove(&key);
+    /// Write snapshots of documents changed since the last autosave, and wait until they (and
+    /// every autosave before them) are on disk: the app going to the background, tests.
+    pub fn autosave_now(&mut self) {
+        let jobs = self.autosave_jobs();
+        self.autosave_in_background(jobs);
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(writer) = &self.autosaver {
+            let (done, wait) = std::sync::mpsc::channel();
+            if writer.jobs.send(Job::Flush(done)).is_ok() {
+                let _ = wait.recv();
+            }
         }
     }
 
-    /// Autosave when the interval has passed (called every frame).
+    /// Remove entry `key` for good: one queued or being written for it never lands after.
+    fn drop_recovery_entry(&self, store: &RecoveryStore, key: &str) {
+        #[cfg(not(target_arch = "wasm32"))]
+        let _writer = self.autosaver.as_ref().map(|w| {
+            let mut gone = forgotten_keys(&w.forgotten);
+            gone.insert(key.to_owned());
+            gone
+        });
+        store.remove(key);
+    }
+
+    /// Drop a document's recovery entry (it was saved, discarded or closed).
+    pub(crate) fn forget_recovery(&mut self, doc: pdfcraft_engine::DocId) {
+        if let (Some(store), Some(key)) = (self.recovery.clone(), self.recovery_keys.remove(&doc)) {
+            self.drop_recovery_entry(&store, &key);
+        }
+    }
+
+    /// Autosave when the interval has passed (called every frame), off the UI thread.
     pub(crate) fn autosave_tick(&mut self, now: f64) {
         if self.recovery.is_none() {
             return;
         }
         if now - self.last_autosave >= AUTOSAVE_SECS {
             self.last_autosave = now;
-            self.autosave_now();
+            let jobs = self.autosave_jobs();
+            self.autosave_in_background(jobs);
         }
     }
 
@@ -251,12 +418,91 @@ impl PdfCraftApp {
     /// Clean shutdown: documents were saved or discarded, so nothing needs recovering.
     pub fn shutdown_recovery(&mut self) {
         if self.first_dirty().is_none()
-            && let Some(store) = &self.recovery
+            && let Some(store) = self.recovery.clone()
         {
             for key in self.recovery_keys.values() {
-                store.remove(key);
+                self.drop_recovery_entry(&store, key);
             }
             self.recovery_keys.clear();
         }
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    use super::*;
+
+    /// A writer about to write into this folder says so, and waits to be told to go on.
+    type Pause = (std::path::PathBuf, std::sync::mpsc::Sender<()>, std::sync::mpsc::Receiver<()>);
+    static BEFORE_WRITE: std::sync::Mutex<Option<Pause>> = std::sync::Mutex::new(None);
+
+    /// The writer's pause point between its first check and the write (only for the folder a test
+    /// asked it for: other tests' writers run alongside).
+    pub(super) fn before_write(store: &RecoveryStore) {
+        let pause = {
+            let mut held = BEFORE_WRITE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            if held.as_ref().is_some_and(|(dir, ..)| dir == store.dir()) { held.take() } else { None }
+        };
+        if let Some((_, reached, go_on)) = pause {
+            let _ = reached.send(());
+            let _ = go_on.recv();
+        }
+    }
+
+    /// A document forgotten while its autosave is being written leaves no entry: the write lands
+    /// after the removal, and the writer takes it back out.
+    #[test]
+    fn an_autosave_forgotten_while_written_is_taken_back() {
+        let dir = std::env::temp_dir().join(format!("pdfcraft-autosave-during-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let store = RecoveryStore::new(&dir);
+        let mut app = PdfCraftApp::new();
+        app.enable_recovery(store.clone());
+        let pdf = b"%PDF-1.7\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n2 0 obj << /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >> endobj\n3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >> endobj\n4 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF";
+        app.open_bytes("a.pdf", None, pdf.to_vec()).unwrap();
+        assert!(app.apply_edit(pdfcraft_engine::Edit::DeletePages { pages: vec![0] }));
+        let (reached_tx, reached) = std::sync::mpsc::channel();
+        let (go_on, go_on_rx) = std::sync::mpsc::channel();
+        *BEFORE_WRITE.lock().unwrap() = Some((store.dir().to_path_buf(), reached_tx, go_on_rx));
+        app.autosave_tick(AUTOSAVE_SECS + 1.0);
+        // The writer has checked the entry and is about to write it: now it is forgotten.
+        reached.recv_timeout(std::time::Duration::from_secs(20)).unwrap();
+        let Some((_, id)) = app.active_ids() else { panic!("a document") };
+        app.forget_recovery(id);
+        go_on.send(()).unwrap();
+        app.autosave_now();
+        assert!(store.list().is_empty(), "{:?}", store.list());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The periodic autosave writes off the UI thread, and a document saved or closed while its
+    /// snapshot waits to be written leaves no entry behind.
+    #[test]
+    fn a_background_autosave_never_outlives_its_document() {
+        let dir = std::env::temp_dir().join(format!("pdfcraft-autosave-bg-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let store = RecoveryStore::new(&dir);
+        let mut app = PdfCraftApp::new();
+        app.enable_recovery(store.clone());
+        let pdf = b"%PDF-1.7\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n2 0 obj << /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >> endobj\n3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >> endobj\n4 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF";
+        app.open_bytes("a.pdf", None, pdf.to_vec()).unwrap();
+        assert!(app.apply_edit(pdfcraft_engine::Edit::DeletePages { pages: vec![0] }));
+        // The writer is held while the snapshot waits behind it and the document is forgotten.
+        app.autosaver = Autosaver::start();
+        let (go_on, held) = std::sync::mpsc::channel();
+        let Some(writer) = &app.autosaver else { panic!("a writer") };
+        writer.jobs.send(Job::Hold(held)).unwrap();
+        app.autosave_tick(AUTOSAVE_SECS + 1.0);
+        let Some((_, id)) = app.active_ids() else { panic!("a document") };
+        app.forget_recovery(id);
+        go_on.send(()).unwrap();
+        app.autosave_now();
+        assert!(store.list().is_empty(), "{:?}", store.list());
+        // And one still open is there once written.
+        assert!(app.apply_edit(pdfcraft_engine::Edit::RotatePages { pages: vec![0], degrees: 90 }));
+        app.autosave_tick(2.0 * AUTOSAVE_SECS + 2.0);
+        app.autosave_now();
+        assert_eq!(store.list().len(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -2,7 +2,7 @@
 //! user's permission, and anything but a web or email address is refused (#90, #91).
 
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use pdfcraft_ui_egui::{LinkOrigin, PdfCraftApp, PendingLink};
 
 /// See `tests/view.rs`: WARP's shader JIT crashes when two devices compile at once on ARM64.
@@ -389,4 +389,41 @@ fn a_numeric_host_is_shown_as_the_address_it_goes_to() {
     let h = prompt_for("http://3232235777/admin");
     h.get_by_label("192.168.1.1");
     assert!(h.query_by_label_contains("alphabet").is_none());
+}
+
+/// Removing every link says how many went, under a notice still showing (both are read), and
+/// offers Undo, which brings the links back. Once the document changes again, Undo is gone: it
+/// would undo something else.
+#[test]
+fn removed_links_come_back_with_the_notices_undo() {
+    let _gpu = gpu();
+    let mut h = harness();
+    let links = |h: &Harness<'static, PdfCraftApp>| {
+        let app = h.state();
+        let i = app.active.expect("a document");
+        app.session.get(app.views[i].id).map_or(0, |d| d.links.len())
+    };
+    let before = links(&h);
+    assert!(before > 1, "the fixture has links");
+    h.state_mut().notify("An earlier notice");
+    h.run_steps(2);
+    h.state_mut().remove_all_links();
+    h.run_steps(2);
+    assert_eq!(links(&h), 0);
+    let removed = format!("Removed {before} links");
+    assert!(h.query_by_label(&removed).is_some() && h.query_by_label("An earlier notice").is_some(), "both notices show");
+    // Said by screen readers as it shows.
+    assert_eq!(h.get_by_label(&removed).accesskit_node().live(), egui::accesskit::Live::Polite);
+    h.get_by_label("Undo").click();
+    h.run_steps(2);
+    assert_eq!(links(&h), before, "undone");
+    assert!(h.query_by_label(&removed).is_none(), "the notice goes with it");
+
+    h.state_mut().remove_all_links();
+    h.run_steps(2);
+    assert!(h.query_by_label("Undo").is_some());
+    h.state_mut().apply_edit(pdfcraft_engine::Edit::RotatePages { pages: vec![0], degrees: 90 });
+    h.run_steps(2);
+    assert!(h.query_by_label("Undo").is_none(), "another edit since: no Undo for it");
+    assert!(h.query_by_label(&removed).is_some(), "the notice itself stays its time");
 }

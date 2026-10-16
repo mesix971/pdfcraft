@@ -1,7 +1,6 @@
 //! Standards ▸ PDF/A: what the document declares, verifying it against PDF/A-2b or 3b, and
 //! fixing what can be fixed (Save as PDF/A).
 
-use egui::{Align, Layout};
 use pdfcraft_engine::pdfa::{Issue, Level};
 
 use crate::theme::{self, Tokens};
@@ -61,7 +60,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> bool
     let before = app.pdfa.level;
     ui.horizontal(|ui| {
         ui.label(tl!("Conformance level:"));
-        egui::ComboBox::from_id_salt("pdfa-level").selected_text(app.pdfa.level.label()).show_ui(ui, |ui| {
+        crate::widgets::combo("pdfa-level").selected_text(app.pdfa.level.label()).show_ui(ui, |ui| {
             for l in [Level::A2b, Level::A3b] {
                 ui.selectable_value(&mut app.pdfa.level, l, l.label());
             }
@@ -99,7 +98,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> bool
     let mut close = false;
     let mut action = None;
     ui.horizontal(|ui| {
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        widgets::buttons_row(ui, |ui| {
             if widgets::pill_button(ui, tl!("Save as PDF/A"), true).clicked() {
                 action = Some(true);
             }

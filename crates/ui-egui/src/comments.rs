@@ -255,7 +255,7 @@ pub struct CommentPrefs {
 impl Default for CommentPrefs {
     fn default() -> Self {
         Self {
-            author: login_name(),
+            author: login_name().to_owned(),
             styles: ALL.iter().map(|t| (*t, Style::default_for(&t.sample()))).collect(),
             pinned: false,
             group_tool: [CommentTool::Note, CommentTool::Highlight, CommentTool::Ink],
@@ -339,17 +339,21 @@ pub fn tool_for(a: &Annotation) -> Option<CommentTool> {
     })
 }
 
-/// The user's login name, which Acrobat uses as the default comment author.
-fn login_name() -> String {
-    #[cfg(not(target_arch = "wasm32"))]
-    for var in ["USER", "USERNAME", "LOGNAME"] {
-        if let Ok(v) = std::env::var(var)
-            && !v.trim().is_empty()
-        {
-            return v;
+/// The user's login name, which Acrobat uses as the default comment author. Read once: Home
+/// compares the name with it every frame.
+pub(crate) fn login_name() -> &'static str {
+    static NAME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    NAME.get_or_init(|| {
+        #[cfg(not(target_arch = "wasm32"))]
+        for var in ["USER", "USERNAME", "LOGNAME"] {
+            if let Ok(v) = std::env::var(var)
+                && !v.trim().is_empty()
+            {
+                return v;
+            }
         }
-    }
-    "Guest".into()
+        "Guest".into()
+    })
 }
 
 /// A drag in progress on a page.

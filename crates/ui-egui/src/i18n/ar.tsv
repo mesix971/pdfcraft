@@ -2359,3 +2359,149 @@ animation effects	Off	معطّلة
 	The linked PDF opened, but its named destination was not applied.	فُتح ملف PDF المرتبط، لكن لم تُطبَّق وجهته المسماة.
 	The linked PDF opened, but its page destination was out of range.	فُتح ملف PDF المرتبط، لكن وجهة الصفحة خارج النطاق.
 	Local cross-PDF links require the desktop app	تتطلب الروابط المحلية بين ملفات PDF تطبيق سطح المكتب
+
+# In-app file browser (Android's file pickers)
+	Internal storage	وحدة التخزين الداخلية
+	Documents	المستندات
+	PdfCraft files	ملفات PdfCraft
+	SD card {name}	بطاقة SD {name}
+	Couldn't create the folder {name}: {e}	تعذّر إنشاء المجلد {name}: {e}
+	Choose this folder	اختيار هذا المجلد
+	{name} already exists. Replace it?	{name} موجود بالفعل. هل تريد استبداله؟
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	لفتح الملفات وحفظها في أي مكان على هذا الجهاز، اسمح لـ PdfCraft بإدارة جميع الملفات.
+	Allow access	السماح بالوصول
+	All files	جميع الملفات
+	This folder is empty	هذا المجلد فارغ
+	New folder	مجلد جديد
+
+# Printing through another app (Android)
+	Another app	تطبيق آخر
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	يُفتح ملف PDF الجاهز للطباعة في التطبيق الذي تختاره، فيطبعه بإعداداته الخاصة للنسخ والطباعة على الوجهين والألوان.
+	Couldn't hand {name} to another app: {e}	تعذّر تسليم {name} إلى تطبيق آخر: {e}
+	Tools	الأدوات
+phone bar	Edit	تحرير
+	Send	إرسال
+	Thinking…	جارٍ التفكير…
+	Anthropic API key	مفتاح API من Anthropic
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	يُرسَل سؤالك والمستند المفتوح إلى Anthropic (Claude) باستخدام مفتاح API الخاص بك، فقط عندما تطلب ذلك. تُحتسب تكلفة الطلبات على حسابك في Anthropic.
+	Most pages sent per question	أقصى عدد من الصفحات المُرسَلة لكل سؤال
+	Translate page {n}	ترجمة الصفحة {n}
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} رمزًا
+	The answer stopped at its length limit.	توقفت الإجابة عند حدّها الأقصى للطول.
+	Add your Anthropic API key to use the assistant.	أضف مفتاح API من Anthropic لاستخدام المساعد.
+	The API key was refused. Check it in the assistant's settings.	رُفض مفتاح API. تحقّق منه في إعدادات المساعد.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	يحتوي هذا المستند على {pages} صفحة؛ ويقرأ المساعد {max} صفحة على الأكثر. ارفع الحد في إعدادات المساعد.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	هذا المستند كبير جدًا على المساعد ({mb} ميغابايت، والحد الأقصى {max} ميغابايت).
+	Too many requests right now. Try again in a moment.	هناك طلبات كثيرة جدًا الآن. حاول مجددًا بعد قليل.
+	The request was declined ({reason}).	رُفض الطلب ({reason}).
+	Couldn't reach the AI service: {error}	تعذّر الوصول إلى خدمة الذكاء الاصطناعي: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	مفتاح API غير صالح: الصقه مرة أخرى في إعدادات المساعد.
+	The assistant gave no answer. Try asking differently.	لم يقدّم المساعد أي إجابة. جرّب صياغة السؤال بطريقة أخرى.
+	Your Anthropic account can't use this model, or has no credit left: {error}	لا يمكن لحسابك في Anthropic استخدام هذا النموذج، أو لم يعد فيه رصيد: {error}
+	The AI service answered: {error}	ردّت خدمة الذكاء الاصطناعي: {error}
+	{tokens} tokens	{tokens} رمزًا
+	New conversation	محادثة جديدة
+	Proposed changes	التغييرات المقترحة
+	Applied	طُبِّق
+	Discarded	تم تجاهله
+	The document has no page {page}.	لا يحتوي المستند على الصفحة {page}.
+	The passage wasn't found on page {page}.	لم يُعثر على المقطع في الصفحة {page}.
+	The document refused the change.	رفض المستند التغيير.
+	Applied as one step: Undo takes them all back.	تُطبَّق في خطوة واحدة: «تراجع» يلغيها كلها.
+	The passage appears more than once on page {page}.	يظهر المقطع أكثر من مرة في الصفحة {page}.
+	It overlaps another proposed change.	يتداخل مع تغيير مقترح آخر.
+	A PDF on this device.	ملف PDF على هذا الجهاز.
+	Add my name	إضافة اسمي
+	Add to Starred	إضافة إلى المفضلة
+	Add your name and a photo. Your name also signs your comments.	أضف اسمك وصورة. اسمك يوقّع تعليقاتك أيضًا.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	اسمح بالوصول إلى ملفاتك ليعرض PdfCraft ملفات PDF الموجودة على هذا الجهاز.
+	An empty page to start from.	صفحة فارغة للبدء.
+	Change its text and pictures.	غيّر نصه وصوره.
+	Choose a photo	اختيار صورة
+	Files	الملفات
+	Fill in a form and sign it.	املأ نموذجًا ووقّعه.
+	From photos, scans or other files.	من الصور أو المستندات الممسوحة أو ملفات أخرى.
+	Hello, {name}	مرحبًا، {name}
+	It shows on Home and signs your comments.	يظهر في الصفحة الرئيسية ويوقّع تعليقاتك.
+	Make PdfCraft yours	اجعل PdfCraft خاصًا بك
+	More for {name}	المزيد لـ {name}
+	No PDFs found.	لم يُعثر على ملفات PDF.
+	No files match.	لا توجد ملفات مطابقة.
+	No recent files yet.	لا توجد ملفات حديثة بعد.
+	No starred files.	لا توجد ملفات مفضلة.
+	On this device	على هذا الجهاز
+	Open another file…	فتح ملف آخر…
+	PDFs on this device	ملفات PDF على هذا الجهاز
+	PdfCraft looks in Download, Documents and its own folder.	يبحث PdfCraft في التنزيلات والمستندات ومجلده الخاص.
+	Photos and scans become the pages of a new PDF.	تصبح الصور والمستندات الممسوحة صفحات ملف PDF جديد.
+	Pictures	الصور
+	Places	المواقع
+	Profile	الملف الشخصي
+	Remove from Starred	إزالة من المفضلة
+	Remove the photo	إزالة الصورة
+	Search files	البحث في الملفات
+	See your PDFs	اعرض ملفات PDF لديك
+	Set up	إعداد
+	Several PDFs and pictures in one document.	عدة ملفات PDF وصور في مستند واحد.
+	Star a file from its menu to find it here.	أضف ملفًا إلى المفضلة من قائمته لتجده هنا.
+	Starred	المفضلة
+	Summarize, ask and translate.	تلخيص وأسئلة وترجمة.
+	Summarize, question and correct your PDFs with Claude, with your own key.	لخّص ملفات PDF واسألها وصحّحها مع Claude، بمفتاحك الخاص.
+	Text, pictures and other files, converted to PDF.	نص وصور وملفات أخرى، محوّلة إلى PDF.
+	The files you open show here.	تظهر هنا الملفات التي تفتحها.
+	What would you like to do?	ماذا تريد أن تفعل؟
+	Which document?	أي مستند؟
+	Your AI assistant	مساعد الذكاء الاصطناعي الخاص بك
+file state	Open	مفتوح
+	Choose a PNG or JPEG picture.	اختر صورة PNG أو JPEG.
+	This picture is too large.	هذه الصورة كبيرة جدًا.
+	Couldn't use this picture: {e}	تعذّر استخدام هذه الصورة: {e}
+	Couldn't use this picture.	تعذّر استخدام هذه الصورة.
+	{n} MB	{n} ميغابايت
+	{n} KB	{n} كيلوبايت
+decimal separator	.	.
+	Other folders…	مجلدات أخرى…
+	Looking for photos…	جارٍ البحث عن الصور…
+	See your photos	اعرض صورك
+	Allow PdfCraft to see your photos, and choose one here.	اسمح لـ PdfCraft برؤية صورك، واختر واحدة هنا.
+	No photos found.	لم يُعثر على صور.
+	PdfCraft shows the photos in Camera, Pictures and Download.	يعرض PdfCraft الصور الموجودة في الكاميرا والصور والتنزيلات.
+	Automatic	تلقائي
+	Dark mode	الوضع الداكن
+	Dark pages	صفحات داكنة
+	Light text on a dark page, for reading at night.	نص فاتح على صفحة داكنة، للقراءة ليلًا.
+	Night	ليلي
+	Downloads	التنزيلات
+	Choose a file	اختيار ملف
+	Choose files	اختيار ملفات
+	Choose a folder	اختيار مجلد
+	Tap to unlock	انقر لإلغاء القفل
+	Browse folders	تصفّح المجلدات
+	Combined from top to bottom. Use the arrows to change the order.	تُدمج من الأعلى إلى الأسفل. استخدم الأسهم لتغيير الترتيب.
+	PDFs and pictures, combined into one PDF in the order you choose.	ملفات PDF وصور تُدمج في ملف PDF واحد بالترتيب الذي تختاره.
+	Smaller text	تصغير النص
+	Larger text	تكبير النص
+	Flip	قلب
+	Tap text or a picture to change it	انقر على نص أو صورة لتغييرها
+	Tap where the text goes	انقر حيث تريد وضع النص
+	White	أبيض
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	يُرسَل سؤالك والمستند المفتوح إلى الخدمة التي تختارها، بمفتاح API الخاص بك، فقط عندما تطلب ذلك. تُحتسب الطلبات على حسابك لدى تلك الخدمة.
+	Service	الخدمة
+	Another service (OpenAI-compatible)	خدمة أخرى (متوافقة مع OpenAI)
+	API key	مفتاح API
+	On Google's free tier, what you send may be used to improve Google's products.	في الفئة المجانية من Google، قد يُستخدم ما ترسله لتحسين منتجات Google.
+	Fill in for	تعبئة لـ
+	Service address	عنوان الخدمة
+	API key (if the service asks for one)	مفتاح API (إن طلبته الخدمة)
+	The service reads PDF files	الخدمة تقرأ ملفات PDF
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	وإلا يُرسَل نص المستند صفحةً صفحة (من دون صوره أو مسحه الضوئي).
+	Add your API key for {service} in the assistant's settings.	أضف مفتاح API الخاص بـ {service} في إعدادات المساعد.
+	Your {service} account can't use this model, or has no credit left: {error}	لا يمكن لحسابك في {service} استخدام هذا النموذج، أو لم يعد فيه رصيد: {error}
+	Choose the model to ask in the assistant's settings.	اختر النموذج الذي تسأله في إعدادات المساعد.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	لا يحتوي هذا المستند على نص لإرساله (هل هو مسح ضوئي؟). اختر خدمة تقرأ ملفات PDF، أو تعرّف على نصه أولًا.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	نص هذا المستند طويل جدًا على المساعد ({chars} حرفًا، {max} على الأكثر).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	لخّص ملفات PDF واسألها وصحّحها مع Claude أو ChatGPT أو Gemini، بمفتاحك الخاص.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	عنوان الخدمة غير صالح: يبدأ بـ https://‏ (و http://‏ لهذا الجهاز أو للشبكة المحلية فقط).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	لا يسمح هذا المستند بنسخ محتواه، لذا لا يُرسَل إلى المساعد.
+	Try again	أعد المحاولة
+	Price per million tokens read / written	السعر لكل مليون رمز مقروء / مكتوب

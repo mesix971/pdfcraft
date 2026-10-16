@@ -16,6 +16,12 @@ fn white_icons() -> &'static SvgIconSet {
     MAP.get_or_init(|| SvgIconSet::new(ICONS, SvgStyle { current_color: "#ffffff", stroke_width: Some("1.75") }, "bytes://icons/", "square"))
 }
 
+/// The same icons drawn bolder, for a white glyph on a coloured tile (the phone's tools).
+fn bold_icons() -> &'static SvgIconSet {
+    static MAP: OnceLock<SvgIconSet> = OnceLock::new();
+    MAP.get_or_init(|| SvgIconSet::new(ICONS, SvgStyle { current_color: "#ffffff", stroke_width: Some("2.25") }, "bytes://icons-bold/", "square"))
+}
+
 pub fn exists(name: &str) -> bool {
     white_icons().contains(name)
 }
@@ -33,6 +39,13 @@ pub fn paint(ui: &egui::Ui, rect: Rect, name: &str, size: f32, tint: Color32) {
     image(name, size, tint).paint_at(ui, Rect::from_center_size(rect.center(), Vec2::splat(size)));
 }
 
+/// [`paint`] with a bolder stroke.
+pub fn paint_bold(ui: &egui::Ui, rect: Rect, name: &str, size: f32, tint: Color32) {
+    let set = bold_icons();
+    let source = set.source(set.canonical_name(name).unwrap_or("square"));
+    egui::Image::new(source).fit_to_exact_size(Vec2::splat(size)).tint(tint).paint_at(ui, Rect::from_center_size(rect.center(), Vec2::splat(size)));
+}
+
 /// Square icon button: transparent until hovered; `selected` gets the accent treatment.
 pub fn button(ui: &mut egui::Ui, name: &str, box_size: f32, selected: bool, tooltip: &str) -> Response {
     let t = Tokens::get(ui.ctx());
@@ -44,7 +57,7 @@ pub fn button(ui: &mut egui::Ui, name: &str, box_size: f32, selected: bool, tool
         pressed: Some(clear(t.icon)),
         selected: clear(t.accent_text),
         corner_radius: t.radius.into(),
-        focus_stroke: Stroke::new(1.0, t.accent),
+        focus_stroke: Stroke::new(1.0, t.accent_text),
     };
     let label = if tooltip.is_empty() { name } else { tooltip };
     // The wash eases from the response, so reserve its place under the icon and focus ring.
@@ -52,7 +65,7 @@ pub fn button(ui: &mut egui::Ui, name: &str, box_size: f32, selected: bool, tool
     let mut painted = None;
     let resp = IconButton::new(label, Vec2::splat(box_size), &style).selected(selected).show(ui, |_, rect, tint| painted = Some((rect, tint)));
     if let Some((rect, tint)) = painted {
-        let press = theme::Press::track(ui, &resp);
+        let press = theme::Press::track_without_ring(ui, &resp);
         let mut shapes = Vec::with_capacity(2);
         let fill = press.wash_color(&t, selected);
         if fill.a() > 0 {

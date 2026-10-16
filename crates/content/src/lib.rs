@@ -325,6 +325,72 @@ impl Pieces {
     }
 }
 
+/// A fill colour a default appearance sets.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Fill {
+    Gray(f64),
+    Rgb([f64; 3]),
+    Cmyk([f64; 4]),
+}
+
+impl Fill {
+    /// As RGB, each component within 0..=1 (CMYK by the naive conversion, as viewers preview it).
+    pub fn rgb(self) -> [f64; 3] {
+        let c = |v: f64| v.clamp(0.0, 1.0);
+        match self {
+            Fill::Gray(g) => [c(g); 3],
+            Fill::Rgb(rgb) => rgb.map(c),
+            Fill::Cmyk([cy, m, y, k]) => [cy, m, y].map(|v| c((1.0 - c(v)) * (1.0 - c(k)))),
+        }
+    }
+}
+
+/// A default appearance string (`/DA`, ISO 32000-2 §12.7.4.3): the text state a form field, a
+/// free text annotation or a redaction's overlay text starts from. The last font and colour set
+/// win; a font or colour whose operands aren't finite numbers (and a name) counts as not set.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct DefaultAppearance {
+    /// `/Name size Tf`: the font resource's name and its size (0: fit the box).
+    pub font: Option<(Vec<u8>, f64)>,
+    /// The fill colour (`g`, `rg` or `k`), and where it is written in the string (operands and
+    /// operator).
+    pub fill: Option<(Fill, std::ops::Range<usize>)>,
+}
+
+impl DefaultAppearance {
+    pub fn parse(da: &[u8]) -> Self {
+        let mut out = Self::default();
+        let finite = |v: &[f64]| v.iter().all(|x| x.is_finite());
+        for op in parse(da).ops {
+            match op.op.as_slice() {
+                b"Tf" => {
+                    let name = op.operands.len().checked_sub(2).and_then(|k| op.name(k));
+                    if let (Some(name), Some([size])) = (name, op.nums::<1>().filter(|v| finite(v))) {
+                        out.font = Some((name.to_vec(), size));
+                    }
+                }
+                b"g" => {
+                    if let Some([g]) = op.nums::<1>().filter(|v| finite(v)) {
+                        out.fill = Some((Fill::Gray(g), op.span.clone()));
+                    }
+                }
+                b"rg" => {
+                    if let Some(rgb) = op.nums::<3>().filter(|v| finite(v)) {
+                        out.fill = Some((Fill::Rgb(rgb), op.span.clone()));
+                    }
+                }
+                b"k" => {
+                    if let Some(cmyk) = op.nums::<4>().filter(|v| finite(v)) {
+                        out.fill = Some((Fill::Cmyk(cmyk), op.span.clone()));
+                    }
+                }
+                _ => {}
+            }
+        }
+        out
+    }
+}
+
 /// A number operand, written as an integer when it is one.
 pub fn num(v: f64) -> Object {
     if v.fract() == 0.0 && v.abs() < 1e15 { Object::Int(v as i64) } else { Object::Real((v * 10_000.0).round() / 10_000.0) }

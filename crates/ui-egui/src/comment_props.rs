@@ -53,7 +53,7 @@ impl PdfCraftApp {
             None => {
                 // Attached on a later frame, and only to the document it was started on.
                 let target = self.active_ids().map(|(_, id)| id);
-                let dialog = rfd::AsyncFileDialog::new().set_title(tl!("Attach a file"));
+                let dialog = crate::file_dialog::AsyncFileDialog::new().set_title(tl!("Attach a file"));
                 self.ask_one(crate::pickers::Ask::File(dialog), target, move |app, p| match std::fs::read(&p) {
                     Ok(data) => {
                         app.add_attachment_comment(page, at, p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), data)
@@ -188,7 +188,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
                 egui::Grid::new("comment-props").num_columns(2).spacing([12.0, 10.0]).show(ui, |ui| {
                     if let Some(icon) = e.icon.as_mut() {
                         ui.label(tl!("Icon"));
-                        egui::ComboBox::from_id_salt("note-icon").selected_text(icon.name()).show_ui(ui, |ui| {
+                        crate::widgets::combo("note-icon").selected_text(icon.name()).show_ui(ui, |ui| {
                             for i in ICONS {
                                 ui.selectable_value(icon, i, i.name());
                             }
@@ -222,14 +222,11 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
                         ui.label(tl!("Line ending"));
                         ui.horizontal(|ui| {
                             for (i, ending) in ends.iter_mut().enumerate() {
-                                egui::ComboBox::from_id_salt(("line-ending", i)).selected_text(ending_label(*ending)).width(188.0).show_ui(
-                                    ui,
-                                    |ui| {
-                                        for style in LineEnding::ALL {
-                                            ui.selectable_value(ending, style, ending_label(style));
-                                        }
-                                    },
-                                );
+                                crate::widgets::combo(("line-ending", i)).selected_text(ending_label(*ending)).width(188.0).show_ui(ui, |ui| {
+                                    for style in LineEnding::ALL {
+                                        ui.selectable_value(ending, style, ending_label(style));
+                                    }
+                                });
                             }
                         });
                         ui.end_row();

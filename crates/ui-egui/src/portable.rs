@@ -66,6 +66,25 @@ pub fn data_dir() -> Option<&'static Path> {
     current().dir.as_deref()
 }
 
+/// Where PdfCraft keeps the files it makes for itself (recovery entries, new digital IDs): the
+/// portable data folder in portable mode, otherwise the platform's per-user data folder,
+/// `~/Library/Application Support/PdfCraft` (macOS), `%LOCALAPPDATA%\PdfCraft` (Windows), or
+/// `$XDG_DATA_HOME/pdfcraft` / `~/.local/share/pdfcraft` (others).
+pub fn app_data_dir() -> Option<std::path::PathBuf> {
+    use std::path::PathBuf;
+    if let Some(dir) = data_dir() {
+        return Some(dir.to_path_buf());
+    }
+    let env = |k: &str| std::env::var_os(k).filter(|v| !v.is_empty()).map(PathBuf::from);
+    if cfg!(target_os = "macos") {
+        env("HOME").map(|h| h.join("Library/Application Support/PdfCraft"))
+    } else if cfg!(windows) {
+        env("LOCALAPPDATA").map(|d| d.join("PdfCraft"))
+    } else {
+        env("XDG_DATA_HOME").or_else(|| env("HOME").map(|h| h.join(".local/share"))).map(|d| d.join("pdfcraft"))
+    }
+}
+
 /// Look for a marker in `exe_dir` and, when one is there, create its data folder beside it.
 pub fn resolve(exe_dir: Option<&Path>) -> Portable {
     let Some((exe_dir, marker)) = exe_dir.and_then(|d| find_marker(d).map(|m| (d, m))) else {

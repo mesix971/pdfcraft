@@ -5,7 +5,6 @@
 
 use std::sync::{Arc, Mutex};
 
-use egui::{Align, Layout};
 use pdfcraft_engine::export::{ExportSource, Exporter, ImageFormat};
 
 use crate::marks_ui::PageRange;
@@ -51,23 +50,26 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: E
     );
     ui.add_space(8.0);
     if kind == ExportKind::Image {
-        ui.horizontal(|ui| {
+        widgets::row(ui, |ui| {
             ui.label(tl!("Resolution"));
-            egui::ComboBox::from_id_salt("export-dpi")
-                .selected_text(crate::i18n::fmt(tl!("{dpi} pixels/inch"), &[("dpi", &d.dpi.to_string())]))
-                .show_ui(ui, |ui| {
+            widgets::line_break(ui);
+            crate::widgets::combo("export-dpi").selected_text(crate::i18n::fmt(tl!("{dpi} pixels/inch"), &[("dpi", &d.dpi.to_string())])).show_ui(
+                ui,
+                |ui| {
                     for dpi in [72.0, 96.0, 150.0, 300.0, 600.0] {
                         ui.selectable_value(&mut d.dpi, dpi, crate::i18n::fmt(tl!("{dpi} pixels/inch"), &[("dpi", &dpi.to_string())]));
                     }
-                });
+                },
+            );
         });
-        ui.horizontal(|ui| {
+        widgets::row(ui, |ui| {
             ui.label(tl!("Format"));
+            widgets::line_break(ui);
             let mut quality = match d.format {
                 ImageFormat::Jpeg { quality } => quality,
                 _ => 85,
             };
-            egui::ComboBox::from_id_salt("export-format").selected_text(d.format.label()).show_ui(ui, |ui| {
+            crate::widgets::combo("export-format").selected_text(d.format.label()).show_ui(ui, |ui| {
                 for f in [ImageFormat::Png, ImageFormat::Jpeg { quality }, ImageFormat::Tiff] {
                     let on = std::mem::discriminant(&d.format) == std::mem::discriminant(&f);
                     if ui.selectable_label(on, f.label()).clicked() {
@@ -76,6 +78,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: E
                 }
             });
             if let ImageFormat::Jpeg { .. } = d.format {
+                widgets::line_break(ui);
                 ui.label(tl!("Quality"));
                 if ui.add(egui::Slider::new(&mut quality, 10..=100)).changed() {
                     d.format = ImageFormat::Jpeg { quality };
@@ -88,12 +91,13 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: E
                 .color(t.text_faint),
         );
     } else if kind == ExportKind::AllImages {
-        ui.horizontal(|ui| {
+        widgets::row(ui, |ui| {
             ui.label(tl!("Exclude images smaller than"));
+            widgets::line_break(ui);
             let label = move |n: u32| {
                 if n == 0 { tl!("No limit").to_string() } else { crate::i18n::trn(crate::i18n::current(), u64::from(n), "{n} pixel", "{n} pixels") }
             };
-            egui::ComboBox::from_id_salt("export-min").selected_text(label(d.min_side)).show_ui(ui, |ui| {
+            crate::widgets::combo("export-min").selected_text(label(d.min_side)).show_ui(ui, |ui| {
                 for n in [0, 16, 32, 64, 128, 256] {
                     ui.selectable_value(&mut d.min_side, n, label(n));
                 }
@@ -112,7 +116,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: E
     d.range.ui(ui, count);
     ui.add_space(12.0);
     let (mut apply, mut cancel) = (false, false);
-    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+    widgets::buttons_row(ui, |ui| {
         let ok = !d.range.pages(count).is_empty();
         if ui.add_enabled_ui(ok, |ui| widgets::pill_button(ui, tl!("Export"), true)).inner.clicked() {
             apply = true;
@@ -261,7 +265,7 @@ impl PdfCraftApp {
             match self.export_dir_override.clone() {
                 Some(d) => start(self, d.into(), true),
                 None => {
-                    let dialog = rfd::AsyncFileDialog::new().set_title(tl!("Choose a folder for the exported files").to_string());
+                    let dialog = crate::file_dialog::AsyncFileDialog::new().set_title(tl!("Choose a folder for the exported files").to_string());
                     self.ask_one(crate::pickers::Ask::Folder(dialog), None, move |app, dir| start(app, dir, false));
                 }
             }

@@ -112,9 +112,8 @@ fn card(ui: &mut egui::Ui, t: &Tokens, title: &str, active: bool, themes: &[(The
 /// The Appearance section of Preferences.
 pub fn preferences_section(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) {
     ui.label(RichText::new(tl!("Appearance")).font(theme::semibold(13.0)));
-    ui.horizontal(|ui| {
-        ui.label(tl!("Appearance mode"));
-        egui::ComboBox::from_id_salt("appearance-mode").selected_text(tl!(mode_label(app.theme_preference))).show_ui(ui, |ui| {
+    widgets::setting_row(ui, tl!("Appearance mode"), |ui, _| {
+        crate::widgets::combo("appearance-mode").selected_text(tl!(mode_label(app.theme_preference))).show_ui(ui, |ui| {
             for preference in [ThemePreference::System, ThemePreference::Light, ThemePreference::Dark] {
                 if ui.selectable_label(app.theme_preference == preference, tl!(mode_label(preference))).clicked() {
                     app.execute(mode_command(preference));
@@ -125,6 +124,14 @@ pub fn preferences_section(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens)
     });
     ui.add_space(4.0);
     let light_active = app.theme == ThemeKind::Light;
+    // Side by side, the cards would be wider than a phone's screen (and widen the dialog with
+    // them): there they go one under the other.
+    if app.phone_layout() {
+        card(ui, t, tl!("Light theme"), light_active, LIGHT_THEMES);
+        ui.add_space(6.0);
+        card(ui, t, tl!("Dark theme"), !light_active, DARK_THEMES);
+        return;
+    }
     ui.columns(2, |cols| {
         let [light, dark] = cols else { return };
         card(light, t, tl!("Light theme"), light_active, LIGHT_THEMES);

@@ -20,8 +20,12 @@ use pdfcraft_engine::DocId;
 
 use crate::PdfCraftApp;
 
-/// How often an unchanged file is looked at.
+/// How often an unchanged file is looked at. Less often on a phone, where waking up costs
+/// battery and another app rarely writes the document being read.
+#[cfg(not(target_os = "android"))]
 pub const IDLE: Duration = Duration::from_millis(250);
+#[cfg(target_os = "android")]
+pub const IDLE: Duration = Duration::from_secs(2);
 /// How long a changed file must stay the same before it is read: writers pause between chunks.
 pub const SETTLE: Duration = Duration::from_millis(40);
 /// How much of the end of a changed file is read to see whether it is a whole PDF.

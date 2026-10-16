@@ -2468,3 +2468,149 @@ animation effects	Off	Desactivados
 	The linked PDF opened, but its page destination was out of range.	El PDF vinculado se abrió, pero su página de destino está fuera de rango.
 	Local cross-PDF links require the desktop app	Los enlaces locales entre PDF requieren la aplicación de escritorio
 	The existing action will be preserved.	Se conservará la acción existente.
+
+# In-app file browser (Android's file pickers)
+	Internal storage	Almacenamiento interno
+	Documents	Documentos
+	PdfCraft files	Archivos de PdfCraft
+	SD card {name}	Tarjeta SD {name}
+	Couldn't create the folder {name}: {e}	No se pudo crear la carpeta {name}: {e}
+	Choose this folder	Elegir esta carpeta
+	{name} already exists. Replace it?	{name} ya existe. ¿Reemplazarlo?
+	To open and save files anywhere on this device, allow PdfCraft to manage all files.	Para abrir y guardar archivos en cualquier lugar de este dispositivo, permita que PdfCraft administre todos los archivos.
+	Allow access	Permitir el acceso
+	All files	Todos los archivos
+	This folder is empty	Esta carpeta está vacía
+	New folder	Nueva carpeta
+
+# Printing through another app (Android)
+	Another app	Otra aplicación
+	The print-ready PDF opens in the app you choose, which prints it with its own copies, two-sided and colour settings.	El PDF listo para imprimir se abre en la aplicación que elija, que lo imprime con sus propios ajustes de copias, doble cara y color.
+	Couldn't hand {name} to another app: {e}	No se pudo pasar {name} a otra aplicación: {e}
+phone bar	Edit	Editar
+	Send	Enviar
+	Thinking…	Pensando…
+	Anthropic API key	Clave de API de Anthropic
+	Your question and the open document are sent to Anthropic (Claude) with your own API key, only when you ask. Requests are billed to your Anthropic account.	Tu pregunta y el documento abierto se envían a Anthropic (Claude) con tu propia clave de API, solo cuando lo pides. Las solicitudes se cobran en tu cuenta de Anthropic.
+	Most pages sent per question	Páginas enviadas como máximo por pregunta
+	Translate page {n}	Traducir la página {n}
+	≈ {cost} $ · {tokens} tokens	≈ {cost} $ · {tokens} tokens
+	The answer stopped at its length limit.	La respuesta se detuvo en su longitud máxima.
+	Add your Anthropic API key to use the assistant.	Añade tu clave de API de Anthropic para usar el asistente.
+	The API key was refused. Check it in the assistant's settings.	La clave de API fue rechazada. Revísala en los ajustes del asistente.
+	This document has {pages} pages; the assistant reads at most {max}. Raise the limit in the assistant's settings.	Este documento tiene {pages} páginas; el asistente lee como máximo {max}. Sube el límite en los ajustes del asistente.
+	This document is too large for the assistant ({mb} MB, at most {max} MB).	Este documento es demasiado grande para el asistente ({mb} MB, como máximo {max} MB).
+	Too many requests right now. Try again in a moment.	Demasiadas solicitudes ahora mismo. Inténtalo de nuevo en un momento.
+	The request was declined ({reason}).	La solicitud fue rechazada ({reason}).
+	Couldn't reach the AI service: {error}	No se pudo conectar con el servicio de IA: {error}
+	The API key isn't valid: paste it again in the assistant's settings.	La clave de API no es válida: pégala de nuevo en los ajustes del asistente.
+	The assistant gave no answer. Try asking differently.	El asistente no dio ninguna respuesta. Prueba a preguntar de otra forma.
+	Your Anthropic account can't use this model, or has no credit left: {error}	Tu cuenta de Anthropic no puede usar este modelo o no le queda crédito: {error}
+	The AI service answered: {error}	El servicio de IA respondió: {error}
+	{tokens} tokens	{tokens} tokens
+	New conversation	Nueva conversación
+	Proposed changes	Cambios propuestos
+	Applied	Aplicado
+	Discarded	Descartado
+	The document has no page {page}.	El documento no tiene página {page}.
+	The passage wasn't found on page {page}.	No se encontró el pasaje en la página {page}.
+	The document refused the change.	El documento rechazó el cambio.
+	Applied as one step: Undo takes them all back.	Se aplican en un solo paso: Deshacer los revierte todos.
+	The passage appears more than once on page {page}.	El pasaje aparece más de una vez en la página {page}.
+	It overlaps another proposed change.	Se solapa con otro cambio propuesto.
+	A PDF on this device.	Un PDF de este dispositivo.
+	Add my name	Añadir mi nombre
+	Add to Starred	Añadir a favoritos
+	Add your name and a photo. Your name also signs your comments.	Añade tu nombre y una foto. Tu nombre también firma tus comentarios.
+	Allow access to your files and PdfCraft lists the PDFs on this device.	Permite el acceso a tus archivos y PdfCraft mostrará los PDF de este dispositivo.
+	An empty page to start from.	Una página en blanco para empezar.
+	Change its text and pictures.	Cambia su texto e imágenes.
+	Choose a photo	Elegir una foto
+	Files	Archivos
+	Fill in a form and sign it.	Rellena un formulario y fírmalo.
+	From photos, scans or other files.	A partir de fotos, escaneos u otros archivos.
+	Hello, {name}	Hola, {name}
+	It shows on Home and signs your comments.	Aparece en Inicio y firma tus comentarios.
+	Make PdfCraft yours	Haz tuyo PdfCraft
+	More for {name}	Más opciones de {name}
+	No PDFs found.	No se encontraron PDF.
+	No files match.	Ningún archivo coincide.
+	No recent files yet.	Aún no hay archivos recientes.
+	No starred files.	No hay archivos favoritos.
+	On this device	En este dispositivo
+	Open another file…	Abrir otro archivo…
+	PDFs on this device	PDF de este dispositivo
+	PdfCraft looks in Download, Documents and its own folder.	PdfCraft busca en Descargas, Documentos y su propia carpeta.
+	Photos and scans become the pages of a new PDF.	Las fotos y los escaneos se convierten en las páginas de un nuevo PDF.
+	Pictures	Imágenes
+	Places	Ubicaciones
+	Profile	Perfil
+	Remove from Starred	Quitar de favoritos
+	Remove the photo	Quitar la foto
+	Search files	Buscar archivos
+	See your PDFs	Ver tus PDF
+	Set up	Configurar
+	Several PDFs and pictures in one document.	Varios PDF e imágenes en un solo documento.
+	Star a file from its menu to find it here.	Marca un archivo como favorito desde su menú para encontrarlo aquí.
+	Starred	Favoritos
+	Summarize, ask and translate.	Resumir, preguntar y traducir.
+	Summarize, question and correct your PDFs with Claude, with your own key.	Resume, pregunta y corrige tus PDF con Claude, con tu propia clave.
+	Text, pictures and other files, converted to PDF.	Texto, imágenes y otros archivos, convertidos a PDF.
+	The files you open show here.	Los archivos que abras aparecen aquí.
+	What would you like to do?	¿Qué quieres hacer?
+	Which document?	¿Qué documento?
+	Your AI assistant	Tu asistente de IA
+file state	Open	Abierto
+	Choose a PNG or JPEG picture.	Elige una imagen PNG o JPEG.
+	This picture is too large.	Esta imagen es demasiado grande.
+	Couldn't use this picture: {e}	No se pudo usar esta imagen: {e}
+	Couldn't use this picture.	No se pudo usar esta imagen.
+	{n} MB	{n} MB
+	{n} KB	{n} KB
+decimal separator	.	,
+	Other folders…	Otras carpetas…
+	Looking for photos…	Buscando fotos…
+	See your photos	Ver tus fotos
+	Allow PdfCraft to see your photos, and choose one here.	Permite que PdfCraft vea tus fotos y elige una aquí.
+	No photos found.	No se encontraron fotos.
+	PdfCraft shows the photos in Camera, Pictures and Download.	PdfCraft muestra las fotos de Cámara, Imágenes y Descargas.
+	Automatic	Automático
+	Dark mode	Modo oscuro
+	Dark pages	Páginas oscuras
+	Light text on a dark page, for reading at night.	Texto claro sobre página oscura, para leer de noche.
+	Night	Noche
+	Downloads	Descargas
+	Choose a file	Elegir un archivo
+	Choose files	Elegir archivos
+	Choose a folder	Elegir una carpeta
+	Tap to unlock	Toca para desbloquear
+	Browse folders	Explorar carpetas
+	Combined from top to bottom. Use the arrows to change the order.	Se combinan de arriba abajo. Usa las flechas para cambiar el orden.
+	PDFs and pictures, combined into one PDF in the order you choose.	PDF e imágenes, combinados en un solo PDF en el orden que elijas.
+@plural	{n} byte|{n} bytes	{n} byte|{n} bytes
+	Smaller text	Texto más pequeño
+	Larger text	Texto más grande
+	Flip	Voltear
+	Tap text or a picture to change it	Toca un texto o una imagen para cambiarlo
+	Tap where the text goes	Toca donde va el texto
+	White	Blanco
+	Your question and the open document are sent to the service you choose, with your own API key, only when you ask. Requests are billed to your account with that service.	Tu pregunta y el documento abierto se envían al servicio que elijas, con tu propia clave de API, solo cuando lo pides. Las solicitudes se cobran a tu cuenta en ese servicio.
+	Service	Servicio
+	Another service (OpenAI-compatible)	Otro servicio (compatible con OpenAI)
+	API key	Clave de API
+	On Google's free tier, what you send may be used to improve Google's products.	En el nivel gratuito de Google, lo que envías puede usarse para mejorar los productos de Google.
+	Fill in for	Rellenar para
+	Service address	Dirección del servicio
+	API key (if the service asks for one)	Clave de API (si el servicio la pide)
+	The service reads PDF files	El servicio lee archivos PDF
+	Otherwise the document's text is sent, page by page (not its pictures or scans).	Si no, se envía el texto del documento, página a página (sin sus imágenes ni escaneos).
+	Add your API key for {service} in the assistant's settings.	Añade tu clave de API de {service} en los ajustes del asistente.
+	Your {service} account can't use this model, or has no credit left: {error}	Tu cuenta de {service} no puede usar este modelo o no le queda crédito: {error}
+	Choose the model to ask in the assistant's settings.	Elige el modelo al que preguntar en los ajustes del asistente.
+	This document has no text to send (is it a scan?). Choose a service that reads PDF files, or recognize its text first.	Este documento no tiene texto que enviar (¿es un escaneo?). Elige un servicio que lea archivos PDF o reconoce primero su texto.
+	This document's text is too long for the assistant ({chars} characters, at most {max}).	El texto de este documento es demasiado largo para el asistente ({chars} caracteres, como máximo {max}).
+	Summarize, question and correct your PDFs with Claude, ChatGPT or Gemini, with your own key.	Resume, pregunta y corrige tus PDF con Claude, ChatGPT o Gemini, con tu propia clave.
+	The service's address isn't valid: it starts with https:// (http:// only for this device or the local network).	La dirección del servicio no es válida: empieza por https:// (http:// solo para este dispositivo o la red local).
+	This document doesn't allow copying its content, so it isn't sent to the assistant.	Este documento no permite copiar su contenido, así que no se envía al asistente.
+	Try again	Reintentar
+	Price per million tokens read / written	Precio por millón de tokens leídos / escritos

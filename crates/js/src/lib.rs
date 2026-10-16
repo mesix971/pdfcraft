@@ -1023,6 +1023,11 @@ const MAX_CONDITIONALS: usize = 4096;
 /// The script thread's stack.
 #[cfg(not(target_arch = "wasm32"))]
 const SCRIPT_STACK: usize = 1 << 30;
+/// How long a form script may run before it is abandoned. The engine counts loop iterations per
+/// function call, so a loop that calls a function with a loop of its own could otherwise run for
+/// hours, and the viewer would wait for it.
+#[cfg(not(target_arch = "wasm32"))]
+const TIME_LIMIT: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// Why `source` is refused, if it is: too long, or nested deeper than any form needs. Strings
 /// and comments are skipped; brackets in regular expressions and templates count, which only
@@ -1094,27 +1099,58 @@ fn refuse(source: &str) -> Option<String> {
 }
 
 /// Run `script` for `event`, after the document-level scripts (`doc_scripts`, which define the
-/// functions field scripts call), with the form's `fields`.
+/// functions field scripts call), with the form's `fields`. A script still running after a few
+/// seconds is abandoned: its thread is left to finish on its own, and nothing it does then counts.
 pub fn run(script: &str, event: &Event, doc: &DocInfo, fields: &[FieldState], doc_scripts: &[String], limits: Limits) -> Outcome {
-    let failed = |why: String| Outcome { rc: true, value: event.value.clone(), change: event.change.clone(), error: Some(why), ..Default::default() };
-    if let Some(why) = std::iter::once(script).chain(doc_scripts.iter().map(String::as_str)).find_map(refuse) {
-        return failed(why);
-    }
     #[cfg(not(target_arch = "wasm32"))]
     {
-        std::thread::scope(|scope| {
-            let spawned = std::thread::Builder::new()
-                .name("pdfcraft-js".into())
-                .stack_size(SCRIPT_STACK)
-                .spawn_scoped(scope, || run_here(script, event, doc, fields, doc_scripts, limits));
-            match spawned {
-                Ok(thread) => thread.join().unwrap_or_else(|_| failed("the script stopped with an internal error".into())),
-                Err(e) => failed(format!("the script engine could not start: {e}")),
-            }
-        })
+        run_timed(script, event, doc, fields, doc_scripts, limits, TIME_LIMIT)
     }
     #[cfg(target_arch = "wasm32")]
-    run_here(script, event, doc, fields, doc_scripts, limits)
+    {
+        if let Some(why) = std::iter::once(script).chain(doc_scripts.iter().map(String::as_str)).find_map(refuse) {
+            return failed(event, why);
+        }
+        run_here(script, event, doc, fields, doc_scripts, limits)
+    }
+}
+
+/// A script that didn't run: the event as it came, and why.
+fn failed(event: &Event, why: String) -> Outcome {
+    Outcome { rc: true, value: event.value.clone(), change: event.change.clone(), error: Some(why), ..Default::default() }
+}
+
+/// [`run`] on a thread of its own, waiting at most `time` for its outcome.
+#[cfg(not(target_arch = "wasm32"))]
+fn run_timed(
+    script: &str,
+    event: &Event,
+    doc: &DocInfo,
+    fields: &[FieldState],
+    doc_scripts: &[String],
+    limits: Limits,
+    time: std::time::Duration,
+) -> Outcome {
+    use std::sync::mpsc::RecvTimeoutError;
+    if let Some(why) = std::iter::once(script).chain(doc_scripts.iter().map(String::as_str)).find_map(refuse) {
+        return failed(event, why);
+    }
+    // The thread may outlive this call (abandoned), so it gets its own copies.
+    let (script_, event_, doc_, fields_, doc_scripts_) = (script.to_owned(), event.clone(), doc.clone(), fields.to_vec(), doc_scripts.to_vec());
+    let (tx, rx) = std::sync::mpsc::channel();
+    let spawned = std::thread::Builder::new().name("pdfcraft-js".into()).stack_size(SCRIPT_STACK).spawn(move || {
+        // The receiver is gone when the caller stopped waiting: nothing to report then.
+        let _ = tx.send(run_here(&script_, &event_, &doc_, &fields_, &doc_scripts_, limits));
+    });
+    if let Err(e) = spawned {
+        return failed(event, format!("the script engine could not start: {e}"));
+    }
+    match rx.recv_timeout(time) {
+        Ok(outcome) => outcome,
+        Err(RecvTimeoutError::Timeout) => failed(event, format!("the script ran longer than {} s and was abandoned", time.as_secs_f64())),
+        // It stopped without an outcome (it can't panic, but a lost outcome is still a failure).
+        Err(RecvTimeoutError::Disconnected) => failed(event, "the script stopped with an internal error".into()),
+    }
 }
 
 fn run_here(script: &str, event: &Event, doc: &DocInfo, fields: &[FieldState], doc_scripts: &[String], limits: Limits) -> Outcome {

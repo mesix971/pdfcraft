@@ -7,5 +7,15 @@ plan/
 .DS_Store
 /fuzz-out
 /assets/models
+# Secrets and signing keys never go in git (keep an encrypted copy of a release keystore
+# elsewhere: a lost key means no more updates), nor do built packages (rebuilt from source).
+local.properties
+**/google-services.json
+*.jks
+*.keystore
+key.properties
+.env
+*.apk
+*.aab
 # A craft-fonts checkout used as the optional CRAFT_FONTS_DIR build input (CI and releases put it here).
 /craft-fonts

@@ -11,9 +11,6 @@ use crate::canvas::{DocView, PageXform};
 use crate::theme::Tokens;
 use crate::widgets;
 
-/// The colour of the warning under text the standard fonts can't draw.
-const UNDRAWABLE: Color32 = Color32::from_rgb(0xD7, 0x37, 0x3F);
-
 /// The first character of a draft that can't be drawn, as the engine decides it (it refuses
 /// such text, #125): outside the standard fonts and not shaped with the Arabic face.
 pub(crate) fn undrawable(d: &TextDraft, memo: &UndrawableMemo) -> Option<char> {
@@ -89,6 +86,16 @@ pub struct ContentView {
 }
 
 impl ContentView {
+    /// An added item is being moved or resized.
+    pub(crate) fn grabbing(&self) -> bool {
+        self.grab.is_some()
+    }
+
+    /// Stop moving or resizing it, where it was.
+    pub(crate) fn cancel_grab(&mut self) {
+        self.grab = None;
+    }
+
     /// The draft's first character the standard fonts can't draw. Such a draft is kept open, and
     /// counts as unsaved work, until it is corrected or discarded.
     pub(crate) fn blocked(&self) -> Option<char> {
@@ -169,6 +176,7 @@ pub(crate) fn page_input(
     added: &[Added],
     adding_text: bool,
     style: &AddedText,
+    tap_edits: bool,
     view: &mut DocView,
 ) -> bool {
     let mut consumed = false;
@@ -225,14 +233,14 @@ pub(crate) fn page_input(
             let at = to_display(xf, info, page, p);
             let mut style = style.clone();
             style.text.clear();
-            cv.draft = Some(TextDraft {
-                page,
-                index: None,
-                rect: [at[0], at[1] - style.size * 1.2, at[0] + 200.0, at[1]],
-                text: String::new(),
-                style,
-                focus: true,
-            });
+            // 200 points wide; on a phone, no wider than what is left of the page (its text is
+            // typed on a screen of its own, where the box can't be seen or resized).
+            let right = match info.pages.get(page).map(|p| f64::from(p.width)) {
+                Some(width) if tap_edits && width.is_finite() => (at[0] + 200.0).min(width - 4.0).max(at[0] + 24.0),
+                _ => at[0] + 200.0,
+            };
+            cv.draft =
+                Some(TextDraft { page, index: None, rect: [at[0], at[1] - style.size * 1.2, right, at[1]], text: String::new(), style, focus: true });
             consumed = true;
             if typed.is_some() {
                 view.pending_edit = typed;
@@ -257,7 +265,8 @@ pub(crate) fn page_input(
         }
         return consumed;
     }
-    if resp.double_clicked()
+    // Double-click retypes text (a phone: a tap does).
+    if (resp.double_clicked() || tap_edits && resp.clicked())
         && let Some((i, a)) = hit
         && let AddedContent::Text(t) = &a.content
     {
@@ -266,6 +275,7 @@ pub(crate) fn page_input(
         }
         cv.draft = Some(TextDraft { page, index: Some(i), rect: t.rect, text: t.text.clone(), style: t.clone(), focus: true });
         cv.selected = Some((page, i));
+        view.image_selection = None;
         consumed = true;
         return consumed;
     }
@@ -273,6 +283,7 @@ pub(crate) fn page_input(
         match hit {
             Some((i, _)) => {
                 cv.selected = Some((page, i));
+                view.image_selection = None;
                 consumed = true;
             }
             None if corner.is_none() => cv.selected = None,
@@ -391,7 +402,7 @@ pub(crate) fn editor(ctx: &egui::Context, view: &mut DocView, info: &DocInfo, ad
         // Page text is drawn with the standard fonts; anything else would be saved as `?` (#125).
         undrawable = self::undrawable(t, memo);
         if let Some(c) = undrawable {
-            ui.label(egui::RichText::new(undrawable_message(c)).small().color(UNDRAWABLE));
+            ui.label(egui::RichText::new(undrawable_message(c)).small().color(tokens.error));
         }
     });
     if cancel {
@@ -404,6 +415,61 @@ pub(crate) fn editor(ctx: &egui::Context, view: &mut DocView, info: &DocInfo, ad
     }
     let edit = view.content.draft.take().and_then(|d| finish(&mut view.content, d, added));
     (edit, done)
+}
+
+/// The topmost added item on `page` under `p` (screen), by its place among the page's items.
+pub(crate) fn item_at(xf: &PageXform, info: &DocInfo, page: usize, added: &[Added], p: Pos2) -> Option<usize> {
+    on_page(added, page).into_iter().rev().find(|(_, a)| screen_rect(xf, info, page, a.content.rect()).expand(2.0).contains(p)).map(|(i, _)| i)
+}
+
+/// Added item `i` of `page` on screen.
+pub(crate) fn item_screen_rect(xf: &PageXform, info: &DocInfo, page: usize, added: &[Added], i: usize) -> Option<Rect> {
+    on_page(added, page).into_iter().find(|(k, _)| *k == i).map(|(_, a)| screen_rect(xf, info, page, a.content.rect()))
+}
+
+/// Resize added item `i` of `page` by its corner (`left`, `top` say which) under a finger at `at`
+/// (a phone's handle), as a mouse drag on its handle does.
+pub(crate) fn grab_corner(view: &mut DocView, page: usize, i: usize, left: bool, top: bool, at: Pos2) {
+    view.content.selected = Some((page, i));
+    view.content.grab = Some((page, Grab::Corner(left, top), at));
+}
+
+/// Pick up added item `i` of `page` with a finger at `at` (a long press on a phone): it moves
+/// with the finger and lands where it is let go, as a mouse drag does.
+pub(crate) fn carry(view: &mut DocView, page: usize, i: usize, at: Pos2) {
+    view.content.selected = Some((page, i));
+    view.content.grab = Some((page, Grab::Move, at));
+    view.image_selection = None;
+}
+
+/// The draft, finished as an edit (the phone's typing screen's Done): see [`finish`]. With
+/// `restyled`, retyped text takes the draft's look too (the phone formats it on its typing
+/// screen; the desktop's Format panel changes the item itself).
+pub(crate) fn finish_draft(view: &mut DocView, added: &[Added], restyled: bool) -> Option<Edit> {
+    let d = view.content.draft.take()?;
+    if restyled && let Some(i) = d.index {
+        let text = d.text.trim_end().to_string();
+        if text.trim().is_empty() {
+            return Some(Edit::DeleteContent { page: d.page, index: i });
+        }
+        let (_, a) = on_page(added, d.page).into_iter().find(|(k, _)| *k == i)?;
+        let AddedContent::Text(old) = &a.content else { return None };
+        let new = AddedText { text, rect: old.rect, ..d.style };
+        let changed = new != *old;
+        return changed.then_some(Edit::UpdateContent { page: d.page, index: i, content: AddedContent::Text(new) });
+    }
+    finish(&mut view.content, d, added)
+}
+
+/// Retype the added text selected on document `index` (the phone's Edit text for it).
+pub(crate) fn retype_selected(app: &mut crate::PdfCraftApp, index: usize) {
+    let added = app.views.get(index).and_then(|v| app.session.get(v.id)).map(|d| d.added.clone()).unwrap_or_default();
+    let Some(view) = app.views.get_mut(index) else { return };
+    let Some((page, i)) = view.content.selected else { return };
+    let Some((_, a)) = on_page(&added, page).into_iter().find(|(k, _)| *k == i) else { return };
+    if let AddedContent::Text(t) = &a.content {
+        view.content.draft = Some(TextDraft { page, index: Some(i), rect: t.rect, text: t.text.clone(), style: t.clone(), focus: true });
+    }
 }
 
 /// A finished draft as an edit: new text is added (and selected once it exists), retyped text
@@ -431,13 +497,13 @@ pub(crate) fn format_panel(ui: &mut egui::Ui, t: &Tokens, style: &AddedText) -> 
     let mut s = style.clone();
     widgets::section_title(ui, tl!("Format text"));
     ui.horizontal(|ui| {
-        egui::ComboBox::from_id_salt("font-family").selected_text(s.family.label()).width(110.0).show_ui(ui, |ui| {
+        crate::widgets::combo("font-family").selected_text(s.family.label()).width(110.0).show_ui(ui, |ui| {
             for f in [FontFamily::Helvetica, FontFamily::Times, FontFamily::Courier] {
                 ui.selectable_value(&mut s.family, f, f.label());
             }
         });
         // A list rather than a drag value: every change is an undo step.
-        egui::ComboBox::from_id_salt("font-size").selected_text(format!("{} pt", s.size)).width(70.0).show_ui(ui, |ui| {
+        crate::widgets::combo("font-size").selected_text(format!("{} pt", s.size)).width(70.0).show_ui(ui, |ui| {
             for size in [8.0, 9.0, 10.0, 11.0, 12.0, 14.0, 16.0, 18.0, 20.0, 24.0, 28.0, 36.0, 48.0, 72.0] {
                 ui.selectable_value(&mut s.size, size, format!("{size} pt"));
             }
@@ -499,7 +565,7 @@ impl crate::PdfCraftApp {
             Some(p) if p.ends_with(".png") || p.ends_with(".jpg") => read(self, p.into()),
             Some(_) => {}
             None => {
-                let dialog = rfd::AsyncFileDialog::new()
+                let dialog = crate::file_dialog::AsyncFileDialog::new()
                     .add_filter(tl!("Images"), &["png", "jpg", "jpeg", "tif", "tiff", "gif", "bmp", "jp2", "j2k", "jpx"])
                     .set_title(title);
                 let target = self.active_ids().map(|(_, id)| id);
@@ -557,7 +623,7 @@ impl crate::PdfCraftApp {
         }
         let Some(pixels) = self.session.get(id).map(|d| d.page_image_rgba(page, index)) else { return };
         let copied = pixels.and_then(|(w, h, rgba)| {
-            #[cfg(not(target_arch = "wasm32"))]
+            #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
             if self.system_clipboard {
                 let img = arboard::ImageData { width: w as usize, height: h as usize, bytes: std::borrow::Cow::Borrowed(&rgba) };
                 arboard::Clipboard::new().and_then(|mut c| c.set_image(img)).map_err(|e| e.to_string())?;
@@ -565,6 +631,11 @@ impl crate::PdfCraftApp {
             #[cfg(target_arch = "wasm32")]
             if self.system_clipboard {
                 return Err("the web version can't put images on the clipboard yet; use Save Image As".to_string());
+            }
+            // An image goes on Android's clipboard only through a content provider, which needs Java.
+            #[cfg(target_os = "android")]
+            if self.system_clipboard {
+                return Err("PdfCraft for Android can't put images on the clipboard yet; use Save Image As".to_string());
             }
             self.last_copied_image = Some((w, h, rgba));
             Ok((w, h))

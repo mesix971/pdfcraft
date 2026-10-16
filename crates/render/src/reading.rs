@@ -33,12 +33,16 @@ impl ReadingColors {
     /// Yellow text on a black page.
     pub const YELLOW_ON_BLACK: Self =
         Self { params: Some(ReadingParams { text: [0xff, 0xff, 0x00], background: [0x00, 0x00, 0x00], only_black: false, line_art: true }) };
+    /// Light grey text on a black page: for reading in the dark, softer on the eyes than white on
+    /// black, and the page's pixels off on an OLED screen (the phone's "Dark pages").
+    pub const NIGHT: Self =
+        Self { params: Some(ReadingParams { text: [0xd8, 0xd8, 0xd8], background: [0x00, 0x00, 0x00], only_black: false, line_art: true }) };
     /// Green text on a black page.
     pub const GREEN_ON_BLACK: Self =
         Self { params: Some(ReadingParams { text: [0x00, 0xff, 0x00], background: [0x00, 0x00, 0x00], only_black: false, line_art: true }) };
 
     /// Parses tool/settings input. `mode` is one of `off | black-on-white | white-on-black |
-    /// yellow-on-black | green-on-black | custom`; `custom` needs `text` and `background` as
+    /// yellow-on-black | green-on-black | night | custom`; `custom` needs `text` and `background` as
     /// `#rrggbb`; the flags override the preset defaults when given. `off` ignores colours.
     /// Errors are actionable strings.
     pub fn parse(mode: &str, text: Option<&str>, background: Option<&str>, only_black: Option<bool>, line_art: Option<bool>) -> Result<Self, String> {
@@ -61,6 +65,7 @@ impl ReadingColors {
             "white-on-black" => Ok(with_flags(Self::WHITE_ON_BLACK)),
             "yellow-on-black" => Ok(with_flags(Self::YELLOW_ON_BLACK)),
             "green-on-black" => Ok(with_flags(Self::GREEN_ON_BLACK)),
+            "night" => Ok(with_flags(Self::NIGHT)),
             "custom" => match (text, background) {
                 (None, None) => Err("custom needs text and background as #rrggbb".into()),
                 (None, Some(_)) => Err("custom needs text as #rrggbb".into()),
@@ -74,9 +79,9 @@ impl ReadingColors {
                     }),
                 })),
             },
-            other => {
-                Err(format!("unknown mode {other:?}; expected one of: off, black-on-white, white-on-black, yellow-on-black, green-on-black, custom"))
-            }
+            other => Err(format!(
+                "unknown mode {other:?}; expected one of: off, black-on-white, white-on-black, yellow-on-black, green-on-black, night, custom"
+            )),
         }
     }
 
@@ -93,6 +98,8 @@ impl ReadingColors {
                     "yellow-on-black"
                 } else if Some(params) == Self::GREEN_ON_BLACK.params {
                     "green-on-black"
+                } else if Some(params) == Self::NIGHT.params {
+                    "night"
                 } else {
                     "custom"
                 }
@@ -158,6 +165,7 @@ mod tests {
             ("white-on-black", "#ffffff", "#000000"),
             ("yellow-on-black", "#ffff00", "#000000"),
             ("green-on-black", "#00ff00", "#000000"),
+            ("night", "#d8d8d8", "#000000"),
         ] {
             let colors = ReadingColors::parse(mode, None, None, None, None).unwrap();
             assert_eq!(colors.mode_name(), mode, "{mode}");
@@ -186,7 +194,8 @@ mod tests {
     fn parse_rejects_unknown_mode() {
         assert_eq!(
             ReadingColors::parse("nope", None, None, None, None),
-            Err("unknown mode \"nope\"; expected one of: off, black-on-white, white-on-black, yellow-on-black, green-on-black, custom".to_string())
+            Err("unknown mode \"nope\"; expected one of: off, black-on-white, white-on-black, yellow-on-black, green-on-black, night, custom"
+                .to_string())
         );
     }
 

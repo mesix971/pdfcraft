@@ -552,6 +552,64 @@ pub(crate) fn signature_entries(ui: &mut egui::Ui, app: &mut crate::PdfCraftApp,
     command
 }
 
+/// Sign yourself on a phone: a sheet with the saved signature and initials, each shown as it is,
+/// to place (a tap on it), change or remove; or the way to make one. The commands are the ones
+/// the desktop's Fill & Sign panel runs.
+pub(crate) fn phone_sign_sheet(app: &mut crate::PdfCraftApp, ctx: &egui::Context, screen: egui::Rect, t: &Tokens) {
+    let look = crate::phone_home::look(t);
+    let mut command = None;
+    let open = crate::phone::sheet(ctx, "sign", screen, Some(tl!("Sign yourself")), |ui| {
+        for (i, title, what, use_id, change_id, remove_id) in [
+            (0, tl!("Signature"), "signature", "sign.fill.signature", "sign.fill.signature.change", "sign.fill.signature.remove"),
+            (1, tl!("Initials"), "initials", "sign.fill.initials", "sign.fill.initials.change", "sign.fill.initials.remove"),
+        ] {
+            let label = |template: &str| crate::i18n::fmt(tl!(template), &[("what", tl!(what))]);
+            egui::Frame::NONE.inner_margin(egui::Margin { left: 14, right: 14, top: 10, bottom: 4 }).show(ui, |ui| {
+                ui.label(egui::RichText::new(title).font(crate::theme::semibold(14.0)).color(t.text_muted));
+            });
+            let saved = if i == 0 { app.signature.clone() } else { app.initials.clone() };
+            let Some(saved) = saved else {
+                if crate::phone::sheet_row(ui, "plus", &label("Add {what}"), true, None, t).clicked() {
+                    command = Some(use_id);
+                }
+                continue;
+            };
+            ui.horizontal(|ui| {
+                ui.add_space(8.0);
+                // The signature itself, a finger tall: a tap places it.
+                // (The space before it and between the three is part of the row's width.)
+                let width = (ui.available_width() - 2.0 * crate::phone::TARGET - 24.0).max(120.0);
+                let (rect, resp) = ui.allocate_exact_size(vec2(width, 72.0), Sense::click());
+                let use_label = label("Use {what}");
+                resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &use_label));
+                let press = crate::theme::Press::track(ui, &resp);
+                let card = rect.translate(press.offset());
+                ui.painter().rect(card, CornerRadius::same(12), Color32::WHITE, Stroke::new(1.0, look.edge), egui::StrokeKind::Inside);
+                if let Some(cache) = app.saved_signature_previews.get_mut(i) {
+                    paint_saved(ui, card.shrink(10.0), &saved, cache, &format!("saved-{what}"));
+                }
+                if crate::theme::hand(resp).clicked() {
+                    command = Some(use_id);
+                }
+                if crate::icons::button(ui, "pencil", crate::phone::TARGET, false, &label("Change {what}")).clicked() {
+                    command = Some(change_id);
+                }
+                if crate::icons::button(ui, "trash-2", crate::phone::TARGET, false, &label("Remove saved {what}")).clicked() {
+                    command = Some(remove_id);
+                }
+            });
+            ui.add_space(4.0);
+        }
+        ui.add_space(8.0);
+    });
+    if !open || command.is_some() {
+        app.phone.sheet = None;
+    }
+    if let Some(id) = command {
+        app.execute(id);
+    }
+}
+
 /// Draw a saved signature as large as fits in `rect`, centred: typed text and images through
 /// `cache` (a texture named `key`), strokes as lines.
 pub(crate) fn paint_saved(ui: &egui::Ui, rect: egui::Rect, saved: &SavedSig, cache: &mut Option<(SavedSig, egui::TextureHandle)>, key: &str) {
@@ -725,6 +783,12 @@ pub(crate) fn type_box(ctx: &egui::Context, view: &mut DocView, info: &DocInfo, 
     None
 }
 
+/// The width of the pad and its previews: 460 points, or less where the dialog is narrower (a
+/// phone), so Apply never ends up past the screen's edge.
+fn pad_width(ui: &egui::Ui) -> f32 {
+    ui.available_width().clamp(160.0, 460.0)
+}
+
 /// The signature pad: type, draw, import an image or scan a photo. Returns Apply, Cancel and
 /// Browse (for an image or, on the Scan tab, a photo).
 pub(crate) fn signature_pad(
@@ -737,7 +801,7 @@ pub(crate) fn signature_pad(
     let what = if d.initials { tl!("initials") } else { tl!("signature") };
     let title = if d.editing { tl!("Change {what}") } else { tl!("Create {what}") };
     ui.label(egui::RichText::new(crate::i18n::fmt(title, &[("what", what)])).font(crate::theme::semibold(18.0)));
-    ui.horizontal(|ui| {
+    crate::widgets::row(ui, |ui| {
         if crate::widgets::pill_button(ui, tl_ctx!("signature pad", "Type"), !d.drawing && !d.image_mode && !d.scan_mode).clicked() {
             d.drawing = false;
             d.image_mode = false;
@@ -770,7 +834,7 @@ pub(crate) fn signature_pad(
     if d.image_mode {
         ui.label(egui::RichText::new(tl!("Choose a PNG or JPEG image (up to 4 MiB). Transparency is preserved.")).color(t.text_muted));
         let browse = crate::widgets::ghost_button(ui, "folder", tl!("Browse…")).clicked();
-        let (rect, _) = ui.allocate_exact_size(vec2(460.0, 150.0), Sense::hover());
+        let (rect, _) = ui.allocate_exact_size(vec2(pad_width(ui), 150.0), Sense::hover());
         ui.painter().rect_filled(rect, CornerRadius::same(6), Color32::WHITE);
         ui.painter().rect_stroke(rect, CornerRadius::same(6), Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
         if let Some(image) = &d.image {
@@ -784,11 +848,11 @@ pub(crate) fn signature_pad(
         ui.add(
             egui::TextEdit::singleline(&mut d.text)
                 .char_limit(pdfcraft_engine::MAX_SIGNATURE_CHARS)
-                .desired_width(460.0)
+                .desired_width(pad_width(ui))
                 .hint_text(tl!(if d.initials { "Initials" } else { "Your name" })),
         )
         .labelled_by(l.id);
-        let (rect, _) = ui.allocate_exact_size(vec2(460.0, 150.0), Sense::hover());
+        let (rect, _) = ui.allocate_exact_size(vec2(pad_width(ui), 150.0), Sense::hover());
         let painter = ui.painter_at(rect);
         painter.rect_filled(rect, CornerRadius::same(6), Color32::WHITE);
         painter.rect_stroke(rect, CornerRadius::same(6), Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
@@ -805,7 +869,7 @@ pub(crate) fn signature_pad(
     }
     ui.label(egui::RichText::new(crate::i18n::fmt(tl!("Draw your {what} below."), &[("what", what)])).color(t.text_muted));
     let strokes = &mut d.strokes;
-    let (rect, resp) = ui.allocate_exact_size(vec2(460.0, 150.0), Sense::drag());
+    let (rect, resp) = ui.allocate_exact_size(vec2(pad_width(ui), 150.0), Sense::drag());
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, CornerRadius::same(6), Color32::WHITE);
     painter.rect_stroke(rect, CornerRadius::same(6), Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
@@ -858,7 +922,7 @@ fn scan_tab(
             }
         }
     });
-    let (area, resp) = ui.allocate_exact_size(vec2(460.0, 230.0), Sense::drag());
+    let (area, resp) = ui.allocate_exact_size(vec2(pad_width(ui), 230.0), Sense::drag());
     let painter = ui.painter_at(area);
     painter.rect_filled(area, CornerRadius::same(6), t.pasteboard);
     painter.rect_stroke(area, CornerRadius::same(6), Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
@@ -987,7 +1051,7 @@ fn scan_tab(
         }
     });
     ui.add_space(4.0);
-    let (rect, _) = ui.allocate_exact_size(vec2(460.0, 110.0), Sense::hover());
+    let (rect, _) = ui.allocate_exact_size(vec2(pad_width(ui), 110.0), Sense::hover());
     ui.painter().rect_filled(rect, CornerRadius::same(6), Color32::WHITE);
     ui.painter().rect_stroke(rect, CornerRadius::same(6), Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
     if let Some(image) = &d.image {
@@ -1035,7 +1099,7 @@ fn pad_buttons(ui: &mut egui::Ui, d: &mut SigDraft) -> (bool, bool) {
                 d.scan = None;
             }
         }
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        crate::widgets::buttons_row(ui, |ui| {
             let ready = d.ready();
             if ui.add_enabled_ui(ready, |ui| crate::widgets::pill_button(ui, tl!("Apply"), true)).inner.clicked() {
                 apply = true;
@@ -1071,7 +1135,7 @@ impl crate::PdfCraftApp {
         let epoch = self.dialog_epoch();
         let initials = self.signature_draft.initials;
         let scan = self.signature_draft.scan_mode;
-        let dialog = rfd::AsyncFileDialog::new().add_filter(tl!(if scan { "Photo" } else { "Image" }), &["png", "jpg", "jpeg"]);
+        let dialog = crate::file_dialog::AsyncFileDialog::new().add_filter(tl!(if scan { "Photo" } else { "Image" }), &["png", "jpg", "jpeg"]);
         #[cfg(not(target_arch = "wasm32"))]
         self.ask_one(crate::pickers::Ask::File(dialog), None, move |app, path| {
             if app.dialog_epoch() != epoch
@@ -1160,7 +1224,7 @@ impl crate::PdfCraftApp {
         match cleaned {
             Ok(image) => {
                 self.signature_draft.image = Some(image);
-                self.toast = None;
+                self.clear_notices();
             }
             Err(e) => self.notify_fmt("Couldn't import the signature image: {e}", &[("e", &e)]),
         }
@@ -1203,7 +1267,7 @@ impl crate::PdfCraftApp {
             Ok(mut scan) => {
                 scan.rescan_in_background(&mut self.signature_draft.image, true, self.ctx.as_ref());
                 self.signature_draft.scan = Some(scan);
-                self.toast = None;
+                self.clear_notices();
             }
             Err(e) => self.notify_fmt("Couldn't use the photo: {e}", &[("e", &e)]),
         }

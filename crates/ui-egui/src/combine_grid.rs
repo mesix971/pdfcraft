@@ -21,7 +21,7 @@ use egui::{Align2, Color32, CornerRadius, Rect, Sense, Stroke, TextureHandle, Ve
 use pdfcraft_render::{RenderConfig, RenderPool, RenderRequest, Retiring};
 
 use crate::PdfCraftApp;
-use crate::combine_ui::{CombineFile, ERROR, Lock, RowAction, WARNING};
+use crate::combine_ui::{CombineFile, Lock, RowAction};
 use crate::icons;
 use crate::theme::{self, Tokens};
 
@@ -890,46 +890,21 @@ impl Card {
             };
             why = Some(("lock", ON_PAPER, text.to_owned()));
         } else if let Some(p) = &f.problem {
-            why = Some(("circle-x", ERROR, p.clone()));
+            why = Some(("circle-x", t.error, p.clone()));
         } else {
             match page {
-                Err(e) => why = Some(("circle-x", ERROR, e)),
+                Err(e) => why = Some(("circle-x", t.error, e)),
                 // The pages couldn't be counted, or the page's size is unknown (some passwords
                 // open a file for combining but not for reading it here): nothing is drawn (the
                 // engine decides at Combine), and the card says so rather than look blank.
                 Ok(p) if p >= f.pages || known.is_none() => why = Some(("eye-off", ON_PAPER, tl!("No preview").to_owned())),
-                Ok(p) => {
-                    // Pixels per point: the size the paper is drawn at, on both sides, and never a
-                    // side longer than a thumbnail's (a long, thin page fits by its long side).
-                    let (w, h) = size_pt;
-                    let scale = (size.x * self.ppp / w).min(size.y * self.ppp / h).min(MAX_SIDE / w.max(h));
-                    let px = [w * scale, h * scale].map(|v| (v.max(1.0).ceil() as u32).div_ceil(SIZE_STEP).saturating_mul(SIZE_STEP));
-                    let key = Key { source: Arc::as_ptr(&f.bytes) as usize, auth: f.auth, page: p, px };
-                    let look = thumbs.look((f.group, p), key);
-                    let mut want = false;
-                    match look {
-                        Look::Ready(tex) => {
-                            painter.image(tex, paper, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
-                        }
-                        Look::Failed(e) => why = Some(("triangle-alert", WARNING, crate::i18n::fmt(tl!("Preview unavailable: {e}"), &[("e", &e)]))),
-                        Look::Pending(stand_in) => {
-                            if let Some(tex) = stand_in {
-                                painter.image(tex, paper, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
-                            }
-                            want = true;
-                        }
+                Ok(p) => match page_look(thumbs, f, p, size_pt, size, self.ppp, ui.is_rect_visible(c)) {
+                    Look::Ready(tex) | Look::Pending(Some(tex)) => {
+                        painter.image(tex, paper, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
                     }
-                    if want && scale.is_finite() && scale > 0.0 {
-                        thumbs.wants.push(Want {
-                            slot: (f.group, p),
-                            key,
-                            bytes: f.bytes.clone(),
-                            password: f.password().map(Arc::from),
-                            scale,
-                            visible: ui.is_rect_visible(c),
-                        });
-                    }
-                }
+                    Look::Failed(e) => why = Some(("triangle-alert", t.warning, crate::i18n::fmt(tl!("Preview unavailable: {e}"), &[("e", &e)]))),
+                    Look::Pending(None) => {}
+                },
             }
         }
         if let Some((icon, colour, _)) = &why {
@@ -951,7 +926,7 @@ impl Card {
         if warned && why.as_ref().is_none_or(|(icon, ..)| *icon == "eye-off") {
             let r = Rect::from_center_size(paper.right_top() + vec2(-2.0, 2.0), Vec2::splat(18.0));
             painter.circle_filled(r.center(), 10.0, t.card);
-            icons::paint(ui, r, "triangle-alert", 15.0, WARNING);
+            icons::paint(ui, r, "triangle-alert", 15.0, t.warning);
         }
 
         // The name, shortened in the middle to fit, and the pages taken when a range is set; on a
@@ -971,7 +946,7 @@ impl Card {
         let note = if self.page.is_none() && !f.range.trim().is_empty() {
             match &self.check {
                 Ok(k) => Some((crate::i18n::fmt(tl!("Pages: {k} of {n}"), &[("k", &k.to_string()), ("n", &f.pages.to_string())]), t.text_muted)),
-                Err(_) => Some((tl!("Check the pages").to_owned(), ERROR)),
+                Err(_) => Some((tl!("Check the pages").to_owned(), t.error)),
             }
         } else {
             None
@@ -1077,6 +1052,48 @@ impl Card {
             });
         }
         action
+    }
+}
+
+/// Page `p` of `f` (`size_pt` points) drawn `size` points large: what there is to show of it now,
+/// asking for its thumbnail when it isn't ready (`visible`: it is on screen, so it comes first).
+fn page_look(thumbs: &mut Thumbs, f: &CombineFile, p: usize, size_pt: (f32, f32), size: Vec2, ppp: f32, visible: bool) -> Look {
+    // Pixels per point: the size the paper is drawn at, on both sides, and never a side longer
+    // than a thumbnail's (a long, thin page fits by its long side).
+    let (w, h) = size_pt;
+    let scale = (size.x * ppp / w).min(size.y * ppp / h).min(MAX_SIDE / w.max(h));
+    let px = [w * scale, h * scale].map(|v| (v.max(1.0).ceil() as u32).div_ceil(SIZE_STEP).saturating_mul(SIZE_STEP));
+    let key = Key { source: Arc::as_ptr(&f.bytes) as usize, auth: f.auth, page: p, px };
+    let look = thumbs.look((f.group, p), key);
+    if matches!(look, Look::Pending(_)) && scale.is_finite() && scale > 0.0 {
+        thumbs.wants.push(Want { slot: (f.group, p), key, bytes: f.bytes.clone(), password: f.password().map(Arc::from), scale, visible });
+    }
+    look
+}
+
+/// `f`'s first page fitted in `fit` points, for a row of a list of the files (the phone's
+/// Combine): the size it is drawn at, its thumbnail when there is one to show (an older one while
+/// it is made), asked for when it isn't ready, and whether drawing it failed. No thumbnail for a
+/// file that is locked, can't be read or takes no page.
+pub(crate) fn first_page_thumb(
+    thumbs: &mut Thumbs,
+    f: &mut CombineFile,
+    fit: Vec2,
+    ppp: f32,
+    visible: bool,
+) -> (Vec2, Option<egui::TextureId>, bool) {
+    if f.lock.is_some() || f.problem.is_some() {
+        return (fit, None, false);
+    }
+    let Ok(p) = f.first_page() else { return (fit, None, false) };
+    let Some(size_pt) = f.sizes.get(p).copied().filter(|(w, h)| p < f.pages && paper_size(*w, *h, fit).is_some()) else {
+        return (fit, None, false);
+    };
+    let size = paper_size(size_pt.0, size_pt.1, fit).unwrap_or(fit);
+    match page_look(thumbs, f, p, size_pt, size, ppp, visible) {
+        Look::Ready(tex) | Look::Pending(Some(tex)) => (size, Some(tex), false),
+        Look::Pending(None) => (size, None, false),
+        Look::Failed(_) => (size, None, true),
     }
 }
 
