@@ -232,7 +232,7 @@ fn every_dialog_keeps_its_controls_on_a_phone_screen() {
             // A document to recover, with a long name: the Recovery dialog lists it.
             app.recoverable = vec![pdfcraft_ui_egui::RecoveryMeta {
                 key: "k".into(),
-                name: "lettre-info-familles-2-07-10-2026-version-relue-par-le-bureau.pdf".into(),
+                name: "compte-rendu-reunion-annuelle-2026-version-finale-relue-et-validee.pdf".into(),
                 path: None,
                 saved_at: 0,
                 encrypted: true,
