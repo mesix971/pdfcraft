@@ -85,3 +85,40 @@ fn the_sparkles_button_opens_the_assistant_and_puts_it_away() {
     h.run_steps(4);
     assert!(!shows(&h, "with your own API key"), "a second click put it away");
 }
+
+#[test]
+fn the_question_box_grows_with_the_question_and_enter_sends_it() {
+    let mut h = desktop();
+    h.state_mut().ai.set_key("sk-ant-test");
+    // Nothing leaves: three pages, at most one.
+    h.state_mut().ai.max_pages = 1;
+    h.state_mut().set_option("tool", "ai").unwrap();
+    h.run_steps(4);
+    let field = "Ask about this document";
+    let one_line = h.get_by_label(field).rect().height();
+    h.get_by_label(field).focus();
+    h.run_steps(2);
+    // Enter with nothing to send sends nothing, and doesn't start a line either.
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert!(h.get_by_label(field).value().is_none_or(|v| v.is_empty()));
+    h.get_by_label(field).type_text("Who signs it?");
+    h.run_steps(2);
+    // Shift+Enter starts a new line, and the box makes room for it.
+    for _ in 0..3 {
+        h.key_press_modifiers(egui::Modifiers::SHIFT, egui::Key::Enter);
+        h.run_steps(2);
+    }
+    h.get_by_label(field).type_text("And when?");
+    h.run_steps(3);
+    assert_eq!(h.get_by_label(field).value().as_deref(), Some("Who signs it?\n\n\nAnd when?"));
+    let four_lines = h.get_by_label(field).rect().height();
+    assert!(four_lines > one_line * 2.5, "the box grew from {one_line} to {four_lines}");
+    // Inside its bar (8 points in from the window's edge), the conversation making room for it.
+    assert!(h.get_by_label(field).rect().bottom() <= 900.0 - 8.0, "the box doesn't run off the window");
+    // Enter alone sends it.
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert!(h.get_by_label(field).value().is_none_or(|v| v.is_empty()), "sent, and the box emptied");
+    assert!(shows(&h, "And when?"), "the question is in the conversation");
+}

@@ -57,7 +57,6 @@ pub(super) fn body(req: &Request) -> Value {
     let mut body = json!({
         "model": req.model.trim(),
         "max_tokens": MAX_TOKENS,
-        "output_config": {"effort": "medium"},
         "system": req.system(),
         "messages": messages,
     });
@@ -70,6 +69,11 @@ pub(super) fn body(req: &Request) -> Value {
         }
         if fallbacks(req) {
             map.insert("fallbacks".into(), json!("default"));
+        }
+        // Only to a model whose API takes one: Haiku 4.5's refuses it, and a model the user names
+        // may be such a one.
+        if super::known(Provider::Anthropic, req.model).is_some_and(super::Known::effort) {
+            map.insert("output_config".into(), json!({"effort": "medium"}));
         }
     }
     body

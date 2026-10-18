@@ -53,6 +53,15 @@ fn the_first_question_sends_the_document_cached() {
 }
 
 #[test]
+fn an_effort_level_goes_only_to_a_model_that_takes_one() {
+    let effort =
+        |model| request_body(&of(Provider::Anthropic, model, request(b"%PDF", &[], Task::Summarize))).unwrap()["output_config"]["effort"].clone();
+    assert_eq!(effort("claude-opus-4-6"), "medium");
+    assert_eq!(effort("claude-haiku-4-5"), Value::Null, "Haiku 4.5 refuses one");
+    assert_eq!(effort("claude-somebody-new"), Value::Null, "a model the user names may too");
+}
+
+#[test]
 fn follow_up_questions_keep_the_conversation_and_its_cached_start() {
     let first = request_body(&request(b"%PDF", &[], Task::Ask("Who signs it?".into()))).unwrap();
     let answer = json!([{"type": "thinking", "thinking": "", "signature": "sig"}, {"type": "text", "text": "Ms Durand (p. 2)."}]);
@@ -275,7 +284,9 @@ fn models_are_known_by_their_provider_and_their_dated_ids() {
     assert_eq!(known(Provider::OpenAi, "gpt-6.1-sol-mini"), None);
     assert_eq!(known(Provider::OpenAi, "claude-opus-5-5"), None, "another provider's");
     assert_eq!(known(Provider::Compatible, "gpt-6.1-sol"), None, "a compatible service's are never priced");
-    assert!(!Provider::Anthropic.models().any(|m| m.id == "claude-opus-4-8"), "a fallback is priced, not offered");
+    assert!(Provider::Anthropic.models().any(|m| m.id == "claude-opus-4-6"), "older Claude models are offered");
+    assert!(known(Provider::Anthropic, "claude-opus-4-6").is_some_and(|k| k.effort()));
+    assert!(known(Provider::Anthropic, "claude-haiku-4-5-20251001").is_some_and(|k| !k.effort()), "Haiku 4.5 refuses one");
     assert!(known(Provider::Gemini, "gemini-3.8-flash").is_some_and(|k| k.free_tier));
     assert!(known(Provider::Gemini, "gemini-4-argon").is_some_and(|k| !k.free_tier));
 }

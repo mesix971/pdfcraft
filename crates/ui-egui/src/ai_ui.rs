@@ -906,6 +906,9 @@ fn compatible_settings(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
     );
 }
 
+/// The question box's tallest, in lines; a longer question scrolls.
+const QUESTION_ROWS: usize = 6;
+
 /// "4 $ / 20 $" for a million tokens read / written, as the radio buttons show it.
 fn price_line(m: &pdfcraft_ai::Known) -> String {
     let (input, output) = m.list_prices();
@@ -947,9 +950,19 @@ fn chat(app: &mut PdfCraftApp, doc: DocId, ui: &mut egui::Ui, t: &Tokens) {
     // A failed question asked again, or the one on its way cancelled.
     let mut retry: Option<usize> = None;
     let mut cancel = false;
-    // The question box at the bottom, the conversation above it.
-    let input_h = 64.0;
+    // The question box at the bottom, the conversation above it, the box as tall as the question
+    // (up to six lines, then it scrolls).
     let full = ui.max_rect();
+    let send_w = crate::phone::TARGET;
+    let font = theme::regular(15.5);
+    // The bar's side padding, the gap before Send and the field's own margins.
+    let text_w = (full.width() - 20.0 - send_w - 8.0 - 8.0).max(40.0);
+    let (rows, row_h) = ui.fonts_mut(|f| {
+        let galley = f.layout(app.ai.input.clone(), font.clone(), Color32::WHITE, text_w);
+        (galley.rows.len().clamp(1, QUESTION_ROWS), f.row_height(&font))
+    });
+    let field_h = |rows: usize| rows as f32 * row_h + 4.0;
+    let input_h = (field_h(rows) + 16.0).clamp(64.0, (full.height() * 0.5).max(64.0));
     let list = Rect::from_min_max(full.min, egui::pos2(full.right(), full.bottom() - input_h));
     ui.scope_builder(egui::UiBuilder::new().max_rect(list), |ui| {
         egui::ScrollArea::vertical().auto_shrink([false, false]).stick_to_bottom(true).show(ui, |ui| {
@@ -1017,19 +1030,26 @@ fn chat(app: &mut PdfCraftApp, doc: DocId, ui: &mut egui::Ui, t: &Tokens) {
     let bar = Rect::from_min_max(egui::pos2(full.left(), full.bottom() - input_h), full.max);
     ui.painter().rect_filled(bar, CornerRadius::ZERO, t.chrome);
     ui.painter().hline(bar.x_range(), bar.top(), Stroke::new(1.0, t.divider));
-    ui.scope_builder(egui::UiBuilder::new().max_rect(bar.shrink2(vec2(10.0, 8.0))).layout(egui::Layout::left_to_right(egui::Align::Center)), |ui| {
-        let send_w = crate::phone::TARGET;
-        let edit = egui::TextEdit::singleline(&mut app.ai.input)
+    ui.scope_builder(egui::UiBuilder::new().max_rect(bar.shrink2(vec2(10.0, 8.0))).layout(egui::Layout::left_to_right(egui::Align::Max)), |ui| {
+        // Enter sends; Shift+Enter starts a new line.
+        let edit = egui::TextEdit::multiline(&mut app.ai.input)
             .id(egui::Id::new("ai-question"))
             .hint_text(tl!("Ask about this document"))
-            .font(theme::regular(15.5))
-            .desired_width(ui.available_width() - send_w - 8.0)
+            .font(font.clone())
+            .desired_rows(rows)
+            .desired_width(text_w)
+            .return_key(egui::KeyboardShortcut::new(egui::Modifiers::SHIFT, egui::Key::Enter))
             .char_limit(4000);
-        let r = widgets::named_edit(ui, edit, tl!("Ask about this document"));
+        let r = egui::ScrollArea::vertical()
+            .id_salt("ai-question-scroll")
+            .max_height(field_h(QUESTION_ROWS))
+            .stick_to_bottom(true)
+            .show(ui, |ui| widgets::named_edit(ui, edit, tl!("Ask about this document")))
+            .inner;
         if std::mem::take(&mut app.ai.focus_question) {
             r.request_focus();
         }
-        let enter = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+        let enter = r.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter) && !i.modifiers.shift);
         ui.add_space(8.0);
         let ready = !busy && !app.ai.input.trim().is_empty();
         // Lit when there is a question to send; a button, not a switch, to a screen reader.

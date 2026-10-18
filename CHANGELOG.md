@@ -3,6 +3,9 @@
 Une ligne par version publiée ([semver](https://semver.org/lang/fr/)) : date et résumé. Avant
 0.8.0, l'historique est dans `ROADMAP.md` et `git log`.
 
+- **0.9.0-fork.2** (2026-10-18) — Assistant IA : la zone de question s'agrandit avec le message
+  (jusqu'à six lignes, puis elle défile ; Entrée envoie, Maj+Entrée va à la ligne) ; d'autres
+  modèles Claude au choix (Opus 5, 4.8, 4.7, 4.6, Sonnet 5, 4.6, Haiku 4.5), avec leurs prix.
 - **0.9.0-fork.1** (2026-10-18) — L'assistant IA aussi sur ordinateur : Tous les outils ▸ Assistant IA
   ou l'étincelle de la barre du haut (résumer, traduire, questions, modifications du texte à
   appliquer) ; sur téléphone, bandeaux et première page sous la barre d'état. Suffixe « fork » :

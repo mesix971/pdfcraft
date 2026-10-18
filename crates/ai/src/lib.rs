@@ -162,6 +162,9 @@ pub struct Known {
     listed: bool,
     /// The service has a free tier for it, on which what is sent may be used to improve it.
     pub free_tier: bool,
+    /// Its API takes an effort level (`output_config.effort`): Claude's from Opus 4.5 and Sonnet
+    /// 4.6 on, not Haiku 4.5, which answers it with an error.
+    effort: bool,
 }
 
 impl Known {
@@ -177,6 +180,11 @@ impl Known {
         (self.prices.input, self.prices.output)
     }
 
+    /// Its API takes an effort level.
+    pub fn effort(&self) -> bool {
+        self.effort
+    }
+
     /// The server re-runs a declined request on another model (Anthropic's, but Haiku).
     fn fallbacks(&self) -> bool {
         matches!(self.id, "claude-opus-5-5" | "claude-sonnet-5-5")
@@ -187,14 +195,14 @@ impl Known {
 ///
 /// - Anthropic's (platform.claude.com/docs/en/about-claude/pricing). A five-minute cache write
 ///   costs 1.25 times the input price; a read 0.05 times on Opus 5.5 and Sonnet 5.5, 0.1 times on
-///   the others. Haiku's prompts over 100K tokens cost more. Opus 4.8, Opus 5 and Sonnet 5 are a
-///   declined request's fallbacks.
+///   the others. Haiku 5.5's prompts over 100K tokens cost more. Opus 4.8, Opus 5 and Sonnet 5
+///   are also a declined request's fallbacks.
 /// - OpenAI's Standard prices (developers.openai.com/api/docs/pricing). A prompt over 272K tokens
 ///   costs twice the input and cache prices and 1.5 times the output price, for the whole request.
 /// - Google's paid tier, Standard (ai.google.dev/gemini-api/docs/pricing), at the regular prices:
 ///   Gemini 4 Argon costs half until 30 November 2026, Gemini 3.8 Flash until 31 December 2026.
 ///   Gemini caches by itself; output includes thinking.
-const KNOWN: [Known; 12] = [
+const KNOWN: [Known; 16] = [
     claude("claude-opus-5-5", "Claude Opus 5.5", Prices { input: 4.0, output: 20.0, cache_write: 5.0, cache_read: 0.20 }, None, true),
     claude("claude-sonnet-5-5", "Claude Sonnet 5.5", Prices { input: 2.0, output: 10.0, cache_write: 2.5, cache_read: 0.10 }, None, true),
     claude(
@@ -204,10 +212,17 @@ const KNOWN: [Known; 12] = [
         Some((100_000, Prices { input: 0.50, output: 2.50, cache_write: 0.625, cache_read: 0.05 })),
         true,
     ),
-    claude("claude-opus-4-8", "Claude Opus 4.8", Prices { input: 5.0, output: 25.0, cache_write: 6.25, cache_read: 0.50 }, None, false),
-    claude("claude-opus-5", "Claude Opus 5", Prices { input: 5.0, output: 25.0, cache_write: 6.25, cache_read: 0.50 }, None, false),
-    // Sonnet 5.5's fallback, at Sonnet 5.5's prices.
-    claude("claude-sonnet-5", "Claude Sonnet 5", Prices { input: 2.0, output: 10.0, cache_write: 2.5, cache_read: 0.10 }, None, false),
+    claude("claude-opus-5", "Claude Opus 5", Prices { input: 5.0, output: 25.0, cache_write: 6.25, cache_read: 0.50 }, None, true),
+    claude("claude-sonnet-5", "Claude Sonnet 5", Prices { input: 2.0, output: 10.0, cache_write: 2.5, cache_read: 0.20 }, None, true),
+    claude("claude-opus-4-8", "Claude Opus 4.8", Prices { input: 5.0, output: 25.0, cache_write: 6.25, cache_read: 0.50 }, None, true),
+    claude("claude-opus-4-7", "Claude Opus 4.7", Prices { input: 5.0, output: 25.0, cache_write: 6.25, cache_read: 0.50 }, None, true),
+    claude("claude-opus-4-6", "Claude Opus 4.6", Prices { input: 5.0, output: 25.0, cache_write: 6.25, cache_read: 0.50 }, None, true),
+    claude("claude-sonnet-4-6", "Claude Sonnet 4.6", Prices { input: 3.0, output: 15.0, cache_write: 3.75, cache_read: 0.30 }, None, true),
+    // No effort level (the API refuses one).
+    Known {
+        effort: false,
+        ..claude("claude-haiku-4-5", "Claude Haiku 4.5", Prices { input: 1.0, output: 5.0, cache_write: 1.25, cache_read: 0.10 }, None, true)
+    },
     openai(
         "gpt-6-astra",
         "GPT-6 Astra",
@@ -232,15 +247,15 @@ const KNOWN: [Known; 12] = [
 ];
 
 const fn claude(id: &'static str, name: &'static str, prices: Prices, long: Option<(u64, Prices)>, listed: bool) -> Known {
-    Known { provider: Provider::Anthropic, id, name, prices, long, listed, free_tier: false }
+    Known { provider: Provider::Anthropic, id, name, prices, long, listed, free_tier: false, effort: true }
 }
 
 const fn openai(id: &'static str, name: &'static str, prices: Prices, long: Prices) -> Known {
-    Known { provider: Provider::OpenAi, id, name, prices, long: Some((272_000, long)), listed: true, free_tier: false }
+    Known { provider: Provider::OpenAi, id, name, prices, long: Some((272_000, long)), listed: true, free_tier: false, effort: false }
 }
 
 const fn gemini(id: &'static str, name: &'static str, prices: Prices, free_tier: bool) -> Known {
-    Known { provider: Provider::Gemini, id, name, prices, long: None, listed: true, free_tier }
+    Known { provider: Provider::Gemini, id, name, prices, long: None, listed: true, free_tier, effort: false }
 }
 
 /// The model of `provider` an API names `id`, or `None` (a compatible service's are never
