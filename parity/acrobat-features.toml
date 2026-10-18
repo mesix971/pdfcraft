@@ -9524,7 +9524,7 @@ status = "partial"
 commands = []
 tools = []
 evidence = ["crates/ai/src/tests.rs::openai_gets_the_pdf_as_a_file_and_nothing_is_stored", "crates/ai/src/tests.rs::openai_answers_are_read_and_go_back_whole_with_what_became_of_their_changes", "crates/ai/src/tests.rs::gemini_gets_the_pdf_as_a_document_and_nothing_is_stored", "crates/ai/src/tests.rs::gemini_answers_are_read_and_their_steps_go_back_whole", "crates/ai/src/tests.rs::a_compatible_services_address_is_checked", "crates/ai/src/tests.rs::a_compatible_service_gets_the_text_or_the_pdf_and_may_need_no_key", "crates/ai/src/tests.rs::a_compatible_answer_goes_back_as_a_plain_message_with_its_tool_answers", "crates/ui-egui/src/ai_ui.rs::the_assistant_is_ready_once_its_service_is_set_up", "crates/ui-egui/src/ai_ui.rs::the_assistants_settings_are_kept_and_read_back_carefully", "crates/ui-egui/src/ai_ui.rs::the_text_a_compatible_service_gets"]
-notes = "Off until set up. The user chooses the service in the assistant's settings, each with its own key and model: Claude (Anthropic's Messages API), ChatGPT's models (OpenAI's Responses API), Gemini (Google's Interactions API), or any OpenAI-compatible endpoint at an address the user gives (OpenRouter, Mistral, DeepSeek, Groq, a local Ollama), which gets the document's text page by page unless it reads PDF files. Request and answer handling is unit-tested per service against the services' documented shapes; the live checks (live_openai, live_gemini) haven't been run against the real APIs yet. Missing: the desktop layout's entry (phone layout only), an automation tool, a model bundled with the app, pictures and scans for a text-only endpoint."
+notes = "Off until set up. The user chooses the service in the assistant's settings, each with its own key and model: Claude (Anthropic's Messages API), ChatGPT's models (OpenAI's Responses API), Gemini (Google's Interactions API), or any OpenAI-compatible endpoint at an address the user gives (OpenRouter, Mistral, DeepSeek, Groq, a local Ollama), which gets the document's text page by page unless it reads PDF files. Request and answer handling is unit-tested per service against the services' documented shapes; the live checks (live_openai, live_gemini) haven't been run against the real APIs yet. Missing: an automation tool, a model bundled with the app, pictures and scans for a text-only endpoint."
 
 [[feature]]
 id = "misc.ai-summary"
@@ -9535,8 +9535,8 @@ milestone = "M13"
 status = "partial"
 commands = []
 tools = []
-evidence = ["crates/ai/src/tests.rs::the_first_question_sends_the_document_cached", "crates/ui-egui/tests/phone.rs::the_assistant_asks_for_a_key_and_says_why_it_cant_answer"]
-notes = "The phone layout's AI assistant (crates/ai): Summarize and Translate page with the service the user chooses and the user's own key (Claude, ChatGPT, Gemini or an OpenAI-compatible one; the first three read the whole PDF, scans included; follow-ups read it back from the prompt cache). Not yet: an entry in the desktop layout, an automation tool, a local model."
+evidence = ["crates/ai/src/tests.rs::the_first_question_sends_the_document_cached", "crates/ui-egui/tests/phone.rs::the_assistant_asks_for_a_key_and_says_why_it_cant_answer", "crates/ui-egui/tests/ai_desktop.rs::the_summarize_command_asks_once_the_service_is_set_up"]
+notes = "The AI assistant (crates/ai), on the phone's screen and in the desktop's tool panel (All tools ▸ AI assistant, or the ai.summary and ai.translate commands): Summarize and Translate page with the service the user chooses and the user's own key (Claude, ChatGPT, Gemini or an OpenAI-compatible one; the first three read the whole PDF, scans included; follow-ups read it back from the prompt cache). Not yet: an automation tool, a local model."
 
 [[feature]]
 id = "misc.ai-ask"
@@ -9547,8 +9547,8 @@ milestone = "M13"
 status = "partial"
 commands = []
 tools = []
-evidence = ["crates/ai/src/tests.rs::follow_up_questions_keep_the_conversation_and_its_cached_start", "crates/ai/src/tests.rs::answers_are_read_after_their_stop_reason"]
-notes = "Phone layout: questions and follow-ups about the open document, answers citing pages as (p. N) in text; the cost of each answer shown. Not yet: citations that jump to the page, the desktop layout, an automation tool."
+evidence = ["crates/ai/src/tests.rs::follow_up_questions_keep_the_conversation_and_its_cached_start", "crates/ai/src/tests.rs::answers_are_read_after_their_stop_reason", "crates/ui-egui/tests/ai_desktop.rs::the_tool_panel_holds_the_assistant_its_settings_first"]
+notes = "Phone layout and the desktop's tool panel: questions and follow-ups about the open document, answers citing pages as (p. N) in text; the cost of each answer shown. Not yet: citations that jump to the page, an automation tool."
 
 [[feature]]
 id = "misc.ai-conversational-edit"
@@ -9560,7 +9560,7 @@ status = "partial"
 commands = []
 tools = []
 evidence = ["crates/ai/src/tests.rs::proposed_changes_are_read_and_their_fate_goes_back_with_the_next_question", "crates/ui-egui/src/ai_ui.rs::apply_changes_the_document_once_and_the_next_question_says_what_happened"]
-notes = "Text only: asked to correct, reword or translate in place, the assistant proposes passage replacements; Apply rewrites each paragraph in its own font, size and colour, rewrapped in its box, as one undo step. Not yet: other edits (pages, comments, forms) through registry commands, the desktop layout."
+notes = "Text only: asked to correct, reword or translate in place, the assistant proposes passage replacements; Apply rewrites each paragraph in its own font, size and colour, rewrapped in its box, as one undo step. Not yet: other edits (pages, comments, forms) through registry commands."
 
 [[feature]]
 id = "misc.ai-presentation"

@@ -190,6 +190,10 @@ pub struct AiState {
     settings_open: bool,
     /// The language pages are translated into (a language's own name, "Français").
     translate_to: String,
+    /// The question box takes the focus the next time it shows (the `ai.ask` command). Asked for
+    /// directly, the focus could go to a box not on screen (the settings show until a service is
+    /// set up), which screen readers are then told has the focus.
+    focus_question: bool,
 }
 
 impl Default for AiState {
@@ -209,6 +213,7 @@ impl Default for AiState {
             provider_draft: Provider::default(),
             settings_open: false,
             translate_to: String::new(),
+            focus_question: false,
         }
     }
 }
@@ -632,6 +637,82 @@ fn find_loosely(hay: &str, needle: &str, limit: usize) -> Vec<std::ops::Range<us
     }
     folded.match_indices(wanted.as_str()).take(limit).filter_map(|(at, m)| Some(*origin.get(at)?..*origin.get(at.checked_add(m.len())?)?)).collect()
 }
+#[cfg(not(target_arch = "wasm32"))]
+/// The assistant in the desktop layout's tool panel (All tools ▸ AI assistant), under its header:
+/// the settings until a service is set up, then the conversation about the open document, as on
+/// the phone's screen.
+pub(crate) fn panel(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
+    if !app.ai.ready() && !app.ai.settings_open {
+        app.ai.open_settings();
+    }
+    let settings = app.ai.settings_open;
+    let doc = app.active_ids().map(|(_, doc)| doc);
+    // Nothing to clear while a question about this document is on its way.
+    let clearable =
+        doc.is_some_and(|doc| app.ai.chats.get(&doc).is_some_and(|c| !c.entries.is_empty()) && app.ai.pending.as_ref().is_none_or(|p| p.doc != doc));
+    let (mut toggle_settings, mut clear) = (false, false);
+    ui.horizontal(|ui| {
+        toggle_settings = icons::button(ui, "settings", 28.0, settings, tl!("Settings")).clicked();
+        if clearable && !settings {
+            clear = icons::button(ui, "trash-2", 28.0, false, tl!("Clear")).clicked();
+        }
+    });
+    if clear && let Some(doc) = doc {
+        app.ai.chats.remove(&doc);
+    }
+    if toggle_settings {
+        if app.ai.settings_open {
+            app.ai.settings_open = false;
+        } else {
+            app.ai.open_settings();
+        }
+    }
+    // The rest of the panel: the conversation keeps its question box at the bottom.
+    let rest = ui.available_rect_before_wrap();
+    ui.scope_builder(egui::UiBuilder::new().max_rect(rest), |ui| {
+        ui.set_clip_rect(rest.intersect(ui.clip_rect()));
+        match doc {
+            _ if settings => settings_form(app, ui, t),
+            Some(doc) => chat(app, doc, ui, t),
+            None => {
+                ui.add_space(8.0);
+                ui.label(egui::RichText::new(tl!("Open a document to ask the assistant about it.")).color(t.text_muted));
+            }
+        }
+    });
+    ui.allocate_rect(rest, Sense::hover());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl PdfCraftApp {
+    /// An `ai.*` command (the tool panel's items, the command palette): show the assistant and,
+    /// once its service is set up, summarize the document or translate the current page; asking
+    /// puts the cursor in the question box. Until then the assistant shows its settings.
+    pub(crate) fn run_ai_command(&mut self, command: &str) {
+        if self.phone_layout() {
+            self.phone.ai_open = true;
+        } else {
+            self.select_tool("ai");
+            self.left_open = true;
+        }
+        let page = self.active.and_then(|i| self.views.get(i)).map_or(1, |v| v.current.saturating_add(1));
+        let ready = self.ai.ready() && self.active.is_some() && !self.ai.busy();
+        match command {
+            "ai.summary" if ready => self.ask_ai(Task::Summarize, tl!("Summarize").to_owned()),
+            "ai.translate" if ready => {
+                if self.ai.translate_to.is_empty() {
+                    self.ai.translate_to = reply_language();
+                }
+                let label = crate::i18n::fmt(tl!("Translate page {n}"), &[("n", &page.to_string())]);
+                let shown = format!("{label} → {}", self.ai.translate_to);
+                self.ask_ai(Task::Translate { page, language: self.ai.translate_to.clone() }, shown);
+            }
+            "ai.ask" => self.ai.focus_question = true,
+            _ => {}
+        }
+    }
+}
+
 /// The assistant's screen in the phone layout, over the reader: `screen` is the content area.
 /// Returns whether its Back was tapped.
 pub(crate) fn page(app: &mut PdfCraftApp, ui: &mut egui::Ui, screen: Rect) -> bool {
@@ -945,6 +1026,9 @@ fn chat(app: &mut PdfCraftApp, doc: DocId, ui: &mut egui::Ui, t: &Tokens) {
             .desired_width(ui.available_width() - send_w - 8.0)
             .char_limit(4000);
         let r = widgets::named_edit(ui, edit, tl!("Ask about this document"));
+        if std::mem::take(&mut app.ai.focus_question) {
+            r.request_focus();
+        }
         let enter = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
         ui.add_space(8.0);
         let ready = !busy && !app.ai.input.trim().is_empty();

@@ -1,6 +1,6 @@
 # Where PdfCraft falls short of Acrobat Pro
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (gap 23: the AI assistant asks Claude, ChatGPT, Gemini or any OpenAI-compatible service, a local Ollama included); earlier: gap 23: the AI assistant proposes text changes; gap 23 in part: AI assistant with the user's own Anthropic key; gap 4 closed: the web build prints through the browser's print dialog; exclusive image-crop resize follow-up; minor (Word invoice regression coverage, #773; Office fidelity still partial; gap 2: hayro patch counts after the native-gradient backport) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-18 · **Change:** minor (gap 23: the AI assistant in the desktop layout's tool panel too); earlier: gap 23: the AI assistant asks Claude, ChatGPT, Gemini or any OpenAI-compatible service, a local Ollama included; gap 23: the AI assistant proposes text changes; gap 23 in part: AI assistant with the user's own Anthropic key; gap 4 closed: the web build prints through the browser's print dialog; exclusive image-crop resize follow-up; minor (Word invoice regression coverage, #773; Office fidelity still partial; gap 2: hayro patch counts after the native-gradient backport) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
 > **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-12 · **Change:** minor (gap 13: large-file memory measured, edits keep two copies instead of three, file-backed input blocked on gap 2) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
 > **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** minor (gap 1 closed by #836; fixed issues removed from gaps 3, 6 and 16) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
 > **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** minor (document-font subset completion and curved/shared image clips in the contributor fork; gap 2: hayro patch counts after the native-gradient backport) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
@@ -306,8 +306,10 @@ update the numbers.
   local Ollama), which gets the document's text page by page unless it reads PDF files. Each
   service keeps its own key and model; nothing is stored on the service's side between
   questions.
+- **Done (2026-10-18):** the same assistant in the desktop layout's tool panel (All tools ▸ AI
+  assistant), its settings first, and the `ai.summary`, `ai.translate` and `ai.ask` commands.
 - **Missing:** a model bundled with the app (a local one runs through an OpenAI-compatible
-  server, text only), the same assistant in the desktop layout, an `automation` tool, page
+  server, text only), an `automation` tool, page
   citations as links, alternate-text and redaction suggestions. Acrobat's AI Assistant is a cloud
   service and out of scope.
 - **Estimate:** 10–22 h left. **Doc:** [target-app-parity.md](target-app-parity.md).

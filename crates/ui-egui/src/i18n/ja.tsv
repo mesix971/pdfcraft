@@ -474,6 +474,7 @@
 	Bring your own model (off by default)	自分のモデルを使用（初期設定では無効）
 	Summarize	要約
 	Ask about this document	この文書について質問
+	Open a document to ask the assistant about it.	アシスタントに質問するには、文書を開いてください。
 	Translate	翻訳
 	pages	ページ
 	Planned	開発予定

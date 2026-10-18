@@ -1805,6 +1805,12 @@ impl PdfCraftApp {
 
     /// Run a catalogue command. Commands that aren't implemented yet say which milestone ships them.
     pub fn run_command(&mut self, command: &str) {
+        // The AI assistant's own commands (not the engine's: they need the service set up here).
+        #[cfg(not(target_arch = "wasm32"))]
+        if command.starts_with("ai.") && pdfcraft_engine::commands::command(command).is_none() {
+            self.run_ai_command(command);
+            return;
+        }
         if let Some(spec) = pdfcraft_engine::commands::command(command) {
             use pdfcraft_engine::commands::Needs;
             // A tool that needs a document, chosen with none open, asks for the file and then

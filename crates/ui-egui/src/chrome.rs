@@ -434,6 +434,19 @@ pub fn mode_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                             app.dialog = Some(Dialog::Properties(PropsTab::Description));
                         }
                     });
+                    // The AI assistant a click away (its settings need no document); a second
+                    // click puts it away.
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        let shown = app.tool_panel_shows("ai");
+                        if icons::button(ui, "sparkles", 32.0, shown, tl!("AI assistant")).clicked() {
+                            if shown {
+                                app.left_open = false;
+                            } else {
+                                app.run_command("ai.ask");
+                            }
+                        }
+                    }
                     ui.add_space(8.0);
                     let search = if fit == ModeBarFit::Full {
                         widgets::search_box(ui, tl!("Find tools and commands"), SEARCH_BOX_WIDTH)
@@ -453,8 +466,10 @@ const MODES: [(Mode, &str); 5] =
     [(Mode::AllTools, "All tools"), (Mode::Read, "Read"), (Mode::Edit, "Edit"), (Mode::Convert, "Convert"), (Mode::Sign, "E-Sign")];
 /// The mode bar's search box, when there is room for it.
 const SEARCH_BOX_WIDTH: f32 = 260.0;
-/// The mode bar's right-hand buttons (Print, Save, Properties) and the gaps around them.
-const MODE_BAR_BUTTONS: f32 = 3.0 * 32.0 + 2.0 * 4.0 + 8.0 + 8.0;
+/// The mode bar's right-hand buttons (Print, Save, Properties, and the AI assistant where it
+/// runs) and the gaps around them.
+const MODE_BAR_BUTTONS: f32 = RIGHT_BUTTONS * 32.0 + (RIGHT_BUTTONS - 1.0) * 4.0 + 8.0 + 8.0;
+const RIGHT_BUTTONS: f32 = if cfg!(target_arch = "wasm32") { 3.0 } else { 4.0 };
 
 /// How the mode bar fits the room left after the main menu.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

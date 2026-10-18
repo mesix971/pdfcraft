@@ -179,6 +179,12 @@ fn tool_detail(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens, g: &'static
         crate::measure_ui::panel(app, ui, t);
         return;
     }
+    // The AI assistant: its settings and conversation (a browser page can't call the services).
+    #[cfg(not(target_arch = "wasm32"))]
+    if g.id == "ai" && !phone {
+        crate::ai_ui::panel(app, ui, t);
+        return;
+    }
     // Add a stamp: the palette.
     if g.id == "stamp" {
         stamp_palette(app, ui, t);
