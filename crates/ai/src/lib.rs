@@ -386,6 +386,7 @@ pub struct ProposedEdit {
 const EDIT_TOOL: &str = "edit_text";
 const EDIT_DESCRIPTION: &str = "Propose a change to the text of the open PDF, keeping its layout: on page `page`, the passage `find` becomes `replace`. \
     Quote `find` exactly as it reads in the document, within one paragraph; the paragraph keeps its font, size, colour and box and is rewrapped. \
+    In a table, each cell is a separate paragraph: match one cell at a time (e.g. find \"152,00 €\" in one call, not a whole row). \
     Use one call per passage, and keep a replacement about as long as what it replaces so it fits. \
     The user sees every proposal and decides whether to apply them; use this only when asked to change the document itself.";
 

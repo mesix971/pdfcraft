@@ -554,20 +554,41 @@ fn text_changes(doc: &pdfcraft_engine::Document, proposed: &[(usize, ProposedEdi
             continue;
         };
         let on_page = blocks.entry(page).or_insert_with(|| doc.text_blocks(page));
-        // Where the passage reads on the page: two places are enough to know it's ambiguous.
-        let mut places =
-            on_page.iter().enumerate().flat_map(|(b, block)| find_loosely(&block.editor_text, &e.find, 2).into_iter().map(move |r| (b, r)));
-        let fate = match (places.next(), places.next()) {
-            (None, _) => Fate::NotFound(e.page),
-            (Some(_), Some(_)) => Fate::Ambiguous(e.page),
-            (Some((b, range)), None) => {
-                let taken = found.entry((page, b)).or_default();
-                if taken.iter().any(|(r, _)| r.start < range.end && range.start < r.end) {
-                    Fate::Overlaps
-                } else {
-                    taken.push((range, e.replace.clone()));
+        // Where the passage reads on the page: two matches per paragraph are enough to know it's
+        // ambiguous within one paragraph. Across paragraphs (common in tables: the same price in
+        // several cells), the model sends one edit per cell, top to bottom, so we take the first
+        // paragraph whose match hasn't been consumed by an earlier edit.
+        let mut candidates: Vec<(usize, std::ops::Range<usize>, bool)> = Vec::new();
+        for (b, block) in on_page.iter().enumerate() {
+            let hits = find_loosely(&block.editor_text, &e.find, 2);
+            let ambiguous_within = hits.len() > 1;
+            for r in hits {
+                candidates.push((b, r, ambiguous_within));
+            }
+        }
+        let fate = if candidates.is_empty() {
+            Fate::NotFound(e.page)
+        } else {
+            let mut picked = None;
+            for (b, range, ambiguous_within) in &candidates {
+                if *ambiguous_within {
+                    // Two matches in the same paragraph: quote more to be unique.
+                    continue;
+                }
+                let taken = found.entry((page, *b)).or_default();
+                if !taken.iter().any(|(r, _)| r.start < range.end && range.start < r.end) {
+                    picked = Some((*b, range.clone()));
+                    break;
+                }
+            }
+            match picked {
+                Some((b, range)) => {
+                    found.entry((page, b)).or_default().push((range, e.replace.clone()));
                     Fate::Applied
                 }
+                // If all candidates were intra-paragraph ambiguous, say Ambiguous; otherwise Overlaps.
+                None if candidates.iter().all(|(_, _, a)| *a) => Fate::Ambiguous(e.page),
+                None => Fate::Overlaps,
             }
         };
         fates.push((*i, fate));
@@ -1238,7 +1259,8 @@ mod tests {
             (2, edit("c", 1, "not in the document", "x")),
             (3, edit("d", 2, "First", "1st")),
             (4, edit("e", 1, "First paragraph", "Opening paragraph")),
-            // "paragraph" is in two paragraphs: which one is meant isn't known.
+            // "paragraph" is in two paragraphs: the first one's range overlaps edit 4, so the second
+            // paragraph's match is taken (table-cell logic: first non-consumed occurrence).
             (5, edit("f", 1, "paragraph", "section")),
             // Inside a passage another change already takes.
             (6, edit("g", 1, "teh", "the")),
@@ -1252,14 +1274,14 @@ mod tests {
                 (2, Fate::NotFound(1)),
                 (3, Fate::NoPage(2)),
                 (4, Fate::Applied),
-                (5, Fate::Ambiguous(1)),
+                (5, Fate::Applied),
                 (6, Fate::Overlaps)
             ]
         );
         assert_eq!(batch.len(), 3, "one rewrite per paragraph");
         session.apply(id, Edit::Batch { label: "Edit text".into(), edits: batch }).unwrap();
         let texts: Vec<String> = session.get(id).unwrap().text_blocks(0).into_iter().map(|b| b.text).collect();
-        for want in ["Opening paragraph here.", "Second paragraph, the typo.", "Third one, receive it."] {
+        for want in ["Opening paragraph here.", "Second section, the typo.", "Third one, receive it."] {
             assert!(texts.iter().any(|t| t == want), "{want:?} in {texts:?}");
         }
         assert_eq!(texts.len(), 3, "and nothing else: {texts:?}");
@@ -1267,6 +1289,60 @@ mod tests {
         session.undo(id).unwrap();
         let back: Vec<String> = session.get(id).unwrap().text_blocks(0).into_iter().map(|b| b.text).collect();
         assert!(back.iter().any(|t| t == "Second paragraph, teh typo."), "{back:?}");
+    }
+
+    /// In a table, several cells read the same (a price repeated in the line and the total):
+    /// the model sends one edit per cell, and each takes the next unconsumed paragraph.
+    #[test]
+    fn table_cells_with_the_same_text_are_edited_one_by_one() {
+        // Three separate paragraphs with the same text, as table cells.
+        let cell = |y: u32| format!("BT /F1 12 Tf 50 {y} Td (152,00) Tj ET\n");
+        let content = format!("{}{}{}", cell(700), cell(600), cell(500));
+        let pdf = format!(
+            "%PDF-1.7\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n\
+             2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n\
+             3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj\n\
+             4 0 obj << /Length {} >> stream\n{content}endstream endobj\n\
+             5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n\
+             trailer << /Root 1 0 R >>\n%%EOF",
+            content.len()
+        )
+        .into_bytes();
+        let mut session = pdfcraft_engine::Session::new();
+        let id = session.open("table.pdf", None, std::sync::Arc::new(pdf), None).unwrap();
+        let doc = session.get(id).unwrap();
+        assert_eq!(doc.text_blocks(0).len(), 3, "three cells with the same text");
+        let edit = |id: &str, find: &str, replace: &str| ProposedEdit { id: id.into(), page: 1, find: find.into(), replace: replace.into() };
+        let proposed = vec![(0, edit("a", "152,00", "157,50")), (1, edit("b", "152,00", "157,50")), (2, edit("c", "152,00", "157,50"))];
+        let (batch, fates) = text_changes(doc, &proposed);
+        assert_eq!(fates, vec![(0, Fate::Applied), (1, Fate::Applied), (2, Fate::Applied)]);
+        assert_eq!(batch.len(), 3, "one edit per cell");
+        session.apply(id, Edit::Batch { label: "Edit text".into(), edits: batch }).unwrap();
+        let texts: Vec<String> = session.get(id).unwrap().text_blocks(0).into_iter().map(|b| b.text).collect();
+        assert!(texts.iter().all(|t| t == "157,50"), "all three cells changed: {texts:?}");
+    }
+
+    /// A passage that appears twice *within the same paragraph* (not in separate cells) is
+    /// ambiguous: the model must quote more context to pick the right one.
+    #[test]
+    fn same_text_twice_in_one_paragraph_is_ambiguous() {
+        let content = "BT /F1 12 Tf 50 700 Td (chat chat) Tj ET\n";
+        let pdf = format!(
+            "%PDF-1.7\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n\
+             2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n\
+             3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj\n\
+             4 0 obj << /Length {} >> stream\n{content}endstream endobj\n\
+             5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n\
+             trailer << /Root 1 0 R >>\n%%EOF",
+            content.len()
+        )
+        .into_bytes();
+        let mut session = pdfcraft_engine::Session::new();
+        let id = session.open("ambig.pdf", None, std::sync::Arc::new(pdf), None).unwrap();
+        let doc = session.get(id).unwrap();
+        let edit = ProposedEdit { id: "a".into(), page: 1, find: "chat".into(), replace: "chien".into() };
+        let (_, fates) = text_changes(doc, &[(0, edit)]);
+        assert_eq!(fates, vec![(0, Fate::Ambiguous(1))]);
     }
 
     /// An answer proposing two changes, one of them for a passage that isn't there.
