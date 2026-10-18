@@ -1,6 +1,6 @@
 #[test]
 fn winit_leaves_the_keys_to_a_text_view_while_it_types() {
-    // vendor/README.md, winit patch (13). Typing itself needs a device; this keeps the patch in
+    // vendor/README.md, winit patch (15). Typing itself needs a device; this keeps the patch in
     // the vendored copy, which the workspace's tests don't build for Android.
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let android = std::fs::read_to_string(root.join("vendor/winit/src/platform_impl/android/mod.rs")).unwrap();
@@ -9,7 +9,7 @@ fn winit_leaves_the_keys_to_a_text_view_while_it_types() {
         "if KEYS_TO_VIEWS.load(Ordering::Relaxed) && key.key_code() != Keycode::Back {\n                    return InputStatus::Unhandled;"
     ));
     // And the soft keyboard: winit neither shows nor hides it for an app that does.
-    assert!(android.contains("pub fn set_ime_allowed(&self, allowed: bool) {\n        // PdfCraft patch (13)"));
+    assert!(android.contains("pub fn set_ime_allowed(&self, allowed: bool) {\n        // PdfCraft patch (15)"));
     assert!(android.contains(
         "if APP_SOFT_KEYBOARD.load(Ordering::Relaxed) || KEYS_TO_VIEWS.load(Ordering::Relaxed) {\n            return;\n        }\n        if allowed {"
     ));

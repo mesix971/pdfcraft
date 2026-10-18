@@ -45,7 +45,7 @@ impl PdfCraftApp {
     /// it closed.
     pub(crate) fn finish_phone_text(&mut self, apply: bool) -> bool {
         let Some(index) = self.active else { return false };
-        let added = self.views.get(index).and_then(|v| self.session.get(v.id)).map(|d| d.added.clone()).unwrap_or_default();
+        let added = self.views.get(index).and_then(|v| self.session.get(v.id)).map(|d| d.added().to_vec()).unwrap_or_default();
         let Some(view) = self.views.get_mut(index) else { return false };
         if let Some(ed) = view.line_editor.take() {
             let style = ed.style();
@@ -484,7 +484,7 @@ pub(crate) fn bottom_bar(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui,
     let raster = picture.is_some_and(|(page, i)| view.edit_images.get(&page).and_then(|(_, images)| images.get(i)).is_some_and(|im| !im.is_form));
     let added = view.content.selected;
     let added_text = added
-        .and_then(|(page, i)| app.session.get(view.id).and_then(|d| d.added.iter().filter(|a| a.page == page).nth(i).cloned()))
+        .and_then(|(page, i)| app.session.get(view.id).and_then(|d| d.added().iter().filter(|a| a.page == page).nth(i).cloned()))
         .is_some_and(|a| matches!(a.content, AddedContent::Text(_)));
     let tool = app.quick_tool;
     let mut pick = None;

@@ -236,6 +236,7 @@ fn every_dialog_keeps_its_controls_on_a_phone_screen() {
                 path: None,
                 saved_at: 0,
                 encrypted: true,
+                instance: None,
             }];
             app
         });
@@ -1229,7 +1230,7 @@ fn add_text_types_new_text_where_the_page_was_tapped() {
     click(&mut h, "Done");
     h.run_steps(4);
     let id = h.state().views[0].id;
-    let added = h.state().session.get(id).unwrap().added.clone();
+    let added = h.state().session.get(id).unwrap().added().to_vec();
     assert!(added.iter().any(|a| matches!(&a.content, pdfcraft_engine::AddedContent::Text(t) if t.text == "New words") && a.page == 0), "{added:?}");
     assert_eq!(h.state().quick_tool, QuickTool::EditText, "back to changing what is on the page");
 }
@@ -1300,7 +1301,7 @@ fn added_text_is_retyped_and_restyled_from_its_bar() {
     click(&mut h, "Done");
     h.run_steps(4);
     let id = h.state().views[0].id;
-    let first = |h: &Harness<'static, PdfCraftApp>| match h.state().session.get(id).unwrap().added.first().map(|a| a.content.clone()) {
+    let first = |h: &Harness<'static, PdfCraftApp>| match h.state().session.get(id).unwrap().added().first().map(|a| a.content.clone()) {
         Some(pdfcraft_engine::AddedContent::Text(t)) => Some((t.text, t.size, t.bold)),
         _ => None,
     };
@@ -1343,7 +1344,7 @@ fn a_picture_and_an_added_item_are_never_picked_together() {
     assert!(h.query_by_label("Rotate").is_some());
     // The text again: the middle of its box (display space, y up, on the 80 × 40 point page).
     let id = h.state().views[0].id;
-    let rect = match h.state().session.get(id).unwrap().added.first().map(|a| a.content.clone()) {
+    let rect = match h.state().session.get(id).unwrap().added().first().map(|a| a.content.clone()) {
         Some(pdfcraft_engine::AddedContent::Text(t)) => t.rect,
         other => panic!("the text was added: {other:?}"),
     };
@@ -1451,7 +1452,7 @@ fn a_long_press_moves_added_text_and_pictures() {
     click(&mut h, "Done");
     h.run_steps(4);
     let id = h.state().views[0].id;
-    let rect = |h: &Harness<'static, PdfCraftApp>| match h.state().session.get(id).unwrap().added.first().map(|a| a.content.clone()) {
+    let rect = |h: &Harness<'static, PdfCraftApp>| match h.state().session.get(id).unwrap().added().first().map(|a| a.content.clone()) {
         Some(pdfcraft_engine::AddedContent::Text(t)) => t.rect,
         other => panic!("the text: {other:?}"),
     };
@@ -1550,7 +1551,7 @@ fn a_finger_on_a_handle_resizes_what_is_picked() {
     click(&mut h, "Done");
     h.run_steps(4);
     let id = h.state().views[0].id;
-    let rect = |h: &Harness<'static, PdfCraftApp>| match h.state().session.get(id).unwrap().added.first().map(|a| a.content.clone()) {
+    let rect = |h: &Harness<'static, PdfCraftApp>| match h.state().session.get(id).unwrap().added().first().map(|a| a.content.clone()) {
         Some(pdfcraft_engine::AddedContent::Text(t)) => t.rect,
         other => panic!("the text: {other:?}"),
     };

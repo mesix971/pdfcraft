@@ -14,8 +14,12 @@ repository = "https://github.com/storytold/pdfcraft"
 [workspace.dependencies]
 # Shared frontend components; engines remain independent of egui.
 craft-ui = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "5c874d51eeb3de70e735c8ce87a59a7dedd47675", features = ["serde"] }
+# Quit the macOS way (#1136): ⌘Q asks about unsaved changes, and closing quits through `terminate:`.
+craft-quit = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "f58bc1a3df490992d633393d0898af0588ce882c" }
 # Shared system spooler; document composition remains in pdfcraft-print.
-craft-print = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "d991bf6792f8ade99c51358bf3c1d902c8cd96b5" }
+craft-print = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "666c358065261a2816b376fa3bb10538dbf53040" }
+# Whether a path stored in a document may be opened (GoToR link targets).
+craft-docpath = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "82a24b006eefa036b43c09a67fb9a3fbd17ffe63" }
 # internal
 pdfcraft-geom = { path = "crates/geom", version = "0.9.0-fork.1" }
 pdfcraft-filters = { path = "crates/filters", version = "0.9.0-fork.1" }
@@ -34,6 +38,8 @@ pdfcraft-xfdf = { path = "crates/xfdf", version = "0.9.0-fork.1" }
 pdfcraft-sign = { path = "crates/sign", version = "0.9.0-fork.1" }
 pdfcraft-optimize = { path = "crates/optimize", version = "0.9.0-fork.1" }
 pdfcraft-a11y = { path = "crates/a11y", version = "0.9.0-fork.1" }
+pdfcraft-oracle = { path = "crates/oracle", version = "0.9.0-fork.1" }
+pdfcraft-testkit = { path = "crates/testkit", version = "0.9.0-fork.1" }
 pdfcraft-ocr = { path = "crates/ocr", version = "0.9.0-fork.1" }
 pdfcraft-ai = { path = "crates/ai", version = "0.9.0-fork.1" }
 pdfcraft-js = { path = "crates/js", version = "0.9.0-fork.1" }
@@ -111,3 +117,4 @@ hayro-jbig2 = { path = "vendor/hayro-jbig2" }
 lopdf = { path = "vendor/lopdf" }
 winit = { path = "vendor/winit" }
 egui-wgpu = { path = "vendor/egui-wgpu" }
+vello_common = { path = "vendor/vello_common" }

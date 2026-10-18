@@ -77,14 +77,14 @@ use self::activity::{AndroidApp, ConfigurationRef, Rect};
 
 /// Leave key events (all but Back) to the activity's own views while `on`, instead of sending
 /// them to the app: for an app that shows an Android text view over its window to take typing
-/// from every input method. PdfCraft patch (13), see vendor/README.md.
+/// from every input method. PdfCraft patch (15), see vendor/README.md.
 pub fn set_keys_to_views(on: bool) {
     crate::platform_impl::KEYS_TO_VIEWS.store(on, std::sync::atomic::Ordering::Relaxed);
 }
 
 /// Leave the soft keyboard to the app while `on`: `Window::set_ime_allowed` no longer shows or
 /// hides it, for an app that does (one that types through its own Android text views). PdfCraft
-/// patch (13), see vendor/README.md.
+/// patch (15), see vendor/README.md.
 pub fn set_app_soft_keyboard(on: bool) {
     crate::platform_impl::APP_SOFT_KEYBOARD.store(on, std::sync::atomic::Ordering::Relaxed);
 }

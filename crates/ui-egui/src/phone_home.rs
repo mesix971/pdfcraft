@@ -291,11 +291,16 @@ impl PdfCraftApp {
         {
             let dialog = crate::file_dialog::AsyncFileDialog::new().add_filter("PDF", &["pdf"]);
             self.ask_one(crate::pickers::Ask::File(dialog), None, move |app, path| {
-                let tabs = app.views.len();
-                app.open_recent(&path.to_string_lossy());
-                // Opened, or already open and brought forward.
-                if app.views.len() > tabs || app.active.is_some() {
+                let path = path.to_string_lossy().into_owned();
+                app.open_recent(&path);
+                // Opened at once, or already open and brought forward: on it now. Otherwise it
+                // opens on a worker, and the action waits for it (the document active meanwhile
+                // is another one).
+                if let Some(i) = app.tab_showing(&path) {
+                    app.active = Some(i);
                     app.run_then(then);
+                } else {
+                    app.phone.then_after_open = Some((path, then));
                 }
             });
         }
@@ -304,6 +309,28 @@ impl PdfCraftApp {
             let _ = then;
             self.open_dialog();
         }
+    }
+
+    /// The Home action waiting for its file: on it once its tab shows, kept while the file is
+    /// still opening (or asks for its password), dropped once it has failed.
+    pub(crate) fn run_then_after_open(&mut self) {
+        let Some((path, then)) = self.phone.then_after_open.take() else { return };
+        if let Some(i) = self.tab_showing(&path) {
+            self.active = Some(i);
+            self.run_then(then);
+        } else if self.still_opening(&path) {
+            self.phone.then_after_open = Some((path, then));
+        }
+    }
+
+    /// The file at `path` is on its way: read on a worker, or waiting for its password.
+    fn still_opening(&self, path: &str) -> bool {
+        #[cfg(not(target_arch = "wasm32"))]
+        let reading = self.pending_opens.iter().any(|p| p.path.as_deref().is_some_and(|p| crate::same_file(p, path)));
+        // The web build reads a file the browser hands over: no path to wait on.
+        #[cfg(target_arch = "wasm32")]
+        let reading = false;
+        reading || self.password_prompt.as_ref().is_some_and(|p| p.path.as_deref().is_some_and(|p| crate::same_file(p, path)))
     }
 
     /// Run `then` on the active document.

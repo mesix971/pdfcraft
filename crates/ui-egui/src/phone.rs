@@ -191,6 +191,9 @@ pub struct PhoneState {
     pub drawer: bool,
     /// The AI assistant's screen is open over the reader.
     pub ai_open: bool,
+    /// A Home action waiting for the file it asked for, which opens on a worker: it runs once
+    /// that file's tab shows, and is dropped if the file doesn't open.
+    pub(crate) then_after_open: Option<(String, crate::phone_home::Then)>,
     /// "Keep tool selected" before the tool mode turned it on (a mode keeps its tool until Done).
     pinned_before: bool,
     /// The Go to page sheet's field.
@@ -489,6 +492,7 @@ pub(crate) fn back_key(app: &mut PdfCraftApp, ctx: &egui::Context) {
 
 /// Draw the window in the phone shell.
 pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
+    app.run_then_after_open();
     let ctx = ui.ctx().clone();
     let t = Tokens::get(&ctx);
     let screen = ctx.content_rect();

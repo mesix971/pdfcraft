@@ -77,7 +77,7 @@ Android 8.0 (API 26) or later, 64-bit ARM by default.
   `NativeActivity`'s window only gets key events, and loses the characters a keyboard map can't
   produce). What it holds shows in the field as it is typed, caret included, and a caret moved in
   the field moves the view's. The window leaves the keys to that view meanwhile (a patched winit,
-  vendor/README.md, patch 13), all but Back, which closes the keyboard. Enter in a one-line field
+  vendor/README.md, patch 15), all but Back, which closes the keyboard. Enter in a one-line field
   is its Done, so a page number, a zoom, a search or a file name takes effect (in the command
   palette, it runs the top match). A password is typed in Android's own text box instead, never in
   the field's place, and is never shown in its prefill. With a hardware keyboard, typing goes

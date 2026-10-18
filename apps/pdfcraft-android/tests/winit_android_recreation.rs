@@ -1,6 +1,6 @@
 #[test]
 fn winit_lets_each_android_activity_create_its_event_loop() {
-    // vendor/README.md, winit patch (12). Relaunching needs a device; this keeps the patch in the
+    // vendor/README.md, winit patch (14). Relaunching needs a device; this keeps the patch in the
     // vendored copy, which the workspace's tests don't build for Android.
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let android = std::fs::read_to_string(root.join("vendor/winit/src/platform_impl/android/mod.rs")).unwrap();

@@ -475,7 +475,7 @@ pub fn section_title(ui: &mut egui::Ui, text: &str) {
     ui.add_space(10.0);
     // Section titles across every panel go through here, so one translation point covers them.
     let title = tl!(text);
-    let r = ui.label(egui::RichText::new(crate::i18n::upper(title)).font(theme::semibold(10.5)).color(t.text_faint).extra_letter_spacing(0.6));
+    let r = ui.label(egui::RichText::new(crate::i18n::upper_label(text)).font(theme::semibold(10.5)).color(t.text_faint).extra_letter_spacing(0.6));
     // Named as written, not in capitals: a screen reader may spell those out.
     heading(ui, &r, title);
     ui.add_space(2.0);

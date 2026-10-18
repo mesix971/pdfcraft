@@ -9,12 +9,15 @@
 //! Encrypted documents are stored encrypted (the working file is), so recovery never writes
 //! plaintext of a protected document to disk. The web build has no recovery store yet.
 //!
-//! Several PdfCraft windows may run at once (another process each), sharing the folder. Each
-//! holds a lock on `instances/<pid>.lock` while it runs, and an entry (its key carries the
-//! process id) whose process still holds its lock is that process's: never offered for recovery
-//! nor removed by another one's clean quit.
+//! A running instance holds an exclusively locked `instance-<pid>-<n>.lock` in the folder and
+//! names it in the snapshots it writes, so a second instance can tell live autosaves from a
+//! crash's leftovers and neither offers nor discards them (#2166). The OS releases the lock
+//! when the process dies.
 
+use std::fs::{File, TryLockError};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, OnceLock};
 
 use crate::PdfCraftApp;
 
@@ -32,17 +35,110 @@ pub struct RecoveryMeta {
     pub saved_at: u64,
     /// The bytes are encrypted; recovering asks for the password.
     pub encrypted: bool,
+    /// The lock file of the instance that wrote the snapshot (see the module doc); missing in
+    /// snapshots from before it.
+    #[serde(default)]
+    pub instance: Option<String>,
 }
 
 /// The recovery folder.
 #[derive(Clone, Debug)]
 pub struct RecoveryStore {
     dir: PathBuf,
+    /// This instance's lock, held while it runs and shared by the store's clones (one store,
+    /// one instance). Unset until [`claim`](Self::claim); `Some(None)` when claiming failed
+    /// (the folder can't be written, or the platform has no file locks).
+    lock: Arc<OnceLock<Option<InstanceLock>>>,
 }
+
+/// An open, exclusively locked `instance-<pid>-<n>.lock` in the folder, released and removed
+/// with the last clone of its store.
+#[derive(Debug)]
+struct InstanceLock {
+    name: String,
+    path: PathBuf,
+    file: File,
+}
+
+impl Drop for InstanceLock {
+    fn drop(&mut self) {
+        let _ = self.file.unlock();
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
+
+/// Tells this process's stores apart: tests make several, and a dropped one's lock is free.
+static CLAIMS: AtomicU64 = AtomicU64::new(0);
 
 impl RecoveryStore {
     pub fn new(dir: impl Into<PathBuf>) -> Self {
-        Self { dir: dir.into() }
+        Self { dir: dir.into(), lock: Arc::default() }
+    }
+
+    /// Mark the folder as in use by a running instance (see the module doc). Without a lock
+    /// (the folder can't be written, or the platform has no file locks) snapshots are written
+    /// and offered as before.
+    pub fn claim(&self) {
+        self.lock.get_or_init(|| {
+            if let Err(e) = std::fs::create_dir_all(&self.dir) {
+                log::warn!("recovery folder {} can't be made: {e}", self.dir.display());
+                return None;
+            }
+            let name = format!("instance-{}-{}.lock", std::process::id(), CLAIMS.fetch_add(1, Ordering::Relaxed));
+            let path = self.dir.join(&name);
+            let locked = File::options().read(true).write(true).create(true).truncate(false).open(&path).and_then(|file| match file.try_lock() {
+                Ok(()) => Ok(file),
+                Err(TryLockError::WouldBlock) => Err(std::io::Error::new(std::io::ErrorKind::WouldBlock, "held by another instance")),
+                Err(TryLockError::Error(e)) => Err(e),
+            });
+            match locked {
+                Ok(file) => Some(InstanceLock { name, path, file }),
+                Err(e) => {
+                    let _ = std::fs::remove_file(&path);
+                    log::warn!("recovery folder {} can't be claimed: {e}", self.dir.display());
+                    None
+                }
+            }
+        });
+    }
+
+    fn own_lock(&self) -> Option<&InstanceLock> {
+        self.lock.get().and_then(Option::as_ref)
+    }
+
+    /// The name of this instance's lock file, for the snapshots it writes.
+    pub fn instance(&self) -> Option<String> {
+        self.own_lock().map(|l| l.name.clone())
+    }
+
+    /// Whether `meta` was written by another instance that is still running. A lock file that
+    /// is no longer held is a crash's leftover and is removed. The name comes from the sidecar,
+    /// which is untrusted, so only a plain `instance-….lock` name in the folder is looked at.
+    fn written_by_a_live_instance(&self, meta: &RecoveryMeta) -> bool {
+        let Some(name) = meta.instance.as_deref() else { return false };
+        if self.own_lock().is_some_and(|l| l.name == name) {
+            return false;
+        }
+        let plain = name.starts_with("instance-")
+            && name.ends_with(".lock")
+            && !name.contains("..")
+            && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.');
+        if !plain {
+            return false;
+        }
+        let path = self.dir.join(name);
+        let Ok(file) = File::options().read(true).write(true).open(&path) else { return false };
+        match file.try_lock() {
+            Err(TryLockError::WouldBlock) => true,
+            Ok(()) => {
+                let _ = file.unlock();
+                drop(file);
+                let _ = std::fs::remove_file(&path);
+                false
+            }
+            // Can't tell (no file locks here): offered, as before.
+            Err(TryLockError::Error(_)) => false,
+        }
     }
 
     /// `Recovery` in the portable data folder in portable mode ([`crate::portable`]), otherwise
@@ -73,46 +169,8 @@ impl RecoveryStore {
         let _ = std::fs::remove_file(self.dir.join(format!("{key}.pdf")));
     }
 
-    /// Mark this process as running: a lock on its file in `instances`, held as long as the
-    /// returned file is. `None` where the system can't lock files (other instances' entries are
-    /// then taken as left behind, as before).
-    pub fn claim(&self) -> Option<std::fs::File> {
-        let dir = self.dir.join("instances");
-        std::fs::create_dir_all(&dir).ok()?;
-        let file =
-            std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(dir.join(format!("{}.lock", std::process::id()))).ok()?;
-        file.try_lock().ok()?;
-        Some(file)
-    }
-
-    /// Whether entry `key` belongs to another PdfCraft that is still running: its process (named
-    /// in the key) holds its lock. One whose process is gone, or ours, is not.
-    fn running_elsewhere(&self, key: &str) -> bool {
-        // "<time>-<pid>-<document>[-<serial>]" (see `autosave_jobs`).
-        let Some(pid) = key.split('-').nth(1).and_then(|p| p.parse::<u32>().ok()) else { return false };
-        if pid == std::process::id() {
-            return false;
-        }
-        let path = self.dir.join("instances").join(format!("{pid}.lock"));
-        let Ok(file) = std::fs::OpenOptions::new().write(true).open(&path) else { return false };
-        match file.try_lock() {
-            Err(std::fs::TryLockError::WouldBlock) => true,
-            // Ours now: that process is gone, and so is its lock file.
-            Ok(()) => {
-                drop(file);
-                let _ = std::fs::remove_file(&path);
-                false
-            }
-            Err(std::fs::TryLockError::Error(_)) => false,
-        }
-    }
-
-    /// Snapshots left behind (by this process before, or by one that has ended), newest first.
-    pub fn left_behind(&self) -> Vec<RecoveryMeta> {
-        self.list().into_iter().filter(|m| !self.running_elsewhere(&m.key)).collect()
-    }
-
-    /// Snapshots, newest first. Listing never removes files; missing metadata uses the file name.
+    /// Snapshots, newest first, leaving out what another running instance is autosaving.
+    /// Listing never removes a snapshot; missing metadata uses the file name.
     pub fn list(&self) -> Vec<RecoveryMeta> {
         let Ok(dir) = std::fs::read_dir(&self.dir) else { return Vec::new() };
         let mut out = Vec::new();
@@ -140,9 +198,11 @@ impl RecoveryStore {
                     saved_at,
                     // This is only a display hint; opening the PDF still detects encryption.
                     encrypted: false,
+                    instance: None,
                 }
             }));
         }
+        out.retain(|m| !self.written_by_a_live_instance(m));
         out.sort_by_key(|m| std::cmp::Reverse(m.saved_at));
         out
     }
@@ -170,7 +230,7 @@ impl RecoveryStore {
     /// Remove every entry (clean quit, or "Discard all"), and metadata left without a snapshot;
     /// not another running PdfCraft's.
     pub fn clear(&self) {
-        for m in self.left_behind() {
+        for m in self.list() {
             self.remove(&m.key);
         }
         let Ok(dir) = std::fs::read_dir(&self.dir) else { return };
@@ -263,8 +323,8 @@ fn now_secs() -> u64 {
 impl PdfCraftApp {
     /// Turn on autosave into `store`, and look for documents a previous session left behind.
     pub fn enable_recovery(&mut self, store: RecoveryStore) {
-        self.recovery_lock = store.claim();
-        self.recoverable = store.left_behind();
+        store.claim();
+        self.recoverable = store.list();
         if !self.recoverable.is_empty() {
             self.dialog = Some(crate::Dialog::Recovery);
         }
@@ -277,6 +337,8 @@ impl PdfCraftApp {
             return Vec::new();
         }
         let mut jobs = Vec::new();
+        // The instance that writes them, so another running instance leaves them alone.
+        let instance = self.recovery.as_ref().and_then(RecoveryStore::instance);
         for snap in self.session.autosave_snapshots() {
             // Never a key used before, even within the same second for the same document: an
             // entry forgotten is never written again.
@@ -286,7 +348,10 @@ impl PdfCraftApp {
                 .entry(snap.doc)
                 .or_insert_with(|| format!("{}-{}-{}-{serial}", now_secs(), std::process::id(), snap.doc.0))
                 .clone();
-            jobs.push((RecoveryMeta { key, name: snap.name, path: snap.path, saved_at: now_secs(), encrypted: snap.encrypted }, snap.bytes));
+            jobs.push((
+                RecoveryMeta { key, name: snap.name, path: snap.path, saved_at: now_secs(), encrypted: snap.encrypted, instance: instance.clone() },
+                snap.bytes,
+            ));
         }
         jobs
     }
@@ -366,6 +431,25 @@ impl PdfCraftApp {
         let Some(store) = self.recovery.clone() else { return };
         for key in keys {
             let Some(meta) = self.recoverable.iter().find(|m| &m.key == key).cloned() else { continue };
+            #[cfg(not(target_arch = "wasm32"))]
+            if self.ctx.is_some() && !self.run_inline {
+                self.startup_superseded = true;
+                let result = self.schedule_open(crate::OpenRequest {
+                    name: meta.name.clone(),
+                    path: None,
+                    stamp: None,
+                    input: crate::open_worker::Input::Recovery(store.clone(), key.clone()),
+                    password: None,
+                    activate: true,
+                    after_open: None,
+                    recovered: Some(meta.clone()),
+                    then: None,
+                });
+                if let Err(error) = result {
+                    self.notify_fmt("Couldn't recover {name}: {e}", &[("name", &meta.name), ("e", &error)]);
+                }
+                continue;
+            }
             let bytes = match store.read(key) {
                 Ok(b) => b,
                 Err(e) => {
