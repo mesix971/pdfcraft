@@ -5043,3 +5043,39 @@ fn find_and_replace_rewrites_each_matching_paragraph() {
     assert!(find_replace(&mut same, &[0], " ", "x", options).is_err());
     assert_eq!(page_content_bytes(&same, 0), page_content_bytes(&original, 0));
 }
+
+/// A header or watermark in Times or Courier names that font, registers it on the page, and is
+/// measured with its own widths (a centred line sits at the centre in that face).
+#[test]
+fn headers_and_watermarks_use_the_chosen_standard_font() {
+    for (family, resource, base, face) in [
+        (crate::added::Family::Times, "PCTimes", "Times-Roman", pdfcraft_fonts::Std14::TimesRoman),
+        (crate::added::Family::Courier, "PCCour", "Courier", pdfcraft_fonts::Std14::Courier),
+    ] {
+        let mut doc = fixture();
+        let hf = HeaderFooter {
+            font: family,
+            text: [String::new(), "Centred title".into(), String::new(), String::new(), String::new(), String::new()],
+            ..HeaderFooter::default()
+        };
+        add_header_footer(&mut doc, &[0], &hf, false, &cx()).unwrap();
+        let doc = reopen(&doc);
+        let mark = streams(&doc, 0).last().cloned().unwrap();
+        assert!(mark.contains(&format!("/{resource} 8 Tf")), "{mark}");
+        let p0 = &pdfcraft_model::pages(&doc)[0];
+        let res = doc.resolve(p0.dict.get(b"Resources").unwrap());
+        let fonts = doc.resolve(res.as_dict().unwrap().get(b"Font").unwrap()).as_dict().cloned().unwrap();
+        let font = doc.resolve(fonts.get(resource.as_bytes()).unwrap()).as_dict().cloned().unwrap();
+        assert_eq!(font.name(b"BaseFont"), Some(base.as_bytes()));
+        let (w, _) = p0.display_size(&doc);
+        let x = (w - face.text_width("Centred title", 8.0)) / 2.0;
+        let centred = mark.split_whitespace().filter_map(|t| t.parse::<f64>().ok()).any(|v| (v - x).abs() < 0.01);
+        assert!(centred, "centred with {base} widths at {x}: {mark}");
+
+        let mut doc = fixture();
+        let wm = Watermark { text: "DRAFT".into(), font: family, ..Watermark::default() };
+        add_watermark(&mut doc, &[0], &wm, false).unwrap();
+        let mark = streams(&reopen(&doc), 0).iter().find(|s| s.contains("/PCMark /Watermark")).cloned().unwrap();
+        assert!(mark.contains(&format!("/{resource} ")), "{mark}");
+    }
+}

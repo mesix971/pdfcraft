@@ -1247,9 +1247,15 @@ impl Automation {
         let color =
             |key: &str, default: [f64; 3]| -> Result<[f64; 3]> { Ok(a.opt_str(key)?.map(comments::parse_color).transpose()?.unwrap_or(default)) };
         let replace = a.opt_bool("replace")?.unwrap_or(false);
+        let font = match a.opt_str("font")? {
+            None | Some("helvetica") => pdfcraft_engine::FontFamily::Helvetica,
+            Some("times") => pdfcraft_engine::FontFamily::Times,
+            Some("courier") => pdfcraft_engine::FontFamily::Courier,
+            Some(other) => return Err(ToolError::InvalidArgs(format!("unknown font {other:?} (helvetica, times, courier)"))),
+        };
         let edit = match tool {
             "doc_header_footer" => {
-                let mut hf = HeaderFooter::default();
+                let mut hf = HeaderFooter { font, ..HeaderFooter::default() };
                 for (k, key) in ["header_left", "header_center", "header_right", "footer_left", "footer_center", "footer_right"].iter().enumerate() {
                     hf.text[k] = a.opt_str(key)?.unwrap_or_default().to_string();
                 }
@@ -1277,6 +1283,7 @@ impl Automation {
                     text,
                     source: None,
                     scale: a.opt_num("scale")?.unwrap_or(d.scale).clamp(0.01, 1.0),
+                    font,
                     font_size: a.opt_num("font_size")?.unwrap_or(0.0),
                     color: color("color", d.color)?,
                     opacity: a.opt_num("opacity")?.unwrap_or(d.opacity),

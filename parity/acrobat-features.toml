@@ -2402,7 +2402,7 @@ status = "shipped"
 commands = ["edit.header_footer"]
 tools = ["doc_header_footer"]
 evidence = ["crates/ui-egui/tests/ui_group/marks.rs::header_and_footer_dialog_inserts_tokens_and_applies_to_a_subset", "crates/edit/src/tests.rs::header_and_footer_are_drawn_in_display_space_and_wrap_the_original_content", "crates/engine/src/tests.rs::headers_footers_watermarks_and_backgrounds_show_update_and_remove"]
-notes = "Helvetica only (no font choice yet); drawn in display space on rotated pages; artifact-tagged"
+notes = "Helvetica, Times or Courier (regular; doc_header_footer font), measured with that face's widths; drawn in display space on rotated pages; artifact-tagged. Not yet: bold or italic, or a document or installed font"
 
 [[feature]]
 id = "edit.header-footer-update-remove"
@@ -2462,7 +2462,7 @@ status = "shipped"
 commands = ["edit.watermark"]
 tools = ["doc_watermark"]
 evidence = ["crates/edit/src/tests.rs::watermarks_rotate_fade_and_can_go_behind", "crates/ui-egui/tests/ui_group/marks.rs::watermark_and_background_dialogs", "crates/automation/tests/automation.rs::headers_watermarks_and_backgrounds_through_tools"]
-notes = "Helvetica; fit-to-page or a size"
+notes = "Helvetica, Times or Courier (doc_watermark font); fit-to-page or a size"
 
 [[feature]]
 id = "edit.watermark-add-file"

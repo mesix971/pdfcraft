@@ -15,7 +15,7 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 use pdfcraft_cos::{Dict, Document, Object, Stream};
-use pdfcraft_fonts::{helvetica_width, literal, win_ansi};
+use pdfcraft_fonts::{literal, win_ansi};
 
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum EditError {
@@ -57,6 +57,8 @@ pub struct HeaderFooter {
     /// `<<m/d/yy>>`, `<<mmmm d, yyyy>>`, and Bates numbers `<<Bates Number#6#1#PRE#SUF>>`
     /// (digits, start, prefix, suffix).
     pub text: [String; 6],
+    /// A standard family (regular weight).
+    pub font: crate::added::Family,
     pub font_size: f64,
     pub color: Rgb,
     pub underline: bool,
@@ -69,7 +71,15 @@ pub struct HeaderFooter {
 impl Default for HeaderFooter {
     /// Acrobat's defaults: 8 pt black, margins 0.5 in top and bottom, 1 in left and right.
     fn default() -> Self {
-        Self { text: Default::default(), font_size: 8.0, color: [0.0; 3], underline: false, margins: [36.0, 36.0, 72.0, 72.0], start_number: 1 }
+        Self {
+            text: Default::default(),
+            font: crate::added::Family::Helvetica,
+            font_size: 8.0,
+            color: [0.0; 3],
+            underline: false,
+            margins: [36.0, 36.0, 72.0, 72.0],
+            start_number: 1,
+        }
     }
 }
 
@@ -102,6 +112,8 @@ pub struct Watermark {
     pub source: Option<MarkSource>,
     /// Pictures: size relative to the page (1.0 fits the page).
     pub scale: f64,
+    /// A standard family (regular weight) for text.
+    pub font: crate::added::Family,
     /// 0 = fit: about half the page diagonal.
     pub font_size: f64,
     pub color: Rgb,
@@ -132,6 +144,7 @@ impl Default for Watermark {
             text: String::new(),
             source: None,
             scale: 0.5,
+            font: crate::added::Family::Helvetica,
             font_size: 0.0,
             color: [0.6, 0.6, 0.6],
             opacity: 0.5,
@@ -292,6 +305,15 @@ fn contents(doc: &mut Document, page: &pdfcraft_model::Page) -> Result<Vec<Objec
         Some(Object::Array(a)) => a,
         Some(other) => vec![Object::Ref(doc.add(other))],
     })
+}
+
+/// The page resource and standard-14 metrics a mark's text uses for `family`.
+fn mark_font(family: crate::added::Family) -> (&'static str, pdfcraft_fonts::Std14) {
+    match family {
+        crate::added::Family::Helvetica => ("PCHelv", pdfcraft_fonts::Std14::Helvetica),
+        crate::added::Family::Times => ("PCTimes", pdfcraft_fonts::Std14::TimesRoman),
+        crate::added::Family::Courier => ("PCCour", pdfcraft_fonts::Std14::Courier),
+    }
 }
 
 /// Add the font (and an opacity state) to the page's own resources.
@@ -613,7 +635,8 @@ pub fn add_header_footer(doc: &mut Document, pages: &[usize], hf: &HeaderFooter,
         let bates = bates0.checked_add(k as u64).ok_or_else(|| EditError::Invalid("the Bates numbers are too large".into()))?;
         let size = hf.font_size;
         let [top, bottom, left, right] = hf.margins;
-        let mut body: Vec<u8> = format!("BT\n/PCHelv {} Tf\n{}\n", n(size), rgb(hf.color)).into_bytes();
+        let (resource, face) = mark_font(hf.font);
+        let mut body: Vec<u8> = format!("BT\n/{resource} {} Tf\n{}\n", n(size), rgb(hf.color)).into_bytes();
         let mut underlines = String::new();
         for (slot, template) in hf.text.iter().enumerate() {
             if template.trim().is_empty() {
@@ -623,7 +646,7 @@ pub fn add_header_footer(doc: &mut Document, pages: &[usize], hf: &HeaderFooter,
             let header = slot < 3;
             let line_h = size * 1.2;
             for (li, line) in lines.iter().enumerate() {
-                let tw = helvetica_width(line, size);
+                let tw = face.text_width(line, size);
                 let x = match slot % 3 {
                     0 => left,
                     1 => (w - tw) / 2.0,
@@ -644,7 +667,7 @@ pub fn add_header_footer(doc: &mut Document, pages: &[usize], hf: &HeaderFooter,
         let mut content = begin(MarkKind::HeaderFooter, "Header", page.view_matrix(doc)).into_bytes();
         content.extend(body);
         content.extend_from_slice(END.as_bytes());
-        add_resources(doc, page, None, None)?;
+        add_resources(doc, page, None, Some(&content))?;
         let page = &page_list(doc)[i];
         place(doc, page, MarkKind::HeaderFooter, content, false)?;
     }
@@ -689,14 +712,15 @@ pub fn add_watermark(doc: &mut Document, pages: &[usize], wm: &Watermark, replac
             place(doc, page, MarkKind::Watermark, content.into_bytes(), wm.behind)?;
             continue;
         }
-        let widest = lines.iter().map(|l| helvetica_width(l, 1.0)).fold(0.0, f64::max).max(0.01);
+        let (resource, face) = mark_font(wm.font);
+        let widest = lines.iter().map(|l| face.text_width(l, 1.0)).fold(0.0, f64::max).max(0.01);
         let size = if wm.font_size > 0.0 { wm.font_size } else { ((w * w + h * h).sqrt() * 0.5 / widest).clamp(6.0, 300.0) };
         let (s, c) = wm.rotation.to_radians().sin_cos();
         let (cx, cy) = (w / 2.0 + wm.offset[0], h / 2.0 + wm.offset[1]);
         let mut content = begin(MarkKind::Watermark, "Watermark", page.view_matrix(doc)).into_bytes();
         content.extend(
             format!(
-                "/PCGS{} gs\n{} {} {} {} {} {} cm\nBT\n/PCHelv {} Tf\n{}\n",
+                "/PCGS{} gs\n{} {} {} {} {} {} cm\nBT\n/{resource} {} Tf\n{}\n",
                 (opacity * 100.0).round() as i64,
                 n(c),
                 n(s),
@@ -712,12 +736,12 @@ pub fn add_watermark(doc: &mut Document, pages: &[usize], wm: &Watermark, replac
         let line_h = size * 1.15;
         let total = line_h * (lines.len() as f64 - 1.0);
         for (li, line) in lines.iter().enumerate() {
-            let tw = helvetica_width(line, size);
+            let tw = face.text_width(line, size);
             content.extend(text_op(-tw / 2.0, total / 2.0 - li as f64 * line_h - size * 0.35, line));
         }
         content.extend_from_slice(b"ET\n");
         content.extend_from_slice(END.as_bytes());
-        add_resources(doc, &page, Some(opacity), None)?;
+        add_resources(doc, &page, Some(opacity), Some(&content))?;
         let page = &page_list(doc)[i];
         place(doc, page, MarkKind::Watermark, content, wm.behind)?;
     }

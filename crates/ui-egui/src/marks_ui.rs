@@ -168,7 +168,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
     match kind {
         MarkKind::HeaderFooter => {
             widgets::row(ui, |ui| {
-                ui.label(tl!("Font: Helvetica"));
+                font_combo(ui, "header-footer-font", &mut d.hf.font);
                 ui.label(tl!("Size"));
                 ui.add(egui::DragValue::new(&mut d.hf.font_size).range(4.0..=72.0).speed(0.5));
                 ui.add(widgets::checkbox(&mut d.hf.underline, tl!("Underline")));
@@ -257,6 +257,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
                         );
                     });
                     widgets::row(ui, |ui| {
+                        ui.add_enabled_ui(!d.use_file, |ui| font_combo(ui, "watermark-font", &mut d.wm.font));
                         ui.add_enabled_ui(!d.use_file, |ui| ui.add(widgets::checkbox(&mut d.fit, tl!("Fit to page"))));
                         ui.add_enabled_ui(!d.fit, |ui| {
                             ui.label(tl!("Size"));
@@ -510,6 +511,17 @@ pub fn edit(d: &MarksDraft, kind: MarkKind, count: usize) -> Edit {
         }
         MarkKind::Background => Edit::AddBackground { pages, settings: d.bg.clone(), replace: d.replace, file: mark_file(d) },
     }
+}
+
+/// The standard family a mark's text is drawn in.
+fn font_combo(ui: &mut egui::Ui, id: &str, font: &mut pdfcraft_engine::FontFamily) {
+    use pdfcraft_engine::FontFamily as F;
+    ui.label(tl!("Font:"));
+    crate::widgets::combo(id).selected_text(font.label()).width(110.0).show_ui(ui, |ui| {
+        for f in [F::Helvetica, F::Times, F::Courier] {
+            ui.selectable_value(font, f, f.label());
+        }
+    });
 }
 
 #[cfg(test)]
