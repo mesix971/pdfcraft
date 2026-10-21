@@ -548,31 +548,23 @@ fn text_changes(doc: &pdfcraft_engine::Document, proposed: &[(usize, ProposedEdi
     // (page, paragraph) → its places.
     let mut found: BTreeMap<(usize, usize), Places> = BTreeMap::new();
     let mut fates = Vec::new();
-    for (i, e) in proposed {
-        let Some(page) = e.page.checked_sub(1).filter(|p| *p < pages) else {
-            fates.push((*i, Fate::NoPage(e.page)));
-            continue;
-        };
-        let on_page = blocks.entry(page).or_insert_with(|| doc.text_blocks(page));
-        // Where the passage reads on the page: two matches per paragraph are enough to know it's
-        // ambiguous within one paragraph. Across paragraphs (common in tables: the same price in
-        // several cells), the model sends one edit per cell, top to bottom, so we take the first
-        // paragraph whose match hasn't been consumed by an earlier edit.
-        let mut candidates: Vec<(usize, std::ops::Range<usize>, bool)> = Vec::new();
-        for (b, block) in on_page.iter().enumerate() {
-            let hits = find_loosely(&block.editor_text, &e.find, 2);
-            let ambiguous_within = hits.len() > 1;
-            for r in hits {
-                candidates.push((b, r, ambiguous_within));
+    // Try to place one edit in a paragraph. Returns the fate.
+    let place_one =
+        |page: usize, find: &str, replace: &str, on_page: &[pdfcraft_engine::TextBlock], found: &mut BTreeMap<(usize, usize), Places>| -> Fate {
+            let mut candidates: Vec<(usize, std::ops::Range<usize>, bool)> = Vec::new();
+            for (b, block) in on_page.iter().enumerate() {
+                let hits = find_loosely(&block.editor_text, find, 2);
+                let ambiguous_within = hits.len() > 1;
+                for r in hits {
+                    candidates.push((b, r, ambiguous_within));
+                }
             }
-        }
-        let fate = if candidates.is_empty() {
-            Fate::NotFound(e.page)
-        } else {
+            if candidates.is_empty() {
+                return Fate::NotFound(page + 1);
+            }
             let mut picked = None;
             for (b, range, ambiguous_within) in &candidates {
                 if *ambiguous_within {
-                    // Two matches in the same paragraph: quote more to be unique.
                     continue;
                 }
                 let taken = found.entry((page, *b)).or_default();
@@ -583,14 +575,32 @@ fn text_changes(doc: &pdfcraft_engine::Document, proposed: &[(usize, ProposedEdi
             }
             match picked {
                 Some((b, range)) => {
-                    found.entry((page, b)).or_default().push((range, e.replace.clone()));
+                    found.entry((page, b)).or_default().push((range, replace.to_owned()));
                     Fate::Applied
                 }
-                // If all candidates were intra-paragraph ambiguous, say Ambiguous; otherwise Overlaps.
-                None if candidates.iter().all(|(_, _, a)| *a) => Fate::Ambiguous(e.page),
+                None if candidates.iter().all(|(_, _, a)| *a) => Fate::Ambiguous(page + 1),
                 None => Fate::Overlaps,
             }
         };
+    for (i, e) in proposed {
+        let Some(page) = e.page.checked_sub(1).filter(|p| *p < pages) else {
+            fates.push((*i, Fate::NoPage(e.page)));
+            continue;
+        };
+        let on_page = blocks.entry(page).or_insert_with(|| doc.text_blocks(page));
+        let mut fate = place_one(page, &e.find, &e.replace, on_page, &mut found);
+        // A table row quoted as one passage: each cell is its own paragraph.
+        if matches!(fate, Fate::NotFound(_)) {
+            let taken = |b: usize, r: &std::ops::Range<usize>| {
+                found.get(&(page, b)).is_some_and(|places| places.iter().any(|(p, _)| p.start < r.end && r.start < p.end))
+            };
+            if let Some(parts) = across_paragraphs(on_page, &e.find, &e.replace, taken) {
+                for (b, range, text) in parts {
+                    found.entry((page, b)).or_default().push((range, text));
+                }
+                fate = Fate::Applied;
+            }
+        }
         fates.push((*i, fate));
     }
     // Later paragraphs first on each page: should a rewrite ever change where its paragraph
@@ -599,6 +609,9 @@ fn text_changes(doc: &pdfcraft_engine::Document, proposed: &[(usize, ProposedEdi
         .into_iter()
         .rev()
         .filter_map(|((page, block), mut places)| {
+            if places.is_empty() {
+                return None;
+            }
             let mut text = blocks.get(&page)?.get(block)?.editor_text.clone();
             // From the end, so each range still points where it did in the original text.
             places.sort_by_key(|(r, _)| std::cmp::Reverse(r.start));
@@ -614,6 +627,198 @@ fn text_changes(doc: &pdfcraft_engine::Document, proposed: &[(usize, ProposedEdi
     (edits, fates)
 }
 
+/// Curly quotes and dashes read as their plain forms when matching a quoted passage.
+fn fold_char(c: char) -> char {
+    match c {
+        '\u{2018}' | '\u{2019}' | '\u{02BC}' => '\'',
+        '\u{201C}' | '\u{201D}' => '"',
+        '\u{2010}' | '\u{2011}' | '\u{2013}' | '\u{2014}' => '-',
+        c => c,
+    }
+}
+
+/// The words of `text` (split at whitespace): where each sits, and how it reads folded.
+fn words(text: &str) -> Vec<(std::ops::Range<usize>, String)> {
+    let mut out = Vec::new();
+    let mut start = None;
+    for (at, c) in text.char_indices().chain(std::iter::once((text.len(), ' '))) {
+        match (c.is_whitespace(), start) {
+            (false, None) => start = Some(at),
+            (true, Some(s)) => {
+                out.push((s..at, text.get(s..at).unwrap_or_default().chars().map(fold_char).collect()));
+                start = None;
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+/// Paragraphs one cross-paragraph passage may span, and the words either side may have: past
+/// these it is not a table row, and the alignment below is quadratic in the words.
+const MAX_SPAN: usize = 16;
+const MAX_SPAN_WORDS: usize = 200;
+
+/// A passage spanning consecutive paragraphs of a page, as a model quotes a table row whose
+/// cells are each a paragraph: where it reads (ending the first paragraph, covering the middle
+/// ones, starting the last) and, for each paragraph, its part of `replace`. Words that read the
+/// same in both anchor the replacement; the words between anchors go to the paragraphs of the
+/// words they replace, one for one when the counts match. `None` when the passage does not read
+/// across paragraphs or the replacement cannot be shared out unambiguously; `taken` refuses a
+/// place another change already has.
+fn across_paragraphs(
+    blocks: &[pdfcraft_engine::TextBlock],
+    find: &str,
+    replace: &str,
+    taken: impl Fn(usize, &std::ops::Range<usize>) -> bool,
+) -> Option<Vec<(usize, std::ops::Range<usize>, String)>> {
+    let wanted: Vec<String> = words(find).into_iter().map(|(_, w)| w).collect();
+    let new: Vec<(std::ops::Range<usize>, String)> = words(replace);
+    if wanted.len() < 2 || wanted.len() > MAX_SPAN_WORDS || new.len() > MAX_SPAN_WORDS {
+        return None;
+    }
+    let para: Vec<Vec<(std::ops::Range<usize>, String)>> = blocks.iter().map(|b| words(&b.editor_text)).collect();
+    // Each part: (paragraph, its first and past-last word matched).
+    let mut found: Option<Vec<(usize, usize, usize)>> = None;
+    'start: for (b, ws) in para.iter().enumerate() {
+        for s in 0..ws.len() {
+            let mut parts = Vec::new();
+            let (mut p, mut k, mut at) = (b, s, 0usize);
+            while let Some(pw) = para.get(p) {
+                let first = k;
+                while let (Some((_, w)), Some(x)) = (pw.get(k), wanted.get(at))
+                    && w == x
+                {
+                    k += 1;
+                    at += 1;
+                }
+                if k == first {
+                    break;
+                }
+                parts.push((p, first, k));
+                if at == wanted.len() {
+                    if parts.len() > 1 && !parts.iter().any(|&(p, a, z)| range_of(&para, p, a, z).is_some_and(|r| taken(p, &r))) {
+                        found = Some(parts);
+                        break 'start;
+                    }
+                    break;
+                }
+                // Only a paragraph read to its end continues into the next one with words.
+                if k < pw.len() || parts.len() >= MAX_SPAN {
+                    break;
+                }
+                p += 1;
+                while para.get(p).is_some_and(Vec::is_empty) {
+                    p += 1;
+                }
+                k = 0;
+            }
+        }
+    }
+    let parts = found?;
+    // Which part each wanted word belongs to.
+    let owner: Vec<usize> = parts.iter().enumerate().flat_map(|(i, &(_, a, z))| std::iter::repeat_n(i, z - a)).collect();
+    let folded: Vec<&str> = new.iter().map(|(_, w)| w.as_str()).collect();
+    let anchors = common_words(&wanted, &folded);
+    let mut share: Vec<Vec<usize>> = vec![Vec::new(); parts.len()];
+    // Between consecutive anchors (and the ends), the replaced words and their replacements.
+    let mut prev: Option<(usize, usize)> = None;
+    for next in anchors.iter().copied().map(Some).chain(std::iter::once(None)) {
+        let (fa, ra) = prev.map_or((0, 0), |(f, r)| (f + 1, r + 1));
+        let (fb, rb) = next.unwrap_or((wanted.len(), new.len()));
+        let gap_old = owner.get(fa..fb)?;
+        let fresh = ra..rb;
+        if !fresh.is_empty() {
+            if gap_old.len() == fresh.len() {
+                for (o, r) in gap_old.iter().zip(fresh) {
+                    share.get_mut(*o)?.push(r);
+                }
+            } else if let Some(&o) = gap_old.first().filter(|o| gap_old.iter().all(|x| x == *o)) {
+                share.get_mut(o)?.extend(fresh);
+            } else if gap_old.is_empty() {
+                // Inserted words join the paragraph of the word before them (or after, at the start).
+                let o = prev.and_then(|(f, _)| owner.get(f)).or_else(|| next.and_then(|(f, _)| owner.get(f)))?;
+                share.get_mut(*o)?.extend(fresh);
+            } else {
+                return None;
+            }
+        }
+        if let Some((f, r)) = next {
+            share.get_mut(*owner.get(f)?)?.push(r);
+        }
+        prev = next;
+    }
+    let mut out = Vec::new();
+    for (i, &(p, a, z)) in parts.iter().enumerate() {
+        let text = &blocks.get(p)?.editor_text;
+        let pw = para.get(p)?;
+        let mine = share.get(i)?;
+        let range = range_of(&para, p, a, z)?;
+        let mut joined = String::new();
+        for (n, r) in mine.iter().enumerate() {
+            if n > 0 {
+                // One for one: keep the paragraph's own separators (a cell's line break stays one).
+                let sep = if mine.len() == z - a {
+                    let before = pw.get(a + n - 1)?.0.end;
+                    let after = pw.get(a + n)?.0.start;
+                    text.get(before..after).unwrap_or(" ")
+                } else {
+                    " "
+                };
+                joined.push_str(sep);
+            }
+            joined.push_str(replace.get(new.get(*r)?.0.clone())?);
+        }
+        // A cell the change leaves as it reads is not rewritten (a rewrite may change its font).
+        if text.get(range.clone()) != Some(joined.as_str()) {
+            out.push((p, range, joined));
+        }
+    }
+    Some(out)
+}
+
+/// The byte range of words `a..z` of paragraph `p`.
+fn range_of(para: &[Vec<(std::ops::Range<usize>, String)>], p: usize, a: usize, z: usize) -> Option<std::ops::Range<usize>> {
+    let ws = para.get(p)?;
+    Some(ws.get(a)?.0.start..ws.get(z.checked_sub(1)?)?.0.end)
+}
+
+/// The longest common subsequence of `a` and `b`, as index pairs in order.
+fn common_words(a: &[String], b: &[&str]) -> Vec<(usize, usize)> {
+    let (n, m) = (a.len(), b.len());
+    // len[i][j]: the LCS of a[i..] and b[j..]; both are capped by MAX_SPAN_WORDS.
+    let mut len = vec![vec![0u16; m + 1]; n + 1];
+    for i in (0..n).rev() {
+        for j in (0..m).rev() {
+            let v = if a.get(i).map(String::as_str) == b.get(j).copied() {
+                len.get(i + 1).and_then(|r| r.get(j + 1)).map_or(1, |x| x.saturating_add(1))
+            } else {
+                let down = len.get(i + 1).and_then(|r| r.get(j)).copied().unwrap_or(0);
+                let right = len.get(i).and_then(|r| r.get(j + 1)).copied().unwrap_or(0);
+                down.max(right)
+            };
+            if let Some(cell) = len.get_mut(i).and_then(|r| r.get_mut(j)) {
+                *cell = v;
+            }
+        }
+    }
+    let at = |i: usize, j: usize| len.get(i).and_then(|r| r.get(j)).copied().unwrap_or(0);
+    let mut out = Vec::new();
+    let (mut i, mut j) = (0, 0);
+    while i < n && j < m {
+        if a.get(i).map(String::as_str) == b.get(j).copied() {
+            out.push((i, j));
+            i += 1;
+            j += 1;
+        } else if at(i + 1, j) >= at(i, j + 1) {
+            i += 1;
+        } else {
+            j += 1;
+        }
+    }
+    out
+}
+
 /// Where `needle` reads in `hay` (at most `limit` places, none overlapping), as byte ranges of
 /// `hay`: whitespace runs count as one space (a paragraph's line breaks read as spaces), and
 /// curly quotes and dashes as their plain forms.
@@ -625,12 +830,7 @@ fn find_loosely(hay: &str, needle: &str, limit: usize) -> Vec<std::ops::Range<us
     if hay.len() > MAX_LOOSE {
         return hay.match_indices(needle).take(limit).filter_map(|(at, m)| Some(at..at.checked_add(m.len())?)).collect();
     }
-    let fold = |c: char| match c {
-        '\u{2018}' | '\u{2019}' | '\u{02BC}' => '\'',
-        '\u{201C}' | '\u{201D}' => '"',
-        '\u{2010}' | '\u{2011}' | '\u{2013}' | '\u{2014}' => '-',
-        c => c,
-    };
+    let fold = fold_char;
     // The folded text, and for each of its bytes where its character starts in `hay`.
     let mut folded = String::with_capacity(hay.len());
     let mut origin: Vec<usize> = Vec::with_capacity(hay.len() + 1);
@@ -1343,6 +1543,107 @@ mod tests {
         let edit = ProposedEdit { id: "a".into(), page: 1, find: "chat".into(), replace: "chien".into() };
         let (_, fates) = text_changes(doc, &[(0, edit)]);
         assert_eq!(fates, vec![(0, Fate::Ambiguous(1))]);
+    }
+
+    /// A one-page Helvetica PDF drawing `content`.
+    fn page_pdf(content: &str) -> Vec<u8> {
+        format!(
+            "%PDF-1.7\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n\
+             2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n\
+             3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj\n\
+             4 0 obj << /Length {} >> stream\n{content}endstream endobj\n\
+             5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n\
+             trailer << /Root 1 0 R >>\n%%EOF",
+            content.len()
+        )
+        .into_bytes()
+    }
+
+    /// A table row: three cells, the middle one on two lines.
+    const ROW: &str = "BT /F1 12 Tf 50 700 Td (Total HT) Tj ET\n\
+                       BT /F1 12 Tf 200 700 Td (152,00 EUR) Tj ET\n\
+                       BT /F1 12 Tf 350 700 Td (30,40 EUR) Tj 0 -14 Td ((20.0 %)) Tj ET\n";
+
+    /// What becomes of a change, the paragraphs it rewrites (number, new text) and the page's
+    /// paragraphs before it.
+    type Rewritten = (Vec<(usize, Fate)>, Vec<(usize, String)>, Vec<String>);
+
+    /// The text each change gives its paragraph, in paragraph order.
+    fn rewritten(content: &str, find: &str, replace: &str) -> Rewritten {
+        let mut session = pdfcraft_engine::Session::new();
+        let id = session.open("row.pdf", None, std::sync::Arc::new(page_pdf(content)), None).unwrap();
+        let doc = session.get(id).unwrap();
+        let before = doc.text_blocks(0).into_iter().map(|b| b.editor_text).collect();
+        let edit = ProposedEdit { id: "a".into(), page: 1, find: find.into(), replace: replace.into() };
+        let (edits, fates) = text_changes(doc, &[(0, edit)]);
+        let mut texts: Vec<(usize, String)> = edits
+            .into_iter()
+            .filter_map(|e| match e {
+                Edit::EditTextBlock { block, text, .. } => Some((block, text)),
+                _ => None,
+            })
+            .collect();
+        texts.sort();
+        (fates, texts, before)
+    }
+
+    /// A model quotes a table row as one passage, cells separated by spaces (or line breaks): each
+    /// cell is its own paragraph, and each gets its own part of the replacement.
+    #[test]
+    fn a_table_row_quoted_as_one_passage_edits_each_cell() {
+        for (find, replace) in [
+            ("Total HT 152,00 EUR 30,40 EUR", "Total HT 157,50 EUR 31,50 EUR"),
+            ("Total HT\n152,00 EUR\n30,40 EUR", "Total HT\n157,50 EUR\n31,50 EUR"),
+        ] {
+            let (fates, texts, before) = rewritten(ROW, find, replace);
+            assert_eq!(fates, vec![(0, Fate::Applied)], "{find:?} in {before:?}");
+            let cells: Vec<&str> = texts.iter().map(|(_, t)| t.as_str()).collect();
+            // The unchanged label is rewritten as it was; the two price cells change.
+            assert!(cells.contains(&"157,50 EUR"), "{cells:?} from {before:?}");
+            assert!(cells.iter().any(|c| c.starts_with("31,50 EUR") && c.ends_with("(20.0 %)")), "{cells:?} from {before:?}");
+        }
+    }
+
+    /// Words of a cell kept on two lines keep their line break when replaced one for one.
+    #[test]
+    fn a_cell_keeps_its_line_break() {
+        let (fates, texts, before) = rewritten(ROW, "152,00 EUR 30,40 EUR (20.0 %)", "157,50 EUR 31,50 EUR (20.0 %)");
+        assert_eq!(fates, vec![(0, Fate::Applied)], "{before:?}");
+        let old = before.iter().find(|t| t.starts_with("30,40")).unwrap();
+        let new = &texts.iter().find(|(_, t)| t.starts_with("31,50")).unwrap().1;
+        assert_eq!(new, &old.replace("30,40", "31,50"));
+    }
+
+    /// A changed number of words is shared out by the words both sides keep.
+    #[test]
+    fn a_longer_replacement_goes_to_the_cell_it_replaces() {
+        let (fates, texts, before) = rewritten(ROW, "Total HT 152,00 EUR", "Total hors taxes 152,00 EUR");
+        assert_eq!(fates, vec![(0, Fate::Applied)], "{before:?}");
+        assert!(texts.iter().any(|(_, t)| t == "Total hors taxes"), "{texts:?}");
+    }
+
+    /// A passage with a word no cell has is not found, and changes nothing.
+    #[test]
+    fn a_row_with_a_missing_word_changes_nothing() {
+        let (fates, texts, _) = rewritten(ROW, "Total HT INTROUVABLE 152,00 EUR", "Total HT X 157,50 EUR");
+        assert_eq!(fates, vec![(0, Fate::NotFound(1))]);
+        assert!(texts.is_empty(), "{texts:?}");
+    }
+
+    /// A passage must run on from where a cell ends: words from the middle of two cells are not
+    /// one passage.
+    #[test]
+    fn a_passage_skipping_the_end_of_a_cell_is_not_found() {
+        let (fates, texts, _) = rewritten(ROW, "30,40 EUR Total", "31,50 EUR Total");
+        assert_eq!(fates, vec![(0, Fate::NotFound(1))]);
+        assert!(texts.is_empty(), "{texts:?}");
+    }
+
+    #[test]
+    fn common_words_are_the_longest_shared_run() {
+        let a: Vec<String> = ["a", "b", "c", "d"].map(String::from).to_vec();
+        assert_eq!(common_words(&a, &["a", "x", "c", "d"]), vec![(0, 0), (2, 2), (3, 3)]);
+        assert_eq!(common_words(&a, &[]), vec![]);
     }
 
     /// An answer proposing two changes, one of them for a passage that isn't there.
