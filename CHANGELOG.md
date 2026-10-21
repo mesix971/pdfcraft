@@ -3,6 +3,12 @@
 Une ligne par version publiée ([semver](https://semver.org/lang/fr/)) : date et résumé. Avant
 0.8.0, l'historique est dans `ROADMAP.md` et `git log`.
 
+- **0.9.0-fork.3** (2026-10-21) — Modifier un PDF rattrape Acrobat : exposant/indice, listes,
+  espace entre paragraphes (aussi sur téléphone, avec police, interligne et couleur libre) ;
+  rechercher et remplacer ; pièces jointes (joindre, décrire, supprimer) ; lien sur des mots
+  sélectionnés ; aligner/répartir les objets et premier/arrière-plan des éléments ajoutés ;
+  recadrage au doigt ; police des en-têtes, pieds de page et filigranes ; suppression Bates ;
+  modifier une image avec l'éditeur du système. L'IA modifie chaque cellule d'une ligne de tableau.
 - **0.9.0-fork.2** (2026-10-18) — Assistant IA : la zone de question s'agrandit avec le message
   (jusqu'à six lignes, puis elle défile ; Entrée envoie, Maj+Entrée va à la ligne) ; d'autres
   modèles Claude au choix (Opus 5, 4.8, 4.7, 4.6, Sonnet 5, 4.6, Haiku 4.5), avec leurs prix.
