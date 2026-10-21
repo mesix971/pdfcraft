@@ -36,6 +36,8 @@ mod appearance;
 pub mod canvas;
 mod chrome;
 mod combine_grid;
+#[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
+mod external_image;
 mod image_pick;
 mod tags_ui;
 pub use combine_grid::ThumbState as CombineThumb;
@@ -728,6 +730,9 @@ pub struct PdfCraftApp {
     pub split_draft: SplitDraft,
     pub extract_draft: ExtractDraft,
     pub find_replace_draft: FindReplaceDraft,
+    /// A picture out in the system's image editor (Edit Image Using).
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
+    pub(crate) external_image: Option<external_image::ExternalImage>,
     pub rotate_draft: RotateDraft,
     /// Summarize Comments: sort order.
     pub summary_sort: pdfcraft_engine::SummarySort,
@@ -1100,6 +1105,8 @@ impl PdfCraftApp {
             split_draft: SplitDraft::default(),
             extract_draft: ExtractDraft::default(),
             find_replace_draft: FindReplaceDraft::default(),
+            #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
+            external_image: None,
             rotate_draft: RotateDraft::default(),
             summary_sort: Default::default(),
             sign_draft: None,
@@ -3294,6 +3301,14 @@ impl eframe::App for PdfCraftApp {
                 worker.set_context(ctx);
             }
             self.poll_pending_opens();
+        }
+        #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
+        {
+            let now = ctx.input(|i| i.time);
+            self.poll_external_image(now);
+            if self.external_image.is_some() {
+                ctx.request_repaint_after(std::time::Duration::from_secs(1));
+            }
         }
         // Chinese wants its own faces before the Japanese ones (one baseline per line).
         let cjk = theme::CjkPreference::for_language(lang.code());

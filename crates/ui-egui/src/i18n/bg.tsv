@@ -2583,3 +2583,9 @@ decimal separator	.	,
 	{n} replaced.	Заменени: {n}.
 	Remove Bates numbering	Премахване на номерацията Bates
 	This document has no Bates numbers PdfCraft added.	Този документ няма номера Bates, добавени от PdfCraft.
+	Edit Image Using…	Редактиране на изображението с…
+	Opens the picture in your image editor; each save there updates the PDF.	Отваря изображението в редактора ви; всяко записване там обновява PDF файла.
+	The picture is open in your image editor: save it there to update the PDF.	Изображението е отворено в редактора: запишете го там, за да обновите PDF файла.
+	The picture was updated from your image editor.	Изображението е обновено от редактора.
+	The edited picture is too large to put back (at most 256 MB).	Редактираното изображение е твърде голямо, за да бъде върнато (най-много 256 MB).
+	Couldn't open the image editor: {e}	Редакторът на изображения не можа да се отвори: {e}

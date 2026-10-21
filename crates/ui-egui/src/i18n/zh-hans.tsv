@@ -2584,3 +2584,9 @@ decimal separator	.	.
 	{n} replaced.	已替换 {n} 处。
 	Remove Bates numbering	删除贝茨编号
 	This document has no Bates numbers PdfCraft added.	此文档没有 PdfCraft 添加的贝茨编号。
+	Edit Image Using…	使用其他程序编辑图像…
+	Opens the picture in your image editor; each save there updates the PDF.	在您的图像编辑器中打开图像；在那里每次保存都会更新 PDF。
+	The picture is open in your image editor: save it there to update the PDF.	图像已在编辑器中打开：在那里保存即可更新 PDF。
+	The picture was updated from your image editor.	已从编辑器更新图像。
+	The edited picture is too large to put back (at most 256 MB).	编辑后的图像太大，无法放回（最多 256 MB）。
+	Couldn't open the image editor: {e}	无法打开图像编辑器：{e}

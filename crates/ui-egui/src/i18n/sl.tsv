@@ -2625,3 +2625,9 @@ decimal separator	.	,
 	{n} replaced.	Zamenjano: {n}.
 	Remove Bates numbering	Odstrani oštevilčenje Bates
 	This document has no Bates numbers PdfCraft added.	Ta dokument nima številk Bates, ki bi jih dodal PdfCraft.
+	Edit Image Using…	Uredi sliko z…
+	Opens the picture in your image editor; each save there updates the PDF.	Odpre sliko v urejevalniku slik; vsako shranjevanje tam posodobi PDF.
+	The picture is open in your image editor: save it there to update the PDF.	Slika je odprta v urejevalniku: shranite jo tam, da posodobite PDF.
+	The picture was updated from your image editor.	Slika je bila posodobljena iz urejevalnika.
+	The edited picture is too large to put back (at most 256 MB).	Urejena slika je prevelika za vrnitev (največ 256 MB).
+	Couldn't open the image editor: {e}	Urejevalnika slik ni bilo mogoče odpreti: {e}

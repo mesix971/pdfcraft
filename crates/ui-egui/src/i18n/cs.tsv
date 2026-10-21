@@ -2694,3 +2694,9 @@ decimal separator	.	,
 	{n} replaced.	Nahrazeno: {n}.
 	Remove Bates numbering	Odstranit číslování Bates
 	This document has no Bates numbers PdfCraft added.	Tento dokument nemá čísla Bates přidaná aplikací PdfCraft.
+	Edit Image Using…	Upravit obrázek v…
+	Opens the picture in your image editor; each save there updates the PDF.	Otevře obrázek ve vašem editoru; každé uložení tam aktualizuje PDF.
+	The picture is open in your image editor: save it there to update the PDF.	Obrázek je otevřený v editoru: uložte ho tam a PDF se aktualizuje.
+	The picture was updated from your image editor.	Obrázek byl aktualizován z editoru.
+	The edited picture is too large to put back (at most 256 MB).	Upravený obrázek je příliš velký na vrácení (nejvýše 256 MB).
+	Couldn't open the image editor: {e}	Editor obrázků nelze otevřít: {e}

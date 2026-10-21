@@ -2872,3 +2872,9 @@ phone bar	Edit	Sửa
 	{n} replaced.	Đã thay {n}.
 	Remove Bates numbering	Xóa đánh số Bates
 	This document has no Bates numbers PdfCraft added.	Tài liệu này không có số Bates do PdfCraft thêm.
+	Edit Image Using…	Sửa ảnh bằng…
+	Opens the picture in your image editor; each save there updates the PDF.	Mở ảnh trong trình sửa ảnh của bạn; mỗi lần lưu ở đó sẽ cập nhật PDF.
+	The picture is open in your image editor: save it there to update the PDF.	Ảnh đang mở trong trình sửa ảnh: hãy lưu ở đó để cập nhật PDF.
+	The picture was updated from your image editor.	Ảnh đã được cập nhật từ trình sửa ảnh.
+	The edited picture is too large to put back (at most 256 MB).	Ảnh đã sửa quá lớn để đưa lại (tối đa 256 MB).
+	Couldn't open the image editor: {e}	Không mở được trình sửa ảnh: {e}

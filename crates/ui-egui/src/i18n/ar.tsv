@@ -2897,3 +2897,9 @@ decimal separator	.	.
 	{n} replaced.	تم استبدال {n}.
 	Remove Bates numbering	إزالة ترقيم Bates
 	This document has no Bates numbers PdfCraft added.	لا يحتوي هذا المستند على أرقام Bates أضافها PdfCraft.
+	Edit Image Using…	تحرير الصورة باستخدام…
+	Opens the picture in your image editor; each save there updates the PDF.	يفتح الصورة في محرر الصور لديك؛ كل حفظ هناك يحدّث ملف PDF.
+	The picture is open in your image editor: save it there to update the PDF.	الصورة مفتوحة في محرر الصور: احفظها هناك لتحديث ملف PDF.
+	The picture was updated from your image editor.	تم تحديث الصورة من محرر الصور.
+	The edited picture is too large to put back (at most 256 MB).	الصورة المعدلة أكبر من أن تُعاد (256 ميغابايت كحد أقصى).
+	Couldn't open the image editor: {e}	تعذّر فتح محرر الصور: {e}

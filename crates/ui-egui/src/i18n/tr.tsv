@@ -2616,3 +2616,9 @@ decimal separator	.	,
 	{n} replaced.	{n} değiştirildi.
 	Remove Bates numbering	Bates numaralandırmasını kaldır
 	This document has no Bates numbers PdfCraft added.	Bu belgede PdfCraft’ın eklediği Bates numarası yok.
+	Edit Image Using…	Resmi şununla düzenle…
+	Opens the picture in your image editor; each save there updates the PDF.	Resmi resim düzenleyicinizde açar; orada her kaydetme PDF’yi günceller.
+	The picture is open in your image editor: save it there to update the PDF.	Resim düzenleyicinizde açık: PDF’yi güncellemek için orada kaydedin.
+	The picture was updated from your image editor.	Resim düzenleyicinizden güncellendi.
+	The edited picture is too large to put back (at most 256 MB).	Düzenlenen resim geri koymak için çok büyük (en fazla 256 MB).
+	Couldn't open the image editor: {e}	Resim düzenleyici açılamadı: {e}

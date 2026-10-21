@@ -4219,6 +4219,10 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     match image_action {
         Some(crate::edit_text_ui::ImageAction::Replace(page, index)) => app.replace_page_image_dialog(page, index),
         Some(crate::edit_text_ui::ImageAction::Save(page, index)) => app.save_page_image(page, index),
+        #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
+        Some(crate::edit_text_ui::ImageAction::EditExternally(page, index)) => app.edit_image_externally(page, index),
+        #[cfg(any(target_arch = "wasm32", target_os = "android"))]
+        Some(crate::edit_text_ui::ImageAction::EditExternally(..)) => {}
         Some(crate::edit_text_ui::ImageAction::Copy(page, index)) => {
             app.copy_page_image(page, index);
         }

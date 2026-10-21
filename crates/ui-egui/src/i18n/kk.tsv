@@ -2618,3 +2618,9 @@ decimal separator	.	,
 	{n} replaced.	{n} ауыстырылды.
 	Remove Bates numbering	Bates нөмірлеуін жою
 	This document has no Bates numbers PdfCraft added.	Бұл құжатта PdfCraft қосқан Bates нөмірлері жоқ.
+	Edit Image Using…	Суретті өңдеу…
+	Opens the picture in your image editor; each save there updates the PDF.	Суретті редакторыңызда ашады; сонда әр сақтау PDF файлын жаңартады.
+	The picture is open in your image editor: save it there to update the PDF.	Сурет редакторда ашық: PDF жаңарту үшін сонда сақтаңыз.
+	The picture was updated from your image editor.	Сурет редактордан жаңартылды.
+	The edited picture is too large to put back (at most 256 MB).	Өңделген сурет қайтару үшін тым үлкен (ең көбі 256 МБ).
+	Couldn't open the image editor: {e}	Сурет редакторы ашылмады: {e}

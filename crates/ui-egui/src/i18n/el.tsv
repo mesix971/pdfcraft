@@ -2626,3 +2626,9 @@ decimal separator	.	,
 	{n} replaced.	Αντικαταστάθηκαν {n}.
 	Remove Bates numbering	Κατάργηση αρίθμησης Bates
 	This document has no Bates numbers PdfCraft added.	Αυτό το έγγραφο δεν έχει αριθμούς Bates που πρόσθεσε το PdfCraft.
+	Edit Image Using…	Επεξεργασία εικόνας με…
+	Opens the picture in your image editor; each save there updates the PDF.	Ανοίγει την εικόνα στον επεξεργαστή σας· κάθε αποθήκευση εκεί ενημερώνει το PDF.
+	The picture is open in your image editor: save it there to update the PDF.	Η εικόνα είναι ανοιχτή στον επεξεργαστή: αποθηκεύστε την εκεί για να ενημερωθεί το PDF.
+	The picture was updated from your image editor.	Η εικόνα ενημερώθηκε από τον επεξεργαστή.
+	The edited picture is too large to put back (at most 256 MB).	Η επεξεργασμένη εικόνα είναι πολύ μεγάλη για να επιστρέψει (έως 256 MB).
+	Couldn't open the image editor: {e}	Δεν ήταν δυνατό να ανοίξει ο επεξεργαστής εικόνων: {e}

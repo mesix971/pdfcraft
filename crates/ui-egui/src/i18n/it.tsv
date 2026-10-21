@@ -2832,3 +2832,9 @@ decimal separator	.	,
 	{n} replaced.	{n} sostituiti.
 	Remove Bates numbering	Rimuovi numerazione Bates
 	This document has no Bates numbers PdfCraft added.	Questo documento non ha numeri Bates aggiunti da PdfCraft.
+	Edit Image Using…	Modifica immagine con…
+	Opens the picture in your image editor; each save there updates the PDF.	Apre l’immagine nel tuo editor; ogni salvataggio lì aggiorna il PDF.
+	The picture is open in your image editor: save it there to update the PDF.	L’immagine è aperta nel tuo editor: salvala lì per aggiornare il PDF.
+	The picture was updated from your image editor.	L’immagine è stata aggiornata dal tuo editor.
+	The edited picture is too large to put back (at most 256 MB).	L’immagine modificata è troppo grande da reinserire (al massimo 256 MB).
+	Couldn't open the image editor: {e}	Impossibile aprire l’editor di immagini: {e}

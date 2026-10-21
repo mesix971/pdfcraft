@@ -2529,3 +2529,9 @@ decimal separator	.	.
 	{n} replaced.	{n} మార్చబడ్డాయి.
 	Remove Bates numbering	Bates సంఖ్యలను తొలగించు
 	This document has no Bates numbers PdfCraft added.	ఈ పత్రంలో PdfCraft జోడించిన Bates సంఖ్యలు లేవు.
+	Edit Image Using…	చిత్రాన్ని దీనితో సవరించు…
+	Opens the picture in your image editor; each save there updates the PDF.	చిత్రాన్ని మీ ఎడిటర్‌లో తెరుస్తుంది; అక్కడ ప్రతి సేవ్ PDFను నవీకరిస్తుంది.
+	The picture is open in your image editor: save it there to update the PDF.	చిత్రం మీ ఎడిటర్‌లో తెరిచి ఉంది: PDFను నవీకరించడానికి అక్కడ సేవ్ చేయండి.
+	The picture was updated from your image editor.	చిత్రం మీ ఎడిటర్ నుండి నవీకరించబడింది.
+	The edited picture is too large to put back (at most 256 MB).	సవరించిన చిత్రం తిరిగి పెట్టడానికి చాలా పెద్దది (గరిష్ఠంగా 256 MB).
+	Couldn't open the image editor: {e}	చిత్ర ఎడిటర్‌ను తెరవలేకపోయాం: {e}

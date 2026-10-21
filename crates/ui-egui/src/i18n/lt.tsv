@@ -2871,3 +2871,9 @@ decimal separator	.	,
 	{n} replaced.	Pakeista: {n}.
 	Remove Bates numbering	Pašalinti Bates numeraciją
 	This document has no Bates numbers PdfCraft added.	Šiame dokumente nėra PdfCraft pridėtų Bates numerių.
+	Edit Image Using…	Redaguoti paveikslą su…
+	Opens the picture in your image editor; each save there updates the PDF.	Atidaro paveikslą jūsų redaktoriuje; kiekvienas išsaugojimas ten atnaujina PDF.
+	The picture is open in your image editor: save it there to update the PDF.	Paveikslas atidarytas redaktoriuje: išsaugokite jį ten, kad atnaujintumėte PDF.
+	The picture was updated from your image editor.	Paveikslas atnaujintas iš redaktoriaus.
+	The edited picture is too large to put back (at most 256 MB).	Redaguotas paveikslas per didelis grąžinti (ne daugiau kaip 256 MB).
+	Couldn't open the image editor: {e}	Nepavyko atidaryti paveikslų redaktoriaus: {e}

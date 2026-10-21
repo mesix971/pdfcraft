@@ -2620,3 +2620,9 @@ decimal separator	.	.
 	{n} replaced.	{n} 件置換しました。
 	Remove Bates numbering	ベイツ番号を削除
 	This document has no Bates numbers PdfCraft added.	この文書には PdfCraft が追加したベイツ番号がありません。
+	Edit Image Using…	画像を編集するアプリ…
+	Opens the picture in your image editor; each save there updates the PDF.	画像を画像エディターで開きます。そこで保存するたびに PDF が更新されます。
+	The picture is open in your image editor: save it there to update the PDF.	画像はエディターで開いています。そこで保存すると PDF が更新されます。
+	The picture was updated from your image editor.	画像がエディターから更新されました。
+	The edited picture is too large to put back (at most 256 MB).	編集した画像は大きすぎて戻せません (最大 256 MB)。
+	Couldn't open the image editor: {e}	画像エディターを開けませんでした: {e}

@@ -2619,3 +2619,9 @@ decimal separator	.	,
 	{n} replaced.	{n} csere.
 	Remove Bates numbering	Bates-számozás eltávolítása
 	This document has no Bates numbers PdfCraft added.	Ebben a dokumentumban nincs a PdfCraft által hozzáadott Bates-szám.
+	Edit Image Using…	Kép szerkesztése ezzel…
+	Opens the picture in your image editor; each save there updates the PDF.	Megnyitja a képet a képszerkesztőben; minden ottani mentés frissíti a PDF-et.
+	The picture is open in your image editor: save it there to update the PDF.	A kép meg van nyitva a szerkesztőben: mentse ott a PDF frissítéséhez.
+	The picture was updated from your image editor.	A kép frissült a szerkesztőből.
+	The edited picture is too large to put back (at most 256 MB).	A szerkesztett kép túl nagy a visszahelyezéshez (legfeljebb 256 MB).
+	Couldn't open the image editor: {e}	A képszerkesztő nem nyitható meg: {e}

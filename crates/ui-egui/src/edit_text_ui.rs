@@ -689,6 +689,8 @@ pub(crate) enum ImageAction {
     Link(usize, usize),
     /// Open Recognize Text for the picture's page.
     Recognize(usize),
+    /// Edit the picture in the system's image editor.
+    EditExternally(usize, usize),
 }
 
 fn user_box(xf: &PageXform, info: &DocInfo, page: usize, r: Rect) -> [f64; 4] {
@@ -958,6 +960,15 @@ fn image_menu(
     }
     if ui.add_enabled(raster, egui::Button::new(tl!("Save Image As…"))).clicked() {
         *action = Some(ImageAction::Save(page, hit));
+        ui.close();
+    }
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
+    if ui
+        .add_enabled(raster, egui::Button::new(tl!("Edit Image Using…")))
+        .on_hover_text(tl!("Opens the picture in your image editor; each save there updates the PDF."))
+        .clicked()
+    {
+        *action = Some(ImageAction::EditExternally(page, hit));
         ui.close();
     }
     // Cutting and copying also find the picture inside grouped Form artwork.

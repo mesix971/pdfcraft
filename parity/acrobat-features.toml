@@ -2151,11 +2151,11 @@ title = "Edit an image in an external application"
 area = "C"
 tier = "P2"
 milestone = "M7"
-status = "planned"
+status = "shipped"
 commands = []
 tools = []
-evidence = []
-notes = ""
+evidence = ["crates/ui-egui/src/external_image.rs::a_save_in_the_editor_updates_the_picture"]
+notes = "Desktop: right-click a page picture ▸ Edit Image Using… writes it to a temporary file and opens it with the system's default program for that file type (Explorer on Windows, open on macOS, xdg-open elsewhere); each save there replaces the picture (one undo step each), while its document is the active one. The copy is deleted when the watch ends. Not on the web or the phone, no choice of program (the system's default is used), and no automation tool (it needs a desktop editor)."
 
 [[feature]]
 id = "edit.arrange-objects"
