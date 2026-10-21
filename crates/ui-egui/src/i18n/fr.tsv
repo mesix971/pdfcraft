@@ -2594,3 +2594,5 @@ decimal separator	.	,
 	Delete attachment {name}	Supprimer la pièce jointe {name}
 	Describe attachment {name}	Décrire la pièce jointe {name}
 	{name} is too large to attach (at most 512 MB).	{name} est trop volumineux pour être joint (512 Mo au plus).
+	Font family	Famille de police
+	Other colour	Autre couleur

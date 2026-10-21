@@ -2598,3 +2598,5 @@ decimal separator	.	,
 	Delete attachment {name}	Izbriši prilogo {name}
 	Describe attachment {name}	Opiši prilogo {name}
 	{name} is too large to attach (at most 512 MB).	{name} je prevelika za prilogo (največ 512 MB).
+	Font family	Družina pisav
+	Other colour	Druga barva

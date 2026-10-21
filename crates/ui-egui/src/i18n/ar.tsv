@@ -2870,3 +2870,5 @@ decimal separator	.	.
 	Delete attachment {name}	حذف المرفق {name}
 	Describe attachment {name}	وصف المرفق {name}
 	{name} is too large to attach (at most 512 MB).	{name} أكبر من أن يُرفق (512 ميغابايت كحد أقصى).
+	Font family	عائلة الخط
+	Other colour	لون آخر

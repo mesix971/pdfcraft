@@ -2593,3 +2593,5 @@ decimal separator	.	.
 	Delete attachment {name}	添付ファイル {name} を削除
 	Describe attachment {name}	添付ファイル {name} の説明
 	{name} is too large to attach (at most 512 MB).	{name} は大きすぎて添付できません (最大 512 MB)。
+	Font family	フォントファミリー
+	Other colour	その他の色

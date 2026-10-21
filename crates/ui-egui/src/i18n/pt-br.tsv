@@ -2608,3 +2608,5 @@ decimal separator	.	,
 	Delete attachment {name}	Excluir o anexo {name}
 	Describe attachment {name}	Descrever o anexo {name}
 	{name} is too large to attach (at most 512 MB).	{name} é grande demais para anexar (no máximo 512 MB).
+	Font family	Família da fonte
+	Other colour	Outra cor

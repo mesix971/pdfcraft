@@ -2570,3 +2570,5 @@ decimal separator	.	,
 	Delete attachment {name}	Usuń załącznik {name}
 	Describe attachment {name}	Opisz załącznik {name}
 	{name} is too large to attach (at most 512 MB).	{name} jest za duży, by go dołączyć (najwyżej 512 MB).
+	Font family	Rodzina czcionek
+	Other colour	Inny kolor

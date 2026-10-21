@@ -2616,3 +2616,5 @@ decimal separator	.	,
 	Delete attachment {name}	Видалити вкладення {name}
 	Describe attachment {name}	Описати вкладення {name}
 	{name} is too large to attach (at most 512 MB).	{name} завеликий для вкладення (не більше 512 МБ).
+	Font family	Сімейство шрифтів
+	Other colour	Інший колір

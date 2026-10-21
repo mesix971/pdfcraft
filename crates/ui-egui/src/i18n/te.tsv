@@ -2502,3 +2502,5 @@ decimal separator	.	.
 	Delete attachment {name}	{name} జోడింపును తొలగించు
 	Describe attachment {name}	{name} జోడింపును వివరించు
 	{name} is too large to attach (at most 512 MB).	{name} జోడించడానికి చాలా పెద్దది (గరిష్ఠంగా 512 MB).
+	Font family	ఫాంట్ కుటుంబం
+	Other colour	ఇతర రంగు

@@ -74,10 +74,14 @@ impl PdfCraftApp {
 struct Typing<'a> {
     text: &'a mut String,
     look: &'a mut pdfcraft_engine::AddedText,
-    /// A paragraph's underline (added text has none).
-    underline: Option<&'a mut bool>,
+    /// A paragraph's underline, lists, spacing and superscript (added text has none), and its
+    /// selection.
+    paragraph: Option<(&'a mut crate::edit_text_ui::Extras, &'a mut Option<std::ops::Range<usize>>)>,
     new: bool,
 }
+
+/// The typing field's id (its selection is read for superscript and subscript).
+const TYPING_INPUT: &str = "phone-typing-input";
 
 /// The typing screen over the reader. `screen` is the content area (the keyboard's room is
 /// already taken out of it).
@@ -89,16 +93,20 @@ pub(crate) fn screen(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, scr
     let refocus = std::mem::take(&mut app.phone.typing_refocus);
     let Some(view) = app.views.get_mut(index) else { return };
     let blocked = view.content.blocked();
-    let (mut done, mut cancel, mut formatted) = (false, false, false);
+    let (mut done, mut cancel, mut formatted, mut apply_now) = (false, false, false, false);
+    // The typed text's selection, as byte offsets, for superscript and subscript.
+    let selected =
+        egui::TextEdit::load_state(ui.ctx(), egui::Id::new(TYPING_INPUT)).and_then(|s| s.cursor.char_range()).map(|r| r.as_sorted_char_range());
     {
         let typing = if let Some(ed) = view.line_editor.as_mut() {
-            Typing { text: &mut ed.text, look: &mut ed.look, underline: Some(&mut ed.extras.underline), new: false }
+            let crate::edit_text_ui::LineEditor { text, look, extras, selection, .. } = ed;
+            Typing { text, look, paragraph: Some((extras, selection)), new: false }
         } else if let Some(d) = view.content.draft.as_mut() {
-            Typing { text: &mut d.text, look: &mut d.style, underline: None, new: d.index.is_none() }
+            Typing { text: &mut d.text, look: &mut d.style, paragraph: None, new: d.index.is_none() }
         } else {
             return;
         };
-        let Typing { text, look: style, mut underline, new } = typing;
+        let Typing { text, look: style, mut paragraph, new } = typing;
 
         // Top: ✕, what this is, Done.
         let top = Rect::from_min_size(screen.min, vec2(screen.width(), TOP_BAR));
@@ -125,7 +133,22 @@ pub(crate) fn screen(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, scr
                 ui.horizontal_centered(|ui| {
                     ui.add_space(12.0);
                     ui.spacing_mut().item_spacing.x = 6.0;
-                    formatted |= format_row(ui, style, underline.take(), &t, &look);
+                    formatted |= format_row(ui, style, paragraph.as_mut().map(|(e, _)| &mut e.underline), &t, &look);
+                    divider(ui, &look);
+                    formatted |= family_button(ui, style, &t, &look);
+                    if let Some((extras, selection)) = paragraph.as_mut() {
+                        divider(ui, &look);
+                        let (changed, now) = paragraph_row(ui, extras, &t, &look);
+                        formatted |= changed;
+                        if now {
+                            // Superscript and subscript act on what is selected, as typed so far.
+                            **selection = selected.clone().filter(|r| !r.is_empty()).map(|r| {
+                                let byte = |i: usize| text.char_indices().nth(i).map_or(text.len(), |(at, _)| at);
+                                byte(r.start.into())..byte(r.end.into())
+                            });
+                            apply_now = true;
+                        }
+                    }
                     if compact {
                         divider(ui, &look);
                         formatted |= colour_row(ui, style, &t, &look, TARGET);
@@ -168,7 +191,7 @@ pub(crate) fn screen(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, scr
             ui.scope_builder(egui::UiBuilder::new().max_rect(field), |ui| {
                 egui::ScrollArea::vertical().id_salt("phone-typing-text").auto_shrink([false, false]).show(ui, |ui| {
                     let edit = egui::TextEdit::multiline(text)
-                        .id(egui::Id::new("phone-typing-input"))
+                        .id(egui::Id::new(TYPING_INPUT))
                         .font(theme::regular(18.0))
                         .text_color(t.text)
                         .hint_text(tl!("Type text"))
@@ -191,11 +214,85 @@ pub(crate) fn screen(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, scr
         app.phone.typing_refocus = true;
         ui.ctx().request_repaint();
     }
+    if apply_now && let Some(ed) = app.views.get(index).and_then(|v| v.line_editor.clone()) {
+        app.apply_line_format(index, ed, Some(ui.ctx()));
+    }
     if cancel {
         app.finish_phone_text(false);
     } else if done {
         app.finish_phone_text(true);
     }
+}
+
+/// The font family, one chip that shows it; each tap the next.
+fn family_button(ui: &mut egui::Ui, look: &mut pdfcraft_engine::AddedText, t: &Tokens, l: &phone_home::Look) -> bool {
+    use pdfcraft_engine::FontFamily as F;
+    let next = match look.family {
+        F::Helvetica => F::Times,
+        F::Times => F::Courier,
+        F::Courier => F::Helvetica,
+    };
+    if text_button(ui, look.family.label(), tl!("Font family"), None, t, l) {
+        look.family = next;
+        return true;
+    }
+    false
+}
+
+/// A paragraph's superscript and subscript, lists, line spacing and paragraph spacing. Returns
+/// whether one changed, and whether it must be applied at once (superscript and subscript act
+/// on the selection as it is now).
+fn paragraph_row(ui: &mut egui::Ui, e: &mut crate::edit_text_ui::Extras, t: &Tokens, l: &phone_home::Look) -> (bool, bool) {
+    use pdfcraft_engine::{List, Script};
+    let before = *e;
+    let mut now = false;
+    for (label, script, says) in
+        [("x\u{b2}", Script::Super, tl!("Superscript")), ("x\u{2082}", Script::Sub, tl!("Subscript")), ("x", Script::Normal, tl!("Normal position"))]
+    {
+        if text_button(ui, label, says, None, t, l) {
+            e.script = Some(script);
+            now = true;
+        }
+    }
+    divider(ui, l);
+    for (icon, list, says) in [("list", List::Bullet, tl!("Bulleted list")), ("list-ordered", List::Numbered, tl!("Numbered list"))] {
+        let on = e.list == Some(list);
+        if format_button(ui, icon, says, Some(on), true, t, l) {
+            e.list = Some(if on { List::None } else { list });
+        }
+    }
+    divider(ui, l);
+    // Line spacing: the paragraph's own, then 1, 1.15, 1.5, 2 times the size; each tap the next.
+    const SPACINGS: [f64; 5] = [0.0, 1.0, 1.15, 1.5, 2.0];
+    let at = SPACINGS.iter().position(|v| (*v - e.line_spacing).abs() < 1e-9).unwrap_or(0);
+    let shown = if e.line_spacing == 0.0 { "\u{2195} \u{2014}".to_owned() } else { format!("\u{2195} {}\u{d7}", e.line_spacing) };
+    if text_button(ui, &shown, tl!("Line spacing"), None, t, l) {
+        e.line_spacing = SPACINGS.get(at + 1).copied().unwrap_or(0.0);
+    }
+    // Paragraph spacing: none, 6, 12, 18 points.
+    const GAPS: [f64; 4] = [0.0, 6.0, 12.0, 18.0];
+    let at = GAPS.iter().position(|v| (*v - e.paragraph_spacing).abs() < 1e-9).unwrap_or(0);
+    let shown = format!("\u{b6} {} pt", e.paragraph_spacing.round());
+    if text_button(ui, &shown, tl!("Paragraph spacing"), None, t, l) {
+        e.paragraph_spacing = GAPS.get(at + 1).copied().unwrap_or(0.0);
+    }
+    (*e != before, now)
+}
+
+/// A format's button that shows text rather than an icon (a name, a value). Returns whether tapped.
+fn text_button(ui: &mut egui::Ui, text: &str, label: &str, on: Option<bool>, t: &Tokens, l: &phone_home::Look) -> bool {
+    let font = theme::semibold(14.0);
+    let width = (widgets::text_width(ui, text, &font) + 24.0).max(TARGET);
+    let (rect, resp) = ui.allocate_exact_size(vec2(width, TARGET), Sense::click());
+    match on {
+        Some(on) => resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Button, true, on, label)),
+        None => resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label)),
+    }
+    let press = theme::Press::track(ui, &resp);
+    let chip = rect.shrink(4.0).translate(press.offset());
+    ui.painter().rect(chip, CornerRadius::same(12), press.fill(l.surface, t.hover, t.pressed), Stroke::new(1.0, l.edge), egui::StrokeKind::Inside);
+    ui.painter().text(chip.center(), Align2::CENTER_CENTER, text, font, t.text);
+    theme::hand(resp).clicked()
 }
 
 /// Size, bold, italic, underline and alignment, for `look`. Returns whether one changed.
@@ -260,6 +357,15 @@ fn colour_row(ui: &mut egui::Ui, look: &mut pdfcraft_engine::AddedText, t: &Toke
             look.color = c;
             chosen = true;
         }
+    }
+    // Any other colour, from a picker.
+    let mut rgb = look.color.map(|v| v.clamp(0.0, 1.0) as f32);
+    let r = ui.add_sized(vec2(width, TARGET), |ui: &mut egui::Ui| egui::widgets::color_picker::color_edit_button_rgb(ui, &mut rgb));
+    let r = r.on_hover_text(tl!("Other colour"));
+    r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::ColorButton, true, tl!("Other colour")));
+    if r.changed() {
+        look.color = rgb.map(f64::from);
+        chosen = true;
     }
     chosen
 }

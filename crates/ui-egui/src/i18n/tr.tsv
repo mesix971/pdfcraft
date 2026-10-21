@@ -2589,3 +2589,5 @@ decimal separator	.	,
 	Delete attachment {name}	{name} ekini sil
 	Describe attachment {name}	{name} ekini açıkla
 	{name} is too large to attach (at most 512 MB).	{name} eklemek için çok büyük (en fazla 512 MB).
+	Font family	Yazı tipi ailesi
+	Other colour	Başka renk

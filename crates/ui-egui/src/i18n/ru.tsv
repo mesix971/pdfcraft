@@ -2507,3 +2507,5 @@ decimal separator	.	,
 	Delete attachment {name}	Удалить вложение {name}
 	Describe attachment {name}	Описать вложение {name}
 	{name} is too large to attach (at most 512 MB).	{name} слишком велик для вложения (не более 512 МБ).
+	Font family	Семейство шрифтов
+	Other colour	Другой цвет

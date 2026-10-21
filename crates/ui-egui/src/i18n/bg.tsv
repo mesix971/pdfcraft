@@ -2556,3 +2556,5 @@ decimal separator	.	,
 	Delete attachment {name}	Изтриване на прикачения файл {name}
 	Describe attachment {name}	Описание на прикачения файл {name}
 	{name} is too large to attach (at most 512 MB).	{name} е твърде голям за прикачване (най-много 512 MB).
+	Font family	Семейство шрифтове
+	Other colour	Друг цвят

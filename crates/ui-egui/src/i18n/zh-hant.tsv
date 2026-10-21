@@ -2543,3 +2543,5 @@ decimal separator	.	.
 	Delete attachment {name}	刪除附件 {name}
 	Describe attachment {name}	說明附件 {name}
 	{name} is too large to attach (at most 512 MB).	{name} 太大，無法附加（最多 512 MB）。
+	Font family	字型系列
+	Other colour	其他顏色

@@ -2844,3 +2844,5 @@ decimal separator	.	,
 	Delete attachment {name}	Ištrinti priedą {name}
 	Describe attachment {name}	Aprašyti priedą {name}
 	{name} is too large to attach (at most 512 MB).	{name} per didelis pridėti (ne daugiau kaip 512 MB).
+	Font family	Šrifto šeima
+	Other colour	Kita spalva

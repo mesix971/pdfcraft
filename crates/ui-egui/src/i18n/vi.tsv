@@ -2845,3 +2845,5 @@ phone bar	Edit	Sửa
 	Delete attachment {name}	Xóa tệp đính kèm {name}
 	Describe attachment {name}	Mô tả tệp đính kèm {name}
 	{name} is too large to attach (at most 512 MB).	{name} quá lớn để đính kèm (tối đa 512 MB).
+	Font family	Họ phông chữ
+	Other colour	Màu khác

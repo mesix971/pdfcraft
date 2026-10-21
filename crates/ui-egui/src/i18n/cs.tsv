@@ -2667,3 +2667,5 @@ decimal separator	.	,
 	Delete attachment {name}	Odstranit přílohu {name}
 	Describe attachment {name}	Popsat přílohu {name}
 	{name} is too large to attach (at most 512 MB).	{name} je příliš velký k připojení (nejvýše 512 MB).
+	Font family	Rodina písma
+	Other colour	Jiná barva

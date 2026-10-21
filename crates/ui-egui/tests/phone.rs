@@ -1174,6 +1174,63 @@ fn edit_goes_straight_to_the_text_and_types_it_on_a_screen_of_its_own() {
     assert!(page_one(&h, "brown").0.iter().any(|t| t.contains("The quick brown fox")), "one undo takes it back");
 }
 
+/// Swipe the typing screen's formats row to the left until the button named `label` is on screen.
+fn reveal(h: &mut Harness<'static, PdfCraftApp>, label: &str) {
+    for _ in 0..8 {
+        let r = h.get_by_label(label).rect();
+        if r.left() >= 0.0 && r.right() <= 412.0 {
+            return;
+        }
+        let y = r.center().y;
+        finger_drag(h, pos2(380.0, y), pos2(80.0, y));
+        h.run_steps(4);
+    }
+    panic!("{label} never came on screen");
+}
+
+/// The phone's typing screen has the desktop's paragraph formats too: the font family, lists and
+/// superscript (on what is selected, at once).
+#[test]
+fn the_typing_screen_sets_the_family_lists_and_superscript() {
+    let mut h = harness(true);
+    // A touch screen: egui scrolls a row by dragging only where it has seen one.
+    for phase in [egui::TouchPhase::Start, egui::TouchPhase::End] {
+        h.event(Event::Touch { device_id: egui::TouchDeviceId(0), id: egui::TouchId(0), phase, pos: pos2(4.0, 4.0), force: None });
+    }
+    h.run_steps(2);
+    click(&mut h, "Edit");
+    let p = at(&h, 0, 60.0, 254.0);
+    tap(&mut h, p);
+    assert!(h.state().phone_text_editing());
+    reveal(&mut h, "Font family");
+    click(&mut h, "Font family");
+    reveal(&mut h, "Bulleted list");
+    click(&mut h, "Bulleted list");
+    if let Ok(dir) = std::env::var("PDFCRAFT_PHONE_SHOTS") {
+        h.render().unwrap().save(std::path::Path::new(&dir).join("typing-paragraph-formats.png")).unwrap();
+    }
+    click(&mut h, "Done");
+    h.run_steps(4);
+    let id = h.state().views[0].id;
+    let blocks = h.state().session.get(id).unwrap().text_blocks(0);
+    let fox = blocks.iter().find(|b| b.text.contains("fox")).expect("the paragraph");
+    assert!(fox.editor_text.starts_with("• "), "{:?}", fox.editor_text);
+    assert!(fox.base_font.starts_with("Times"), "{}", fox.base_font);
+
+    // Superscript on the selection applies at once; the screen stays open.
+    let p = at(&h, 0, 60.0, 254.0);
+    tap(&mut h, p);
+    h.key_press_modifiers(Modifiers::COMMAND, Key::A);
+    h.run_steps(2);
+    reveal(&mut h, "Superscript");
+    click(&mut h, "Superscript");
+    h.run_steps(4);
+    assert!(h.state().phone_text_editing(), "still typing");
+    let lines = h.state().session.get(id).unwrap().text_lines(0);
+    let raised = lines.iter().find(|l| l.text.contains("fox")).expect("the line");
+    assert!(raised.size < fox.size * 0.7, "{} {}", raised.size, fox.size);
+}
+
 /// Back keeps what was typed; ✕ throws it away.
 #[test]
 fn back_keeps_the_typing_and_cancel_throws_it_away() {

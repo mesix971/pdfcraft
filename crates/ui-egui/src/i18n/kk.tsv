@@ -2591,3 +2591,5 @@ decimal separator	.	,
 	Delete attachment {name}	{name} тіркемесін жою
 	Describe attachment {name}	{name} тіркемесін сипаттау
 	{name} is too large to attach (at most 512 MB).	{name} тіркеу үшін тым үлкен (ең көбі 512 МБ).
+	Font family	Қаріп тобы
+	Other colour	Басқа түс

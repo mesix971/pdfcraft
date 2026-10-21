@@ -2592,3 +2592,5 @@ decimal separator	.	,
 	Delete attachment {name}	{name} melléklet törlése
 	Describe attachment {name}	{name} melléklet leírása
 	{name} is too large to attach (at most 512 MB).	{name} túl nagy a csatoláshoz (legfeljebb 512 MB).
+	Font family	Betűcsalád
+	Other colour	Más szín
