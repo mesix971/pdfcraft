@@ -767,10 +767,11 @@ fn files_are_starred_listed_from_the_device_and_previewed() {
     wait(&mut h, |app| app.home_device_files().len() == 2);
     assert!(h.query_by_label("second.pdf").is_some());
     assert!(h.query_by_label("notes.txt").is_none());
-    // A file from the list opens.
+    // A file from the list opens, on the open worker now the app is live (`first.pdf` opened
+    // inline, before the first frame): wait for its tab rather than a fixed number of frames.
     click(&mut h, "second.pdf");
-    assert_eq!(h.state().views.len(), 2);
-    assert!(h.state().active.is_some());
+    wait(&mut h, |app| app.views.len() == 2);
+    assert_eq!(h.state().active, Some(1), "the file opened comes to the front");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
