@@ -647,6 +647,16 @@ impl Automation {
                     char_spacing: a.opt_num("char_spacing")?,
                     scale: a.opt_num("scale")?,
                     width: a.opt_num("width")?,
+                    paragraph_spacing: a.opt_num("paragraph_spacing")?,
+                    list: a
+                        .opt_str("list")?
+                        .map(|l| match l {
+                            "none" => Ok(pdfcraft_engine::List::None),
+                            "bullet" => Ok(pdfcraft_engine::List::Bullet),
+                            "numbered" => Ok(pdfcraft_engine::List::Numbered),
+                            _ => Err(Args::wrong("list", "none, bullet or numbered")),
+                        })
+                        .transpose()?,
                     ..Default::default()
                 };
                 let (dx, dy) = (a.opt_num("dx")?, a.opt_num("dy")?);
@@ -2231,6 +2241,15 @@ fn parse_style_ranges(value: Option<&Value>) -> Result<Vec<pdfcraft_engine::Rang
                 underline: a.opt_bool("underline")?,
                 char_spacing: a.opt_num("char_spacing")?,
                 scale: a.opt_num("scale")?,
+                script: a
+                    .opt_str("script")?
+                    .map(|s| match s {
+                        "normal" => Ok(pdfcraft_engine::Script::Normal),
+                        "super" => Ok(pdfcraft_engine::Script::Super),
+                        "sub" => Ok(pdfcraft_engine::Script::Sub),
+                        _ => Err(Args::wrong("script", "normal, super or sub")),
+                    })
+                    .transpose()?,
             })
         })
         .collect()

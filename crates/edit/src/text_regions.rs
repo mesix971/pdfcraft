@@ -71,7 +71,7 @@ fn group_layout(lines: &[TextLine], mixed: bool) -> Vec<TextBlock> {
             scanned
                 && (mixed || same_style(prev, line))
                 && same_plane(prev, line)
-                && (prev.frame_origin().1 - line.frame_origin().1).abs() < prev.size.min(line.size) * 0.2
+                && (prev.frame_line() - line.frame_line()).abs() < prev.size.min(line.size) * 0.2
                 && gap >= -prev.size.min(line.size) * 0.2
                 && gap < prev.size.max(line.size) * 1.5
                 // Separate same-style text objects that merely touch or overlap, with no space
@@ -97,7 +97,7 @@ fn group_layout(lines: &[TextLine], mixed: bool) -> Vec<TextBlock> {
             let Some(prev_row) = block.rows.last() else { return false };
             let Some(prev) = prev_row.first().and_then(|i| lines.get(*i)) else { return false };
             let Some(pr) = frame_row_rect(prev_row, lines) else { return false };
-            let gap = prev.frame_origin().1 - first.frame_origin().1;
+            let gap = prev.frame_line() - first.frame_line();
             let tol = prev.size.max(first.size).max(1.0);
             let aligned =
                 (pr[0] - frame[0]).abs() < tol || ((pr[0] + pr[2] - frame[0] - frame[2]) / 2.0).abs() < tol || (pr[2] - frame[2]).abs() < tol;
@@ -253,6 +253,21 @@ pub(super) fn rewrite_styled_block(
     if draft.len() > 4_000_000 {
         return Err(EditError::Invalid("the replacement text is too large".into()));
     }
+    // A list puts its markers into the text itself; style ranges index the text as given.
+    let listed;
+    let (draft, markers) = match style.list {
+        Some(_) if !style.ranges.is_empty() => {
+            return Err(EditError::Invalid("make a list and format part of its text in separate steps".into()));
+        }
+        Some(list) => {
+            listed = list_text(draft, list);
+            (listed.0.as_str(), listed.1.clone())
+        }
+        None => (draft, Vec::new()),
+    };
+    if style.paragraph_spacing.is_some_and(|s| !s.is_finite() || !(0.0..=1000.0).contains(&s)) {
+        return Err(EditError::Invalid("paragraph spacing must be between 0 and 1000 points".into()));
+    }
     if draft == block.editor_text && *style == BlockStyle::default() {
         return Ok(LineEdit { substituted: None });
     }
@@ -291,16 +306,7 @@ pub(super) fn rewrite_styled_block(
             let mut index = source;
             let selected = ranges.iter().find(|r| r.range.contains(&start)).copied();
             if selected.is_some() || style.family.is_some() || style.bold.is_some() {
-                let default_range = RangeStyle {
-                    range: start..end,
-                    family: None,
-                    resource: None,
-                    size: None,
-                    color: None,
-                    underline: None,
-                    char_spacing: None,
-                    scale: None,
-                };
+                let default_range = RangeStyle { range: start..end, ..Default::default() };
                 let r = selected.unwrap_or(&default_range);
                 let mut line = lines.get(source).unwrap_or(first).clone();
                 if let Some((family, bold, italic)) =
@@ -314,6 +320,12 @@ pub(super) fn rewrite_styled_block(
                 }
                 if let Some(resource) = &r.resource {
                     line.font = resource.clone();
+                }
+                if r.script == Some(Script::Normal) && line.origin.state.rise.abs() > 1e-9 {
+                    // Back on the line: at the size of the text it sits on, not its shrunk one.
+                    if let Some(on) = block.lines.iter().filter_map(|i| lines.get(*i)).find(|l| l.origin.state.rise.abs() <= 1e-9) {
+                        line.size = on.size;
+                    }
                 }
                 if let Some(size) = r.size {
                     line.size = size;
@@ -484,9 +496,12 @@ pub(super) fn rewrite_styled_block(
             chars.push((ch, index, name));
         }
     }
-    let size_of = |source: &TextLine, index: usize| {
+    // The size of the text around a run (in text space), before any superscript shrinks it.
+    let around = |source: &TextLine, index: usize| {
         overrides.get(&index).and_then(|r| r.size).or(style.size).unwrap_or(source.size).max(0.1) / source.origin.k.max(1e-6)
     };
+    let script = |index: usize| overrides.get(&index).and_then(|r| r.script);
+    let size_of = |source: &TextLine, index: usize| around(source, index) * script(index).map_or(1.0, |s| s.metrics().0);
     // A source run may carry TJ kerning/justification that is absent from its text state.
     // Keep its measured advance when rebuilding the run instead of making it wrap on entry.
     let mut calibration = HashMap::new();
@@ -555,9 +570,27 @@ pub(super) fn rewrite_styled_block(
         }
         Ok(width)
     };
+    // A list item's wrapped lines start under its text, past the widest marker.
+    let mut indent: f64 = 0.0;
+    {
+        let mut start = 0;
+        for len in &markers {
+            if let Some(marker) = chars.get(start..start + len) {
+                indent = indent.max(measure(marker)?);
+            }
+            start += chars.get(start..).unwrap_or_default().iter().position(|c| c.0 == '\n').map_or(chars.len(), |p| p + 1);
+        }
+    }
+    // Markers added to text that filled its box would push each item's last word on: the box
+    // grows by the marker, as it does in a word processor's list.
+    let width = if style.list.is_some_and(|l| l != List::None) && style.width.is_none() { width + indent } else { width };
     let mut rows: Vec<Vec<(char, usize, String)>> = Vec::new();
     // Each row's characters, as indexes into the draft's characters (`chars` holds all of them).
     let mut row_ranges = Vec::new();
+    // Whether a row ends where the text breaks itself, and whether it carries on a wrapped line.
+    let mut row_hard: Vec<bool> = Vec::new();
+    let mut row_wrapped: Vec<bool> = Vec::new();
+    let mut wrapped = false;
     let mut row_start = 0;
     let mut row = Vec::new();
     let mut row_width = 0.0;
@@ -568,11 +601,15 @@ pub(super) fn rewrite_styled_block(
         if item.0 == '\n' {
             row_ranges.push(row_start..row_start + row.len());
             rows.push(std::mem::take(&mut row));
+            row_hard.push(true);
+            row_wrapped.push(wrapped);
+            wrapped = false;
             row_width = 0.0;
             at += 1;
             row_start = at;
             continue;
         }
+        let room = if wrapped { (width - indent).max(1.0) } else { width };
         let mut end = at + 1;
         if !item.0.is_whitespace() {
             // A word ends at a space, or where Chinese or Japanese text may break between characters.
@@ -585,12 +622,15 @@ pub(super) fn rewrite_styled_block(
         }
         let word = chars.get(at..end).unwrap_or_default();
         let w = measure(word)?;
-        if !row.is_empty() && !item.0.is_whitespace() && row_width + w > width + 0.5 {
+        if !row.is_empty() && !item.0.is_whitespace() && row_width + w > room + 0.5 {
             while row.last().is_some_and(|c: &(char, usize, String)| c.0.is_whitespace()) {
                 row.pop();
             }
             row_ranges.push(row_start..row_start + row.len());
             rows.push(std::mem::take(&mut row));
+            row_hard.push(false);
+            row_wrapped.push(wrapped);
+            wrapped = true;
             row_width = 0.0;
             row_start = at;
         }
@@ -601,6 +641,8 @@ pub(super) fn rewrite_styled_block(
     if !row.is_empty() {
         row_ranges.push(row_start..row_start + row.len());
         rows.push(row);
+        row_hard.push(false);
+        row_wrapped.push(wrapped);
     }
     let streams = content_streams(doc, &p.dict);
     let pieces = Pieces::join(&streams.iter().map(|(_, d)| d.as_slice()).collect::<Vec<_>>());
@@ -683,18 +725,19 @@ pub(super) fn rewrite_styled_block(
         .filter_map(|rows| {
             let a = rows[0].first().and_then(|i| lines.get(*i))?;
             let b = rows[1].first().and_then(|i| lines.get(*i))?;
-            Some((a.origin.baseline - b.origin.baseline).abs())
+            Some((a.line_baseline() - b.line_baseline()).abs())
         })
         .rfind(|v| *v > 0.0)
         .unwrap_or(first.size * 1.5);
-    let mut baseline = first.origin.baseline;
+    let mut baseline = first.line_baseline();
     for (row_index, row) in rows.iter().enumerate() {
         let anchor = block.rows.get(row_index).and_then(|r| r.first()).and_then(|i| lines.get(*i));
         if style.line_spacing.is_none()
             && style.size.is_none()
+            && style.paragraph_spacing.is_none()
             && let Some(anchor) = anchor
         {
-            baseline = anchor.origin.baseline;
+            baseline = anchor.line_baseline();
         }
         let anchor = anchor.unwrap_or(first);
         if kept.get(row_index).copied().unwrap_or(false) {
@@ -707,11 +750,12 @@ pub(super) fn rewrite_styled_block(
         let original_rect = block.rows.get(row_index).and_then(|row| row_rect(row, lines)).unwrap_or(block.rect);
         let left = if style.width.is_none() && style.align.is_none() { original_rect[0] } else { block.rect[0] };
         let available = if style.width.is_none() && style.align.is_none() { original_rect[2] - original_rect[0] } else { width };
+        let hanging = if row_wrapped.get(row_index).copied().unwrap_or(false) { indent } else { 0.0 };
         let mut x = left
             + match align {
                 crate::added::Align::Center => (available - w) / 2.0,
                 crate::added::Align::Right => available - w,
-                _ => 0.0,
+                _ => hanging,
             };
         let mut pos = 0;
         while pos < row.len() {
@@ -726,6 +770,9 @@ pub(super) fn rewrite_styled_block(
             let m = metrics.get(&item.2).ok_or_else(|| EditError::Invalid("the paragraph font is missing".into()))?;
             let mut state = source.origin.state.clone();
             state.font = Some((item.2.clone(), size_of(source, item.1)));
+            if let Some(s) = script(item.1) {
+                state.rise = around(source, item.1) * s.metrics().1;
+            }
             if let Some(c) = overrides.get(&item.1).and_then(|r| r.char_spacing).or(style.char_spacing) {
                 state.char_spacing = c / source.origin.k.max(1e-6);
             }
@@ -740,7 +787,7 @@ pub(super) fn rewrite_styled_block(
             }
             let inverse = Matrix(o.ctm).invert().ok_or_else(|| EditError::Invalid("the paragraph has a singular transform".into()))?;
             let mut tm = Matrix(source.origin.tm).then(&Matrix(source.origin.ctm)).then(&inverse).0;
-            let (ax, ay) = back.apply(x - source.origin.x, baseline - source.origin.baseline);
+            let (ax, ay) = back.apply(x - source.origin.x, baseline - source.line_baseline());
             tm[4] += ax;
             tm[5] += ay;
             let mut segment_width = segment_advances.get(&(row_index, pos)).copied().unwrap_or(0.0);
@@ -803,6 +850,9 @@ pub(super) fn rewrite_styled_block(
         } else {
             style.line_spacing.unwrap_or(1.5).clamp(0.5, 5.0) * style.size.unwrap_or(anchor.size)
         };
+        if row_hard.get(row_index).copied().unwrap_or(false) {
+            baseline -= style.paragraph_spacing.unwrap_or(0.0);
+        }
     }
     block_ops.push(Op::new("Q", vec![]));
     let mut drop = coincident_ops(lines, &members);
@@ -830,4 +880,55 @@ pub(super) fn rewrite_styled_block(
         d.set(b"Resources".to_vec(), Object::Dict(res));
     })?;
     Ok(LineEdit { substituted })
+}
+
+/// `text` with each line it breaks itself made a `list` item: any bullet or number a line starts
+/// with is replaced (or, for [`List::None`], removed). Blank lines stay blank and unnumbered.
+/// Also returns, for each line, how many characters its marker has.
+pub(crate) fn list_text(text: &str, list: List) -> (String, Vec<usize>) {
+    let mut out = String::with_capacity(text.len() + 8);
+    let mut markers = Vec::new();
+    let mut number = 0u32;
+    for (i, line) in text.split('\n').enumerate() {
+        if i > 0 {
+            out.push('\n');
+        }
+        let body = strip_marker(line);
+        if body.trim().is_empty() {
+            out.push_str(line);
+            markers.push(0);
+            continue;
+        }
+        let marker = match list {
+            List::None => String::new(),
+            List::Bullet => "• ".to_owned(),
+            List::Numbered => {
+                number = number.saturating_add(1);
+                format!("{number}. ")
+            }
+        };
+        markers.push(marker.chars().count());
+        out.push_str(&marker);
+        out.push_str(body);
+    }
+    (out, markers)
+}
+
+/// `line` without a leading list marker ("• ", "- ", "1. " or "1) ").
+fn strip_marker(line: &str) -> &str {
+    let trimmed = line.trim_start();
+    let rest = if let Some(r) = trimmed.strip_prefix(['•', '◦', '▪', '-', '–']) {
+        r
+    } else {
+        let digits = trimmed.find(|c: char| !c.is_ascii_digit()).unwrap_or(trimmed.len());
+        match trimmed.get(digits..).and_then(|r| r.strip_prefix(['.', ')'])) {
+            Some(r) if digits > 0 && digits <= 4 => r,
+            _ => return line,
+        }
+    };
+    // A marker is followed by a space; "-5" or "3.5" are not markers.
+    match rest.strip_prefix([' ', '\t']) {
+        Some(r) => r.trim_start_matches([' ', '\t']),
+        None => line,
+    }
 }

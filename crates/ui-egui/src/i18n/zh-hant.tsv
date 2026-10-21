@@ -2530,3 +2530,9 @@ decimal separator	.	.
 	This document doesn't allow copying its content, so it isn't sent to the assistant.	此文件不允許複製其內容，因此不會傳送給助理。
 	Try again	重試
 	Price per million tokens read / written	每百萬權杖價格（讀取 / 寫入）
+	Superscript	上標
+	Subscript	下標
+	Normal position	正常位置
+	Bulleted list	項目符號清單
+	Numbered list	編號清單
+	Paragraph spacing	段落間距

@@ -2603,3 +2603,9 @@ decimal separator	.	,
 	This document doesn't allow copying its content, so it isn't sent to the assistant.	Цей документ не дозволяє копіювати свій вміст, тому його не надсилають асистентові.
 	Try again	Спробувати ще раз
 	Price per million tokens read / written	Ціна за мільйон прочитаних / написаних токенів
+	Superscript	Верхній індекс
+	Subscript	Нижній індекс
+	Normal position	Звичайне положення
+	Bulleted list	Маркований список
+	Numbered list	Нумерований список
+	Paragraph spacing	Інтервал між абзацами

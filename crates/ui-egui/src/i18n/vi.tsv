@@ -2832,3 +2832,9 @@ key	Space	Space
 decimal separator	.	,
 file state	Open	Đang mở
 phone bar	Edit	Sửa
+	Superscript	Chỉ số trên
+	Subscript	Chỉ số dưới
+	Normal position	Vị trí bình thường
+	Bulleted list	Danh sách dấu đầu dòng
+	Numbered list	Danh sách đánh số
+	Paragraph spacing	Khoảng cách đoạn

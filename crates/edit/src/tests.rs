@@ -3634,6 +3634,7 @@ fn disjoint_style_ranges_preserve_unselected_runs_and_validate_utf8_atomically()
                 underline: Some(true),
                 char_spacing: None,
                 scale: None,
+                script: None,
             },
             RangeStyle {
                 range: b..b + 4,
@@ -3644,6 +3645,7 @@ fn disjoint_style_ranges_preserve_unselected_runs_and_validate_utf8_atomically()
                 underline: None,
                 char_spacing: Some(0.2),
                 scale: Some(90.0),
+                script: None,
             },
         ],
         width: Some(300.0),
@@ -3673,6 +3675,7 @@ fn disjoint_style_ranges_preserve_unselected_runs_and_validate_utf8_atomically()
             underline: None,
             char_spacing: None,
             scale: None,
+            script: None,
         }],
         ..Default::default()
     };
@@ -3993,6 +3996,7 @@ fn turned_paragraph_keeps_its_line_breaks_when_a_word_is_added() {
         underline: None,
         char_spacing: None,
         scale: None,
+        script: None,
     };
     let style = text::BlockStyle { ranges: vec![range], ..Default::default() };
     assert!(text::rewrite_block(&mut doc, 0, 0, Some("Only line"), &style).is_err());
@@ -4266,6 +4270,7 @@ fn rows_the_edit_does_not_reach_keep_their_source_operators() {
         underline: None,
         char_spacing: None,
         scale: None,
+        script: None,
     };
     text::rewrite_block(&mut doc, 0, block, Some(&draft), &text::BlockStyle { ranges: vec![range], ..Default::default() }).unwrap();
     let bytes = String::from_utf8_lossy(&page_content_bytes(&doc, 0)).into_owned();
@@ -4798,4 +4803,105 @@ fn flattening_comments_keeps_annotations_that_are_not_comments() {
     assert_eq!(flatten(&mut doc, &[0], false, true).unwrap(), 1, "the widget");
     let without_widget: Vec<&str> = all.iter().copied().filter(|s| *s != "Widget").collect();
     assert_eq!(left(&reopen(&doc)), without_widget, "flattening fields touches no annotation that isn't a widget");
+}
+
+/// Superscript and subscript shrink part of a line and move its baseline (Ts); the text reads the
+/// same afterwards.
+#[test]
+fn superscript_and_subscript_shift_part_of_a_line() {
+    let mut doc = text_page("BT /F1 12 Tf 72 700 Td (E = mc2 and H2O) Tj ET");
+    let style = text::BlockStyle {
+        ranges: vec![
+            text::RangeStyle { range: 6..7, script: Some(text::Script::Super), ..Default::default() },
+            text::RangeStyle { range: 13..14, script: Some(text::Script::Sub), ..Default::default() },
+        ],
+        ..Default::default()
+    };
+    text::rewrite_block(&mut doc, 0, 0, Some("E = mc2 and H2O"), &style).unwrap();
+    let content = streams(&doc, 0).join("\n");
+    assert!(content.contains("4.2 Ts"), "superscript raised by 0.35 × 12: {content}");
+    assert!(content.contains("-1.8 Ts"), "subscript lowered by 0.15 × 12: {content}");
+    assert!(content.contains("7.8 Tf"), "shifted characters at 0.65 × 12: {content}");
+    let reopened = reopen(&doc);
+    let read: String = text::text_lines(&reopened, 0).unwrap().iter().map(|l| l.text.as_str()).collect::<Vec<_>>().join("");
+    for part in ["E = mc", "2", "and H", "O"] {
+        assert!(read.contains(part), "{part:?} in {read:?}");
+    }
+    // Back on the baseline: no shift, the paragraph's own size.
+    let mut doc = text_page("BT /F1 12 Tf 72 700 Td (x2) Tj ET");
+    let up = text::BlockStyle {
+        ranges: vec![text::RangeStyle { range: 1..2, script: Some(text::Script::Super), ..Default::default() }],
+        ..Default::default()
+    };
+    text::rewrite_block(&mut doc, 0, 0, Some("x2"), &up).unwrap();
+    let down = text::BlockStyle {
+        ranges: vec![text::RangeStyle { range: 1..2, script: Some(text::Script::Normal), ..Default::default() }],
+        ..Default::default()
+    };
+    let mut doc = reopen(&doc);
+    let block = text::text_blocks(&doc, 0).unwrap().remove(0);
+    assert_eq!(block.editor_text, "x2", "a superscript reads as part of its line");
+    text::rewrite_block(&mut doc, 0, 0, Some(&block.editor_text), &down).unwrap();
+    let lines = text::text_lines(&reopen(&doc), 0).unwrap();
+    let two = lines.iter().find(|l| l.text.contains('2')).unwrap();
+    assert!((two.size - 12.0).abs() < 0.01 && (two.origin_baseline() - 700.0).abs() < 0.01, "{lines:?}");
+}
+
+/// Paragraph spacing adds room after each line the text breaks itself, not after wrapped lines.
+#[test]
+fn paragraph_spacing_adds_room_between_paragraphs() {
+    let original = text_page("BT /F1 12 Tf 14 TL 72 700 Td (First) Tj T* (Second) Tj ET");
+    assert_eq!(text::text_blocks(&original, 0).unwrap()[0].editor_text, "First\nSecond");
+    let mut doc = original.clone();
+    let style = text::BlockStyle { paragraph_spacing: Some(10.0), ..Default::default() };
+    text::rewrite_block(&mut doc, 0, 0, None, &style).unwrap();
+    let lines = text::text_lines(&reopen(&doc), 0).unwrap();
+    assert_eq!(lines.len(), 2, "{lines:?}");
+    let gap = lines[0].origin_baseline() - lines[1].origin_baseline();
+    assert!((gap - 24.0).abs() < 0.1, "14 pt leading + 10 pt: {gap}");
+    let bad = text::BlockStyle { paragraph_spacing: Some(f64::NAN), ..Default::default() };
+    assert!(text::rewrite_block(&mut original.clone(), 0, 0, None, &bad).is_err());
+}
+
+/// A list marks each line the text breaks itself; changing the kind replaces the markers, and
+/// a wrapped item's next line starts under its text, not under its marker.
+#[test]
+fn lists_mark_each_line_and_indent_wrapped_items() {
+    let original = text_page("BT /F1 12 Tf 14 TL 72 700 Td (Apples) Tj T* (Pears) Tj ET");
+    let listed = |doc: &Document, list| {
+        let mut doc = doc.clone();
+        text::rewrite_block(&mut doc, 0, 0, None, &text::BlockStyle { list: Some(list), ..Default::default() }).unwrap();
+        reopen(&doc)
+    };
+    let bullets = listed(&original, text::List::Bullet);
+    assert_eq!(text::text_blocks(&bullets, 0).unwrap()[0].editor_text, "• Apples\n• Pears");
+    let numbers = listed(&bullets, text::List::Numbered);
+    assert_eq!(text::text_blocks(&numbers, 0).unwrap()[0].editor_text, "1. Apples\n2. Pears");
+    let plain = listed(&numbers, text::List::None);
+    assert_eq!(text::text_blocks(&plain, 0).unwrap()[0].editor_text, "Apples\nPears");
+    // A long item wraps; its second line is indented past the marker.
+    let mut doc = original.clone();
+    let style = text::BlockStyle { list: Some(text::List::Bullet), width: Some(120.0), ..Default::default() };
+    text::rewrite_block(&mut doc, 0, 0, Some("A long item that has to wrap onto a second line\nPears"), &style).unwrap();
+    let lines = text::text_lines(&reopen(&doc), 0).unwrap();
+    assert!(lines.len() >= 3, "{lines:?}");
+    let (first, second) = (lines[0].rect[0], lines[1].rect[0]);
+    assert!(second > first + 3.0, "wrapped line indented: {first} {second}");
+    let last = lines.last().unwrap();
+    assert!((last.rect[0] - first).abs() < 0.5 && last.text.starts_with('•'), "next item back at the margin: {last:?}");
+    // A list and part-of-text formatting in one step are refused.
+    let style = text::BlockStyle {
+        list: Some(text::List::Bullet),
+        ranges: vec![text::RangeStyle { range: 0..1, size: Some(20.0), ..Default::default() }],
+        ..Default::default()
+    };
+    assert!(text::rewrite_block(&mut original.clone(), 0, 0, None, &style).is_err());
+}
+
+#[test]
+fn list_markers_are_recognised_only_before_a_space() {
+    use text::List;
+    assert_eq!(text::list_text("-5 degrees\n3.5 kg", List::None).0, "-5 degrees\n3.5 kg");
+    assert_eq!(text::list_text("- a\n12) b\n\n• c", List::Numbered), ("1. a\n2. b\n\n3. c".to_owned(), vec![3, 3, 0, 3]));
+    assert_eq!(text::list_text("", List::Bullet).0, "");
 }

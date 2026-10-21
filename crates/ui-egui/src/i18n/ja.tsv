@@ -2580,3 +2580,9 @@ decimal separator	.	.
 	This document doesn't allow copying its content, so it isn't sent to the assistant.	この文書は内容のコピーを許可していないため、アシスタントには送信されません。
 	Try again	再試行
 	Price per million tokens read / written	100万トークンあたりの価格（読み取り / 書き込み）
+	Superscript	上付き
+	Subscript	下付き
+	Normal position	標準の位置
+	Bulleted list	箇条書き
+	Numbered list	番号付きリスト
+	Paragraph spacing	段落の間隔

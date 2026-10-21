@@ -1950,7 +1950,7 @@ milestone = "M7"
 status = "shipped"
 commands = ["edit.edit_text"]
 tools = ["text_edit"]
-evidence = ["crates/edit/src/tests.rs::justify_underline_and_spacing", "crates/edit/src/tests.rs::paragraphs_take_new_formatting", "crates/ui-egui/tests/editing.rs::the_format_panel_restyles_the_paragraph_being_edited"]
+evidence = ["crates/edit/src/tests.rs::justify_underline_and_spacing", "crates/edit/src/tests.rs::paragraphs_take_new_formatting", "crates/ui-egui/tests/editing.rs::the_format_panel_restyles_the_paragraph_being_edited", "crates/edit/src/tests.rs::paragraph_spacing_adds_room_between_paragraphs"]
 notes = "bold and italic through the standard families; underline drawn under each line in the text colour"
 
 [[feature]]
@@ -1959,11 +1959,11 @@ title = "Superscript and subscript"
 area = "C"
 tier = "P2"
 milestone = "M7"
-status = "planned"
-commands = []
-tools = []
-evidence = []
-notes = ""
+status = "shipped"
+commands = ["edit.edit_text"]
+tools = ["text_edit"]
+evidence = ["crates/edit/src/tests.rs::superscript_and_subscript_shift_part_of_a_line", "crates/ui-egui/src/edit_text_ui.rs::format_text_sets_superscript_lists_and_paragraph_spacing", "crates/automation/tests/automation.rs::text_edit_sets_lists_paragraph_spacing_and_superscript"]
+notes = "Existing paragraphs: Format text x² / x₂ / x on the selection (or the whole paragraph), text_edit ranges[].script. Shifted text is drawn at 0.65 × the size around it with a text rise (Ts) of +0.35 or −0.15 × that size, and reads back as part of its line (rows group by the baseline without rise). Back to normal restores the size of the unshifted text. Not yet for added text boxes, right-to-left, turned or Indic text, or from the phone."
 
 [[feature]]
 id = "edit.paragraph-alignment"
@@ -1974,7 +1974,7 @@ milestone = "M7"
 status = "shipped"
 commands = ["edit.edit_text", "edit.text"]
 tools = ["text_edit", "content_update"]
-evidence = ["crates/edit/src/tests.rs::justify_underline_and_spacing", "crates/edit/src/tests.rs::paragraphs_take_new_formatting", "crates/ui-egui/tests/editing.rs::the_format_panel_restyles_the_paragraph_being_edited"]
+evidence = ["crates/edit/src/tests.rs::justify_underline_and_spacing", "crates/edit/src/tests.rs::paragraphs_take_new_formatting", "crates/ui-egui/tests/editing.rs::the_format_panel_restyles_the_paragraph_being_edited", "crates/edit/src/tests.rs::paragraph_spacing_adds_room_between_paragraphs"]
 notes = "left, centre, right and justify (word spacing per line, last line left) for existing paragraphs and added text"
 
 [[feature]]
@@ -1986,8 +1986,8 @@ milestone = "M7"
 status = "partial"
 commands = ["edit.edit_text"]
 tools = ["text_edit"]
-evidence = ["crates/edit/src/tests.rs::justify_underline_and_spacing", "crates/edit/src/tests.rs::paragraphs_take_new_formatting", "crates/ui-egui/tests/editing.rs::the_format_panel_restyles_the_paragraph_being_edited"]
-notes = "line spacing (1, 1.15, 1.5, 2 × size or any multiple); space between paragraphs is not adjustable yet"
+evidence = ["crates/edit/src/tests.rs::justify_underline_and_spacing", "crates/edit/src/tests.rs::paragraphs_take_new_formatting", "crates/ui-egui/tests/editing.rs::the_format_panel_restyles_the_paragraph_being_edited", "crates/edit/src/tests.rs::paragraph_spacing_adds_room_between_paragraphs"]
+notes = "line spacing (1, 1.15, 1.5, 2 × size or any multiple); space between paragraphs in points after each line the text breaks itself (Format text ▸ Paragraph spacing, text_edit paragraph_spacing). Missing: space before, per-paragraph values in one box, and both on the phone."
 
 [[feature]]
 id = "edit.char-spacing-scale"
@@ -1998,7 +1998,7 @@ milestone = "M7"
 status = "shipped"
 commands = ["edit.edit_text"]
 tools = ["text_edit"]
-evidence = ["crates/edit/src/tests.rs::justify_underline_and_spacing", "crates/edit/src/tests.rs::paragraphs_take_new_formatting", "crates/ui-egui/tests/editing.rs::the_format_panel_restyles_the_paragraph_being_edited"]
+evidence = ["crates/edit/src/tests.rs::justify_underline_and_spacing", "crates/edit/src/tests.rs::paragraphs_take_new_formatting", "crates/ui-egui/tests/editing.rs::the_format_panel_restyles_the_paragraph_being_edited", "crates/edit/src/tests.rs::paragraph_spacing_adds_room_between_paragraphs"]
 notes = "character spacing in points and horizontal scaling in percent for a paragraph (Tc, Tz), rewrapped"
 
 [[feature]]
@@ -2007,11 +2007,11 @@ title = "Bulleted and numbered lists"
 area = "C"
 tier = "P1"
 milestone = "M7"
-status = "planned"
-commands = []
-tools = []
-evidence = []
-notes = ""
+status = "partial"
+commands = ["edit.edit_text"]
+tools = ["text_edit"]
+evidence = ["crates/edit/src/tests.rs::lists_mark_each_line_and_indent_wrapped_items", "crates/edit/src/tests.rs::list_markers_are_recognised_only_before_a_space", "crates/ui-egui/src/edit_text_ui.rs::format_text_sets_superscript_lists_and_paragraph_spacing", "crates/automation/tests/automation.rs::text_edit_sets_lists_paragraph_spacing_and_superscript"]
+notes = "Existing paragraphs: each line the text breaks itself becomes an item marked • or 1., 2. …; switching replaces the markers, None removes them (also - , 1) , ◦ , ▪). Wrapped lines hang under the item's text and the box grows by the marker. Missing: nested levels, marker styles (letters, roman), list continuation across paragraphs, lists in added text boxes or on the phone, and tagging items as L/LI."
 
 [[feature]]
 id = "edit.add-text"

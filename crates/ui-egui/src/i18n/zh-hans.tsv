@@ -2544,3 +2544,9 @@ decimal separator	.	.
 	This document doesn't allow copying its content, so it isn't sent to the assistant.	此文档不允许复制其内容，因此不会发送给助手。
 	Try again	重试
 	Price per million tokens read / written	每百万令牌价格（读取 / 写入）
+	Superscript	上标
+	Subscript	下标
+	Normal position	正常位置
+	Bulleted list	项目符号列表
+	Numbered list	编号列表
+	Paragraph spacing	段落间距

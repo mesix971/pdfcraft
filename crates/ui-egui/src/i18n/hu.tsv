@@ -2579,3 +2579,9 @@ decimal separator	.	,
 	This document doesn't allow copying its content, so it isn't sent to the assistant.	Ez a dokumentum nem engedi a tartalma másolását, ezért nem kerül az asszisztenshez.
 	Try again	Próbáld újra
 	Price per million tokens read / written	Ár millió olvasott / írt tokenenként
+	Superscript	Felső index
+	Subscript	Alsó index
+	Normal position	Normál pozíció
+	Bulleted list	Felsorolás
+	Numbered list	Számozott lista
+	Paragraph spacing	Bekezdések közötti térköz

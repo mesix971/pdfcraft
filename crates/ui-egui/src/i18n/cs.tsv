@@ -2654,3 +2654,9 @@ decimal separator	.	,
 	This document doesn't allow copying its content, so it isn't sent to the assistant.	Tento dokument nedovoluje kopírovat svůj obsah, proto se asistentovi neodesílá.
 	Try again	Zkusit znovu
 	Price per million tokens read / written	Cena za milion přečtených / napsaných tokenů
+	Superscript	Horní index
+	Subscript	Dolní index
+	Normal position	Normální poloha
+	Bulleted list	Seznam s odrážkami
+	Numbered list	Číslovaný seznam
+	Paragraph spacing	Mezery mezi odstavci

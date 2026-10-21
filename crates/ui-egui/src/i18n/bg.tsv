@@ -2543,3 +2543,9 @@ decimal separator	.	,
 	This document doesn't allow copying its content, so it isn't sent to the assistant.	Този документ не позволява копиране на съдържанието му, затова не се изпраща до асистента.
 	Try again	Опитайте отново
 	Price per million tokens read / written	Цена за милион прочетени / написани токена
+	Superscript	Горен индекс
+	Subscript	Долен индекс
+	Normal position	Нормална позиция
+	Bulleted list	Списък с водещи символи
+	Numbered list	Номериран списък
+	Paragraph spacing	Разстояние между абзаците

@@ -22,6 +22,8 @@ use crate::EditError;
 
 #[path = "text_regions.rs"]
 mod regions;
+#[cfg(test)]
+pub(crate) use regions::list_text;
 use regions::{group_blocks, rewrite_styled_block};
 
 /// One line of existing text.
@@ -475,6 +477,22 @@ impl TextLine {
     /// Its box in the same frame, `[along0, across0, along1, across1]` (for upright text, `rect`).
     fn frame_rect(&self) -> [f64; 4] {
         self.frame
+    }
+
+    /// How far its text rise (`Ts`, superscript or subscript) lifts it off its line, in user space.
+    fn rise_offset(&self) -> f64 {
+        let v = self.origin.state.rise * self.origin.k;
+        if v.is_finite() { v } else { 0.0 }
+    }
+
+    /// The baseline of the line it sits on (a superscript's is the text's around it), in user space.
+    fn line_baseline(&self) -> f64 {
+        self.origin.baseline - self.rise_offset()
+    }
+
+    /// [`Self::line_baseline`] across the text's own frame, as [`Self::frame_origin`].
+    fn frame_line(&self) -> f64 {
+        self.frame_origin().1 - self.rise_offset()
     }
 }
 
@@ -2002,9 +2020,48 @@ pub struct BlockStyle {
     /// For an invisible paragraph ([`TextBlock::invisible`]): fill its old area with this colour
     /// (RGB 0–1) before the new text, hiding the scanned word beneath it.
     pub cover: Option<[f64; 3]>,
+    /// Extra space (points) after each line the text breaks itself (`\n`), between paragraphs.
+    pub paragraph_spacing: Option<f64>,
+    /// Make each line the text breaks itself a list item (or plain text again), its wrapped
+    /// lines indented under the item's text.
+    pub list: Option<List>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+/// A paragraph's list style: each line the text breaks itself is an item.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum List {
+    /// No markers: any bullet or number the lines start with is removed.
+    None,
+    /// "• " before each item.
+    Bullet,
+    /// "1. ", "2. " … before each item.
+    Numbered,
+}
+
+/// Where characters sit on the line.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Script {
+    /// On the baseline, at the paragraph's size.
+    Normal,
+    /// Smaller, raised (as in 10² or 1er).
+    Super,
+    /// Smaller, lowered (as in H₂O).
+    Sub,
+}
+
+impl Script {
+    /// The size of shifted characters relative to the text around them, and how far their
+    /// baseline moves (a fraction of that surrounding size, up positive).
+    pub fn metrics(self) -> (f64, f64) {
+        match self {
+            Script::Normal => (1.0, 0.0),
+            Script::Super => (0.65, 0.35),
+            Script::Sub => (0.65, -0.15),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct RangeStyle {
     pub range: std::ops::Range<usize>,
     pub family: Option<(crate::added::Family, bool, bool)>,
@@ -2014,6 +2071,8 @@ pub struct RangeStyle {
     pub underline: Option<bool>,
     pub char_spacing: Option<f64>,
     pub scale: Option<f64>,
+    /// Superscript, subscript or back on the baseline.
+    pub script: Option<Script>,
 }
 
 /// Rewrite paragraph `block` with new text (or its own) and formatting, rewrapped to its width.
@@ -2067,6 +2126,14 @@ fn rewrite_block_from(
         return Err(EditError::Invalid("formatting part of turned text, or choosing a document font for it, isn't supported yet".into()));
     }
     let visual_indic = members.iter().any(|line| line.visual_order);
+    // Lists and paragraph spacing are laid out by the styled path only.
+    let layout = style.paragraph_spacing.is_some() || style.list.is_some();
+    if layout && (hebrew || !upright || visual_indic) {
+        return Err(EditError::Invalid("lists and paragraph spacing aren't supported yet in right-to-left, turned or Indic text".into()));
+    }
+    if layout {
+        return rewrite_styled_block(doc, page, &b, &lines, text, style);
+    }
     if upright
         && !hebrew
         && !visual_indic

@@ -174,22 +174,46 @@ pub struct Extras {
     pub line_spacing: f64,
     pub char_spacing: f64,
     pub scale: f64,
+    /// Points after each line break in the text (0 = none).
+    pub paragraph_spacing: f64,
+    /// The list style chosen (`None`: the paragraph as it is).
+    pub list: Option<pdfcraft_engine::List>,
+    /// Superscript, subscript or normal for the selection (or the whole paragraph), applied once.
+    pub script: Option<pdfcraft_engine::Script>,
 }
 
 impl Default for Extras {
     fn default() -> Self {
-        Extras { underline: false, line_spacing: 0.0, char_spacing: 0.0, scale: 100.0 }
+        Extras { underline: false, line_spacing: 0.0, char_spacing: 0.0, scale: 100.0, paragraph_spacing: 0.0, list: None, script: None }
     }
 }
 
-/// Underline, line spacing, character spacing and horizontal scale for the paragraph being
-/// edited (under Format text). Returns `true` when something changed.
+/// Underline, superscript and subscript, lists, line and paragraph spacing, character spacing
+/// and horizontal scale for the paragraph being edited (under Format text). Returns `true` when
+/// something changed.
 pub(crate) fn extras_panel(ui: &mut egui::Ui, e: &mut Extras) -> bool {
+    use pdfcraft_engine::{List, Script};
     let before = *e;
     ui.horizontal(|ui| {
         if crate::icons::button(ui, "underline", 26.0, e.underline, tl!("Underline")).clicked() {
             e.underline = !e.underline;
         }
+        for (label, script, tip) in [("x²", Script::Super, tl!("Superscript")), ("x₂", Script::Sub, tl!("Subscript"))] {
+            if ui.selectable_label(false, label).on_hover_text(tip).clicked() {
+                e.script = Some(script);
+            }
+        }
+        if ui.selectable_label(false, "x").on_hover_text(tl!("Normal position")).clicked() {
+            e.script = Some(Script::Normal);
+        }
+        for (icon, list, tip) in [("list", List::Bullet, tl!("Bulleted list")), ("list-ordered", List::Numbered, tl!("Numbered list"))] {
+            let on = e.list == Some(list);
+            if crate::icons::button(ui, icon, 26.0, on, tip).clicked() {
+                e.list = Some(if on { List::None } else { list });
+            }
+        }
+    });
+    ui.horizontal(|ui| {
         let zero = tl!("Line spacing").to_string();
         let label = |v: f64| if v == 0.0 { zero.clone() } else { format!("{v:.2}×") };
         crate::widgets::combo("line-spacing").selected_text(label(e.line_spacing)).width(110.0).show_ui(ui, |ui| {
@@ -197,6 +221,10 @@ pub(crate) fn extras_panel(ui: &mut egui::Ui, e: &mut Extras) -> bool {
                 ui.selectable_value(&mut e.line_spacing, v, label(v));
             }
         });
+    });
+    ui.horizontal(|ui| {
+        let l = ui.label(tl!("Paragraph spacing"));
+        ui.add(egui::DragValue::new(&mut e.paragraph_spacing).range(0.0..=200.0).speed(0.5).suffix(" pt")).labelled_by(l.id);
     });
     ui.horizontal(|ui| {
         let l = ui.label(tl!("Character spacing"));
@@ -238,8 +266,11 @@ impl LineEditor {
                 .then_some(self.extras.line_spacing),
             char_spacing: (self.extras.char_spacing != self.extras0.char_spacing).then_some(self.extras.char_spacing),
             scale: (self.extras.scale != self.extras0.scale).then_some(self.extras.scale),
+            paragraph_spacing: (self.extras.paragraph_spacing != self.extras0.paragraph_spacing).then_some(self.extras.paragraph_spacing),
+            list: (self.extras.list != self.extras0.list).then_some(self.extras.list).flatten(),
             ..Default::default()
         };
+        let script = self.extras.script;
         if let Some(range) = &self.selection
             && (style.family.is_some()
                 || style.resource.is_some()
@@ -247,7 +278,8 @@ impl LineEditor {
                 || style.color.is_some()
                 || style.underline.is_some()
                 || style.char_spacing.is_some()
-                || style.scale.is_some())
+                || style.scale.is_some()
+                || script.is_some())
         {
             style.ranges.push(pdfcraft_engine::RangeStyle {
                 range: range.clone(),
@@ -258,7 +290,11 @@ impl LineEditor {
                 underline: style.underline.take(),
                 char_spacing: style.char_spacing.take(),
                 scale: style.scale.take(),
+                script,
             });
+        } else if script.is_some() && !self.text.is_empty() {
+            // Nothing selected: the whole paragraph moves.
+            style.ranges.push(pdfcraft_engine::RangeStyle { range: 0..self.text.len(), script, ..Default::default() });
         }
         style
     }
@@ -268,6 +304,8 @@ impl LineEditor {
         self.selection = None;
         self.font_resource = None;
         self.look0 = self.look.clone();
+        // Superscript and subscript are actions on the selection, not a state the panel keeps.
+        self.extras.script = None;
         self.extras0 = self.extras;
         self.original = self.text.clone();
         self.focus = true;
@@ -1506,6 +1544,39 @@ mod tests {
             extras0: Extras::default(),
         };
         (app, ed)
+    }
+
+    /// Superscript applies to the selection once; a list marks the paragraph and stays chosen;
+    /// paragraph spacing is sent only when it changes.
+    #[test]
+    fn format_text_sets_superscript_lists_and_paragraph_spacing() {
+        let (mut app, mut ed) = preview_app();
+        ed.selection = Some(8..12);
+        ed.extras.script = Some(pdfcraft_engine::Script::Super);
+        let style = ed.style();
+        assert_eq!(style.ranges.len(), 1);
+        assert_eq!((style.ranges[0].range.clone(), style.ranges[0].script), (8..12, Some(pdfcraft_engine::Script::Super)));
+        app.apply_line_format(0, ed, None);
+        let doc = app.session.get(app.views[0].id).unwrap();
+        let lines = doc.text_lines(0);
+        let small = lines.iter().find(|l| l.text.contains("text")).unwrap();
+        let big = lines.iter().find(|l| l.text.contains("Preview")).unwrap();
+        assert!(small.size < big.size * 0.7 && small.rect[1] > big.rect[1], "{lines:?}");
+        let ed = app.views[0].line_editor.clone().unwrap();
+        assert_eq!(ed.extras.script, None, "superscript is an action, not a kept state");
+        assert_eq!(ed.style(), pdfcraft_engine::BlockStyle::default(), "nothing left to send");
+
+        let (mut app, mut ed) = preview_app();
+        ed.extras.list = Some(pdfcraft_engine::List::Bullet);
+        ed.extras.paragraph_spacing = 6.0;
+        let style = ed.style();
+        assert_eq!((style.list, style.paragraph_spacing), (Some(pdfcraft_engine::List::Bullet), Some(6.0)));
+        app.apply_line_format(0, ed, None);
+        let doc = app.session.get(app.views[0].id).unwrap();
+        assert_eq!(doc.text_blocks(0)[0].editor_text, "• Preview text");
+        let ed = app.views[0].line_editor.clone().unwrap();
+        assert_eq!(ed.extras.list, Some(pdfcraft_engine::List::Bullet), "the list button stays on");
+        assert_eq!(ed.text, "• Preview text", "the editor shows the marker");
     }
 
     #[test]

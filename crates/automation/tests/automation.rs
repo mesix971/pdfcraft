@@ -477,6 +477,28 @@ fn tool_table_is_well_formed() {
     }
 }
 
+/// text_edit makes a list, adds paragraph spacing and raises a superscript; bad values change nothing.
+#[test]
+fn text_edit_sets_lists_paragraph_spacing_and_superscript() {
+    let dir = workdir("lists-script");
+    let mut a = auto(&dir);
+    let id = ok(&mut a, "doc_open", json!({"path":"a.pdf"}))["doc"].as_u64().unwrap();
+    ok(&mut a, "text_edit", json!({"doc":id,"page":1,"paragraph":1,"list":"bullet","paragraph_spacing":4}));
+    assert_eq!(page_text(&mut a, id)[0], "• Page 1");
+    ok(&mut a, "text_edit", json!({"doc":id,"page":1,"paragraph":1,"text":"• Page 1","ranges":[{"range":[9,10],"script":"super"}]}));
+    let lines = ok(&mut a, "text_lines", json!({"doc":id,"page":1}));
+    let one = lines["lines"].as_array().unwrap().iter().find(|l| l["text"].as_str() == Some("1")).cloned();
+    assert!(one.as_ref().is_some_and(|l| l["size"].as_f64().is_some_and(|s| (s - 24.0 * 0.65).abs() < 0.01)), "{lines}");
+    let before = ok(&mut a, "text_lines", json!({"doc":id,"page":1}));
+    for bad in [json!({"list":"stars"}), json!({"paragraph_spacing":-1}), json!({"ranges":[{"range":[0,1],"script":"up"}]})] {
+        let mut args = json!({"doc":id,"page":1,"paragraph":1});
+        args.as_object_mut().unwrap().extend(bad.as_object().unwrap().clone());
+        assert!(a.call("text_edit", &args).is_err(), "{bad}");
+    }
+    assert_eq!(ok(&mut a, "text_lines", json!({"doc":id,"page":1})), before);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
 #[test]
 fn explicit_font_and_disjoint_ranges_save_reopen_through_tools() {
     let dir = workdir("font-ranges");
