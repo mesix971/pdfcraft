@@ -2563,3 +2563,10 @@ decimal separator	.	,
 	Bulleted list	Lista punktowana
 	Numbered list	Lista numerowana
 	Paragraph spacing	Odstęp między akapitami
+	Attach file…	Dołącz plik…
+	Delete attachment	Usuń załącznik
+	Edit description	Edytuj opis
+	Attach {name}	Dołącz {name}
+	Delete attachment {name}	Usuń załącznik {name}
+	Describe attachment {name}	Opisz załącznik {name}
+	{name} is too large to attach (at most 512 MB).	{name} jest za duży, by go dołączyć (najwyżej 512 MB).

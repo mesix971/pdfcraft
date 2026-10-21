@@ -2838,3 +2838,10 @@ phone bar	Edit	Sửa
 	Bulleted list	Danh sách dấu đầu dòng
 	Numbered list	Danh sách đánh số
 	Paragraph spacing	Khoảng cách đoạn
+	Attach file…	Đính kèm tệp…
+	Delete attachment	Xóa tệp đính kèm
+	Edit description	Sửa mô tả
+	Attach {name}	Đính kèm {name}
+	Delete attachment {name}	Xóa tệp đính kèm {name}
+	Describe attachment {name}	Mô tả tệp đính kèm {name}
+	{name} is too large to attach (at most 512 MB).	{name} quá lớn để đính kèm (tối đa 512 MB).

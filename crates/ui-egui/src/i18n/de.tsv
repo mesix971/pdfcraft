@@ -2588,3 +2588,10 @@ decimal separator	.	,
 	Bulleted list	Aufzählung
 	Numbered list	Nummerierte Liste
 	Paragraph spacing	Absatzabstand
+	Attach file…	Datei anhängen…
+	Delete attachment	Anhang löschen
+	Edit description	Beschreibung bearbeiten
+	Attach {name}	{name} anhängen
+	Delete attachment {name}	Anhang {name} löschen
+	Describe attachment {name}	Anhang {name} beschreiben
+	{name} is too large to attach (at most 512 MB).	{name} ist zu groß zum Anhängen (höchstens 512 MB).

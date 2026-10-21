@@ -2660,3 +2660,10 @@ decimal separator	.	,
 	Bulleted list	Seznam s odrážkami
 	Numbered list	Číslovaný seznam
 	Paragraph spacing	Mezery mezi odstavci
+	Attach file…	Připojit soubor…
+	Delete attachment	Odstranit přílohu
+	Edit description	Upravit popis
+	Attach {name}	Připojit {name}
+	Delete attachment {name}	Odstranit přílohu {name}
+	Describe attachment {name}	Popsat přílohu {name}
+	{name} is too large to attach (at most 512 MB).	{name} je příliš velký k připojení (nejvýše 512 MB).

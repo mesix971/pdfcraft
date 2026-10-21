@@ -2863,3 +2863,10 @@ decimal separator	.	.
 	Bulleted list	قائمة نقطية
 	Numbered list	قائمة مرقمة
 	Paragraph spacing	التباعد بين الفقرات
+	Attach file…	إرفاق ملف…
+	Delete attachment	حذف المرفق
+	Edit description	تعديل الوصف
+	Attach {name}	إرفاق {name}
+	Delete attachment {name}	حذف المرفق {name}
+	Describe attachment {name}	وصف المرفق {name}
+	{name} is too large to attach (at most 512 MB).	{name} أكبر من أن يُرفق (512 ميغابايت كحد أقصى).

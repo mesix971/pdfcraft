@@ -797,10 +797,20 @@ pub fn right_panel(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                     RightPanel::Search => crate::search_ui::panel(ui, &t, view, info.pages.len()),
                     RightPanel::Compare => compare_action = crate::compare_ui::panel(ui, &t, compare, id),
                     RightPanel::Attachments => {
+                        if ui.button(tl!("Attach file…")).clicked() {
+                            panel_command = Some("edit.attach");
+                        }
                         if info.attachments.is_empty() {
                             empty(ui, &t, "paperclip", "This document has no attachments.");
                         }
                         for (ai, a) in info.attachments.iter().enumerate() {
+                            // The document's own files can be described and removed here; a file
+                            // a comment holds goes with its comment.
+                            let key = match &a.source {
+                                pdfcraft_render::AttachmentSource::Document { key } => Some(key.clone()),
+                                pdfcraft_render::AttachmentSource::Annotation { .. } => None,
+                            };
+                            let editing_id = ui.id().with(("attachment-description", ai, &a.name));
                             egui::Frame::NONE.inner_margin(egui::Margin::symmetric(4, 6)).show(ui, |ui| {
                                 ui.horizontal(|ui| {
                                     ui.add(icons::image("paperclip", 16.0, t.icon));
@@ -829,8 +839,37 @@ pub fn right_panel(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                                         {
                                             attachment_action = Some((ai, true));
                                         }
+                                        if let Some(key) = &key {
+                                            if icons::button(ui, "trash-2", 28.0, false, tl!("Delete attachment")).clicked() {
+                                                panel_edit = Some(pdfcraft_engine::Edit::DeleteAttachment { name: key.clone() });
+                                            }
+                                            if icons::button(ui, "pencil", 28.0, false, tl!("Edit description")).clicked() {
+                                                let start = a.description.clone().unwrap_or_default();
+                                                ui.data_mut(|d| d.insert_temp(editing_id, start));
+                                            }
+                                        }
                                     });
                                 });
+                                // Describing it: Enter (or leaving the field) keeps the text, Esc drops it.
+                                if let Some(key) = &key
+                                    && let Some(mut text) = ui.data(|d| d.get_temp::<String>(editing_id))
+                                {
+                                    let r = ui.add(egui::TextEdit::singleline(&mut text).hint_text(tl!("Description")).desired_width(f32::INFINITY));
+                                    if !r.has_focus() && !r.lost_focus() {
+                                        r.request_focus();
+                                    }
+                                    if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                                        ui.data_mut(|d| d.remove::<String>(editing_id));
+                                    } else if r.lost_focus() {
+                                        ui.data_mut(|d| d.remove::<String>(editing_id));
+                                        if text.trim() != a.description.as_deref().unwrap_or("").trim() {
+                                            panel_edit =
+                                                Some(pdfcraft_engine::Edit::SetAttachmentDescription { name: key.clone(), description: text });
+                                        }
+                                    } else {
+                                        ui.data_mut(|d| d.insert_temp(editing_id, text));
+                                    }
+                                }
                             });
                         }
                     }

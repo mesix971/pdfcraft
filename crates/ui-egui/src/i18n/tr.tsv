@@ -2582,3 +2582,10 @@ decimal separator	.	,
 	Bulleted list	Madde işaretli liste
 	Numbered list	Numaralı liste
 	Paragraph spacing	Paragraf aralığı
+	Attach file…	Dosya ekle…
+	Delete attachment	Eki sil
+	Edit description	Açıklamayı düzenle
+	Attach {name}	{name} ekle
+	Delete attachment {name}	{name} ekini sil
+	Describe attachment {name}	{name} ekini açıkla
+	{name} is too large to attach (at most 512 MB).	{name} eklemek için çok büyük (en fazla 512 MB).

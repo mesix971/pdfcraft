@@ -2592,3 +2592,10 @@ decimal separator	.	,
 	Bulleted list	Λίστα με κουκκίδες
 	Numbered list	Αριθμημένη λίστα
 	Paragraph spacing	Απόσταση παραγράφων
+	Attach file…	Επισύναψη αρχείου…
+	Delete attachment	Διαγραφή συνημμένου
+	Edit description	Επεξεργασία περιγραφής
+	Attach {name}	Επισύναψη {name}
+	Delete attachment {name}	Διαγραφή συνημμένου {name}
+	Describe attachment {name}	Περιγραφή συνημμένου {name}
+	{name} is too large to attach (at most 512 MB).	Το {name} είναι πολύ μεγάλο για επισύναψη (έως 512 MB).

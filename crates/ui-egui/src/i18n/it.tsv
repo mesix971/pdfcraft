@@ -2798,3 +2798,10 @@ decimal separator	.	,
 	Bulleted list	Elenco puntato
 	Numbered list	Elenco numerato
 	Paragraph spacing	Spaziatura paragrafi
+	Attach file…	Allega file…
+	Delete attachment	Elimina allegato
+	Edit description	Modifica descrizione
+	Attach {name}	Allega {name}
+	Delete attachment {name}	Elimina l'allegato {name}
+	Describe attachment {name}	Descrivi l'allegato {name}
+	{name} is too large to attach (at most 512 MB).	{name} è troppo grande da allegare (al massimo 512 MB).

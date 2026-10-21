@@ -2495,3 +2495,10 @@ decimal separator	.	.
 	Bulleted list	బుల్లెట్ జాబితా
 	Numbered list	సంఖ్యల జాబితా
 	Paragraph spacing	పేరా అంతరం
+	Attach file…	ఫైల్‌ను జోడించు…
+	Delete attachment	జోడింపును తొలగించు
+	Edit description	వివరణను సవరించు
+	Attach {name}	{name}ను జోడించు
+	Delete attachment {name}	{name} జోడింపును తొలగించు
+	Describe attachment {name}	{name} జోడింపును వివరించు
+	{name} is too large to attach (at most 512 MB).	{name} జోడించడానికి చాలా పెద్దది (గరిష్ఠంగా 512 MB).

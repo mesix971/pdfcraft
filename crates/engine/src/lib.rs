@@ -45,7 +45,7 @@ pub use signature_image::{ImageSignaturePreview, SignatureImage};
 pub use signature_scan::{PhotoRect, ScanError, SignaturePhoto, Turn};
 pub use text_preview::TextEditPreview;
 
-pub use pdfcraft_organize::{BoxSpec, FieldConflicts, PageBox, SplitBy, Transition, TransitionSpec, split_ranges};
+pub use pdfcraft_organize::{Attachment, BoxSpec, FieldConflicts, MAX_ATTACHMENT_BYTES, PageBox, SplitBy, Transition, TransitionSpec, split_ranges};
 
 /// One file produced by a split: (1-based first page, last page, PDF bytes).
 pub use pdfcraft_organize::LabelStyle;
@@ -250,6 +250,7 @@ fn uses_scripts(edit: &Edit) -> bool {
 fn scope_of(edit: &Edit) -> Scope {
     match edit {
         Edit::SetInfo { .. } => Scope::Metadata,
+        Edit::AddAttachment { .. } | Edit::DeleteAttachment { .. } | Edit::SetAttachmentDescription { .. } => Scope::Full,
         // A file attachment also changes the Attachments list.
         Edit::AddAnnotation(a) if matches!(a.shape, Shape::Attachment { .. }) => Scope::Full,
         Edit::AddMeasurement(_)
@@ -631,6 +632,11 @@ impl Document {
 
     pub fn initial_view(&self) -> InitialView {
         self.editor.as_ref().map(|e| pdfcraft_organize::initial_view(&e.cos)).unwrap_or_default()
+    }
+
+    /// The document's file attachments (the catalog's EmbeddedFiles tree), in its order.
+    pub fn attachments(&self) -> Vec<Attachment> {
+        self.editor.as_ref().map(|e| pdfcraft_organize::attachments(&e.cos)).unwrap_or_default()
     }
 
     /// Signed: at least one signature field holds a signature.
@@ -1316,6 +1322,21 @@ pub enum Edit {
         key: String,
         value: String,
     },
+    /// Attachments ▸ Add: attach `data` as `file` (a name taken already gets " (2)"…).
+    AddAttachment {
+        file: String,
+        data: Arc<Vec<u8>>,
+        description: String,
+    },
+    /// Attachments ▸ Delete the attachment listed as `name`.
+    DeleteAttachment {
+        name: String,
+    },
+    /// Attachments ▸ Edit description.
+    SetAttachmentDescription {
+        name: String,
+        description: String,
+    },
     /// Insert pages from another PDF (all pages when `pages` is `None`) at position `at`.
     InsertPagesFrom {
         name: String,
@@ -1969,6 +1990,9 @@ impl Edit {
                 "Keywords" => Label::of("Change Keywords"),
                 _ => Label::with("Change {key}", key.as_str()),
             },
+            Edit::AddAttachment { file, .. } => Label::with("Attach {name}", file.as_str()),
+            Edit::DeleteAttachment { name } => Label::with("Delete attachment {name}", name.as_str()),
+            Edit::SetAttachmentDescription { name, .. } => Label::with("Describe attachment {name}", name.as_str()),
             Edit::InsertPagesFrom { name, .. } => Label::with("Insert pages from {name}", name.as_str()),
             Edit::AddBookmark { .. } => Label::of("Add bookmark"),
             Edit::RenameBookmark { .. } => Label::of("Rename bookmark"),
@@ -2186,6 +2210,9 @@ fn check_permission(edit: &Edit, p: &pdfcraft_cos::Permissions) -> Result<(), Ed
             }
         }
         Edit::SetInfo { .. }
+        | Edit::AddAttachment { .. }
+        | Edit::DeleteAttachment { .. }
+        | Edit::SetAttachmentDescription { .. }
         | Edit::AddHeaderFooter { .. }
         | Edit::AddWatermark { .. }
         | Edit::AddBackground { .. }
@@ -2342,6 +2369,11 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
             pdfcraft_organize::insert_blank_page(doc, *at, *width, *height)?;
         }
         Edit::SetInfo { key, value } => pdfcraft_organize::set_info(doc, key, value)?,
+        Edit::AddAttachment { file, data, description } => {
+            pdfcraft_organize::add_attachment(doc, file, data, description, cx.date.as_deref())?;
+        }
+        Edit::DeleteAttachment { name } => pdfcraft_organize::delete_attachment(doc, name)?,
+        Edit::SetAttachmentDescription { name, description } => pdfcraft_organize::set_attachment_description(doc, name, description)?,
         Edit::DuplicatePages { pages, at } => pdfcraft_organize::duplicate_pages(doc, pages, *at)?,
         Edit::ReplacePages { pages, name, bytes, src_pages } => {
             let src = open_source(name, bytes)?;

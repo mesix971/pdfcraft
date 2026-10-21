@@ -2536,3 +2536,10 @@ decimal separator	.	.
 	Bulleted list	項目符號清單
 	Numbered list	編號清單
 	Paragraph spacing	段落間距
+	Attach file…	附加檔案…
+	Delete attachment	刪除附件
+	Edit description	編輯說明
+	Attach {name}	附加 {name}
+	Delete attachment {name}	刪除附件 {name}
+	Describe attachment {name}	說明附件 {name}
+	{name} is too large to attach (at most 512 MB).	{name} 太大，無法附加（最多 512 MB）。

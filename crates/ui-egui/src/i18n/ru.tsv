@@ -2500,3 +2500,10 @@ decimal separator	.	,
 	Bulleted list	Маркированный список
 	Numbered list	Нумерованный список
 	Paragraph spacing	Интервал между абзацами
+	Attach file…	Прикрепить файл…
+	Delete attachment	Удалить вложение
+	Edit description	Изменить описание
+	Attach {name}	Прикрепить {name}
+	Delete attachment {name}	Удалить вложение {name}
+	Describe attachment {name}	Описать вложение {name}
+	{name} is too large to attach (at most 512 MB).	{name} слишком велик для вложения (не более 512 МБ).

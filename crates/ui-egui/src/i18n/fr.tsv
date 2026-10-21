@@ -2587,3 +2587,10 @@ decimal separator	.	,
 	Bulleted list	Liste à puces
 	Numbered list	Liste numérotée
 	Paragraph spacing	Espace entre paragraphes
+	Attach file…	Joindre un fichier…
+	Delete attachment	Supprimer la pièce jointe
+	Edit description	Modifier la description
+	Attach {name}	Joindre {name}
+	Delete attachment {name}	Supprimer la pièce jointe {name}
+	Describe attachment {name}	Décrire la pièce jointe {name}
+	{name} is too large to attach (at most 512 MB).	{name} est trop volumineux pour être joint (512 Mo au plus).

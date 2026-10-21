@@ -2609,3 +2609,10 @@ decimal separator	.	,
 	Bulleted list	Маркований список
 	Numbered list	Нумерований список
 	Paragraph spacing	Інтервал між абзацами
+	Attach file…	Прикріпити файл…
+	Delete attachment	Видалити вкладення
+	Edit description	Змінити опис
+	Attach {name}	Прикріпити {name}
+	Delete attachment {name}	Видалити вкладення {name}
+	Describe attachment {name}	Описати вкладення {name}
+	{name} is too large to attach (at most 512 MB).	{name} завеликий для вкладення (не більше 512 МБ).

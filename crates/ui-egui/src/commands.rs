@@ -446,6 +446,13 @@ impl PdfCraftApp {
                 self.reveal_tools();
             }
             "edit.image" => self.add_image_dialog(),
+            "edit.attach" => {
+                if self.active.is_none() {
+                    self.notify_tr("Open a document first");
+                } else {
+                    self.pick_files(crate::files::FilePurpose::Attach, true);
+                }
+            }
             "edit.link" => {
                 self.quick_tool = crate::QuickTool::Link;
                 self.notify_tr("Drag a rectangle to create a link; double-click a link to edit it");

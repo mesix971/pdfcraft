@@ -2550,3 +2550,10 @@ decimal separator	.	.
 	Bulleted list	项目符号列表
 	Numbered list	编号列表
 	Paragraph spacing	段落间距
+	Attach file…	附加文件…
+	Delete attachment	删除附件
+	Edit description	编辑说明
+	Attach {name}	附加 {name}
+	Delete attachment {name}	删除附件 {name}
+	Describe attachment {name}	说明附件 {name}
+	{name} is too large to attach (at most 512 MB).	{name} 太大，无法附加（最多 512 MB）。

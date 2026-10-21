@@ -2821,3 +2821,79 @@ fn rotate_repeated_indices_accumulate_from_the_current_page_value() {
         }
     }
 }
+
+/// The attachment listed as `name`: its file's bytes.
+fn attached(doc: &Document, name: &str) -> Vec<u8> {
+    let catalog = catalog(doc);
+    let names = doc.resolve(catalog.get(b"Names").unwrap()).as_dict().cloned().unwrap();
+    let tree = doc.resolve(names.get(b"EmbeddedFiles").unwrap()).as_dict().cloned().unwrap();
+    let list = tree.get(b"Names").unwrap().as_array().unwrap().clone();
+    let at = list.chunks(2).find(|p| doc.resolve(&p[0]).as_string().unwrap().to_text() == name).unwrap();
+    let fs = doc.resolve(&at[1]).as_dict().cloned().unwrap();
+    let ef = doc.resolve(fs.get(b"EF").unwrap()).as_dict().cloned().unwrap();
+    match doc.resolve(ef.get(b"F").unwrap()).as_ref() {
+        Object::Stream(s) => s.decoded().unwrap(),
+        other => panic!("{other:?}"),
+    }
+}
+
+/// Attachments are added under a free name, described, removed, and survive a save; the other
+/// name trees (here the named destinations) stay.
+#[test]
+fn attachments_are_added_described_and_removed() {
+    let mut doc = doc_c();
+    assert_eq!(crate::attachments(&doc).iter().map(|a| a.name.as_str()).collect::<Vec<_>>(), ["notes.txt"]);
+    let key = crate::add_attachment(&mut doc, "notes.txt", b"second file", "Draft", Some("D:20261021120000Z")).unwrap();
+    assert_eq!(key, "notes.txt (2)");
+    let key = crate::add_attachment(&mut doc, "données é.csv", b"a;b", "", None).unwrap();
+    assert_eq!(key, "données é.csv");
+    let doc2 = save_and_reopen(&doc);
+    let list = crate::attachments(&doc2);
+    let mut got: Vec<&str> = list.iter().map(|a| a.name.as_str()).collect();
+    got.sort_unstable();
+    assert_eq!(got, ["données é.csv", "notes.txt", "notes.txt (2)"]);
+    let second = list.iter().find(|a| a.name == "notes.txt (2)").unwrap();
+    assert_eq!((second.file.as_str(), second.description.as_str(), second.size), ("notes.txt", "Draft", Some(11)));
+    assert_eq!(attached(&doc2, "notes.txt (2)"), b"second file");
+    assert_eq!(attached(&doc2, "notes.txt"), b"hello");
+    assert!(doc2.resolve(catalog(&doc2).get(b"Names").unwrap()).as_dict().unwrap().get(b"Dests").is_some(), "named destinations kept");
+
+    let mut doc = doc2;
+    crate::set_attachment_description(&mut doc, "notes.txt", "The first one").unwrap();
+    assert_eq!(crate::attachments(&doc).iter().find(|a| a.name == "notes.txt").unwrap().description, "The first one");
+    crate::delete_attachment(&mut doc, "notes.txt (2)").unwrap();
+    crate::delete_attachment(&mut doc, "données é.csv").unwrap();
+    crate::delete_attachment(&mut doc, "notes.txt").unwrap();
+    let doc = save_and_reopen(&doc);
+    assert!(crate::attachments(&doc).is_empty());
+    let names = doc.resolve(catalog(&doc).get(b"Names").unwrap()).as_dict().cloned().unwrap();
+    assert!(names.get(b"EmbeddedFiles").is_none() && names.get(b"Dests").is_some(), "{names:?}");
+}
+
+#[test]
+fn bad_attachment_requests_change_nothing() {
+    let mut doc = doc_c();
+    for name in ["", "  ", "dir/file.txt", r"a\b", "bell\u{7}"] {
+        assert!(crate::add_attachment(&mut doc, name, b"x", "", None).is_err(), "{name:?}");
+    }
+    assert!(crate::delete_attachment(&mut doc, "missing.txt").is_err());
+    assert!(crate::set_attachment_description(&mut doc, "missing.txt", "x").is_err());
+    assert_eq!(crate::attachments(&doc).len(), 1);
+}
+
+/// A tree whose kids loop, or list one node twice, is read once per node and never hangs.
+#[test]
+fn a_looping_attachment_tree_is_read_once() {
+    let b: Vec<String> = vec![
+        "<< /Type /Catalog /Pages 2 0 R /Names << /EmbeddedFiles 4 0 R >> >>".into(),
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 200 200] >>".into(),
+        "<< /Type /Page /Parent 2 0 R >>".into(),
+        "<< /Kids [4 0 R 5 0 R 5 0 R] >>".into(),
+        "<< /Names [(a.txt) 6 0 R] /Kids [4 0 R 5 0 R] >>".into(),
+        "<< /Type /Filespec /F (a.txt) >>".into(),
+    ];
+    let mut doc = open(build(&b, "/Root 1 0 R"));
+    assert_eq!(crate::attachments(&doc).len(), 1);
+    crate::add_attachment(&mut doc, "b.txt", b"b", "", None).unwrap();
+    assert_eq!(crate::attachments(&doc).iter().map(|a| a.name.clone()).collect::<Vec<_>>(), ["a.txt", "b.txt"]);
+}

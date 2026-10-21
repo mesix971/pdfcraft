@@ -2585,3 +2585,10 @@ decimal separator	.	,
 	Bulleted list	Felsorolás
 	Numbered list	Számozott lista
 	Paragraph spacing	Bekezdések közötti térköz
+	Attach file…	Fájl csatolása…
+	Delete attachment	Melléklet törlése
+	Edit description	Leírás szerkesztése
+	Attach {name}	{name} csatolása
+	Delete attachment {name}	{name} melléklet törlése
+	Describe attachment {name}	{name} melléklet leírása
+	{name} is too large to attach (at most 512 MB).	{name} túl nagy a csatoláshoz (legfeljebb 512 MB).

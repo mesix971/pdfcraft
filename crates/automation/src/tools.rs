@@ -158,6 +158,16 @@ pub fn tools() -> Vec<ToolDef> {
         )),
         t("doc_set_info", "Set document metadata", "Set a document information entry such as Title, Author, Subject or Keywords, or a custom property under any other name (no spaces, delimiters, / or #; at most 127 bytes; doc_info lists them under custom); an empty value removes it. When the file has XMP metadata, the matching XMP property (dc:title, dc:creator, dc:description, pdf:Keywords, xmp:CreatorTool, pdf:Producer) is changed too, so viewers that read XMP first show the new value. Undoable.")
             .with(schema(json!({ "doc": doc(), "key": { "type": "string" }, "value": { "type": "string" } }), &["doc", "key", "value"])),
+        t("attachments_list", "List attachments", "The document's file attachments (the Attachments panel's document-level files, not file-attachment comments): name (its key, used by the other attachments_ tools), file name, description, and size in bytes when the file says it.")
+            .ro()
+            .with(schema(json!({ "doc": doc() }), &["doc"])),
+        t("attachments_add", "Attach a file", "Attach the file at `path` to the document (Edit a PDF ▸ Attach file, Attachments ▸ Add), with an optional description. A name already in use gets \" (2)\", \" (3)\"…; returns the name it got. At most 512 MB. Undoable.")
+            .cmd("edit.attach")
+            .with(schema(json!({ "doc": doc(), "path": { "type": "string" }, "description": { "type": "string" } }), &["doc", "path"])),
+        t("attachments_delete", "Delete an attachment", "Remove the attachment named `name` (from attachments_list) from the document. Undoable.")
+            .with(schema(json!({ "doc": doc(), "name": { "type": "string" } }), &["doc", "name"])),
+        t("attachments_describe", "Describe an attachment", "Set the description of the attachment named `name` (an empty description removes it). Undoable.")
+            .with(schema(json!({ "doc": doc(), "name": { "type": "string" }, "description": { "type": "string" } }), &["doc", "name", "description"])),
         t("page_render", "Render a page", "Render one page to a PNG image (default 96 dpi, at most 600).")
             .ro()
             .with(schema(json!({ "doc": doc(), "page": { "type": "integer", "minimum": 1 }, "dpi": { "type": "number", "minimum": 1, "maximum": 600 },

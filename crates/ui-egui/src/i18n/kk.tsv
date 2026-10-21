@@ -2584,3 +2584,10 @@ decimal separator	.	,
 	Bulleted list	Таңбалауышты тізім
 	Numbered list	Нөмірленген тізім
 	Paragraph spacing	Абзац аралығы
+	Attach file…	Файл тіркеу…
+	Delete attachment	Тіркемені жою
+	Edit description	Сипаттаманы өңдеу
+	Attach {name}	{name} тіркеу
+	Delete attachment {name}	{name} тіркемесін жою
+	Describe attachment {name}	{name} тіркемесін сипаттау
+	{name} is too large to attach (at most 512 MB).	{name} тіркеу үшін тым үлкен (ең көбі 512 МБ).

@@ -2591,3 +2591,10 @@ decimal separator	.	,
 	Bulleted list	Označen seznam
 	Numbered list	Oštevilčen seznam
 	Paragraph spacing	Razmik med odstavki
+	Attach file…	Priloži datoteko…
+	Delete attachment	Izbriši prilogo
+	Edit description	Uredi opis
+	Attach {name}	Priloži {name}
+	Delete attachment {name}	Izbriši prilogo {name}
+	Describe attachment {name}	Opiši prilogo {name}
+	{name} is too large to attach (at most 512 MB).	{name} je prevelika za prilogo (največ 512 MB).

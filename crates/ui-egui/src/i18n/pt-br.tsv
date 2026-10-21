@@ -2601,3 +2601,10 @@ decimal separator	.	,
 	Bulleted list	Lista com marcadores
 	Numbered list	Lista numerada
 	Paragraph spacing	Espaçamento entre parágrafos
+	Attach file…	Anexar arquivo…
+	Delete attachment	Excluir anexo
+	Edit description	Editar descrição
+	Attach {name}	Anexar {name}
+	Delete attachment {name}	Excluir o anexo {name}
+	Describe attachment {name}	Descrever o anexo {name}
+	{name} is too large to attach (at most 512 MB).	{name} é grande demais para anexar (no máximo 512 MB).

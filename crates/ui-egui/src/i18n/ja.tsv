@@ -2586,3 +2586,10 @@ decimal separator	.	.
 	Bulleted list	箇条書き
 	Numbered list	番号付きリスト
 	Paragraph spacing	段落の間隔
+	Attach file…	ファイルを添付…
+	Delete attachment	添付ファイルを削除
+	Edit description	説明を編集
+	Attach {name}	{name} を添付
+	Delete attachment {name}	添付ファイル {name} を削除
+	Describe attachment {name}	添付ファイル {name} の説明
+	{name} is too large to attach (at most 512 MB).	{name} は大きすぎて添付できません (最大 512 MB)。

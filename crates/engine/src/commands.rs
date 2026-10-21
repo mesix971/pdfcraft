@@ -347,6 +347,7 @@ pub const COMMANDS: &[CommandSpec] = &[
     c("edit.watermark.update", "Update watermark…", None, None, Marks(crate::MarkKind::Watermark), "stamp"),
     c("edit.watermark.remove", "Remove watermark", None, None, Marks(crate::MarkKind::Watermark), "stamp"),
     c("edit.background", "Add background…", None, None, Modification, "palette"),
+    c("edit.attach", "Attach file…", None, None, Modification, "paperclip"),
     c("edit.background.update", "Update background…", None, None, Marks(crate::MarkKind::Background), "palette"),
     c("edit.background.remove", "Remove background", None, None, Marks(crate::MarkKind::Background), "palette"),
     c("protect.password", "Protect using password…", FILE, None, Security, "lock"),

@@ -6064,3 +6064,29 @@ fn undo_never_makes_an_unsaved_document_clean() {
     s.undo(new).unwrap();
     assert!(!s.get(new).unwrap().dirty, "once saved, undo back to the saved state is clean");
 }
+
+/// Attachments ▸ Add, describe and delete are undoable steps, and the panel's list follows.
+#[test]
+fn attachments_are_added_described_deleted_and_undone() {
+    let (mut s, id) = session_with(1);
+    let data = Arc::new(b"col1;col2\n1;2\n".to_vec());
+    s.apply(id, Edit::AddAttachment { file: "table.csv".into(), data: data.clone(), description: "Figures".into() }).unwrap();
+    let doc = s.get(id).unwrap();
+    assert_eq!(
+        doc.attachments().iter().map(|a| (a.name.as_str(), a.description.as_str(), a.size)).collect::<Vec<_>>(),
+        [("table.csv", "Figures", Some(14))]
+    );
+    assert_eq!(doc.info.attachments.iter().map(|a| a.name.as_str()).collect::<Vec<_>>(), ["table.csv"], "the Attachments panel lists it");
+    s.apply(id, Edit::AddAttachment { file: "table.csv".into(), data, description: String::new() }).unwrap();
+    s.apply(id, Edit::SetAttachmentDescription { name: "table.csv (2)".into(), description: "Copy".into() }).unwrap();
+    s.apply(id, Edit::DeleteAttachment { name: "table.csv".into() }).unwrap();
+    let names = |s: &Session| s.get(id).unwrap().attachments().into_iter().map(|a| (a.name, a.description)).collect::<Vec<_>>();
+    assert_eq!(names(&s), [("table.csv (2)".to_owned(), "Copy".to_owned())]);
+    assert_eq!(s.undo(id).unwrap().as_str(), "Delete attachment table.csv");
+    assert_eq!(names(&s).len(), 2);
+    s.undo(id).unwrap();
+    s.undo(id).unwrap();
+    s.undo(id).unwrap();
+    assert!(names(&s).is_empty() && s.get(id).unwrap().info.attachments.is_empty());
+    assert!(s.apply(id, Edit::DeleteAttachment { name: "nothing.txt".into() }).is_err());
+}

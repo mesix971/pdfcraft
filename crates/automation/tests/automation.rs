@@ -477,6 +477,37 @@ fn tool_table_is_well_formed() {
     }
 }
 
+/// Files are attached, listed, described and removed through the tools, and only from inside the root.
+#[test]
+fn attachments_are_added_listed_described_and_deleted() {
+    let dir = workdir("attachments");
+    std::fs::write(
+        dir.join("figures.csv"),
+        b"a;b
+1;2
+",
+    )
+    .unwrap();
+    let mut a = auto(&dir);
+    let id = ok(&mut a, "doc_open", json!({"path":"a.pdf"}))["doc"].as_u64().unwrap();
+    assert_eq!(ok(&mut a, "attachments_list", json!({"doc":id}))["count"], 0);
+    let added = ok(&mut a, "attachments_add", json!({"doc":id,"path":"figures.csv","description":"Raw data"}));
+    assert_eq!(added["name"], "figures.csv");
+    let again = ok(&mut a, "attachments_add", json!({"doc":id,"path":"figures.csv"}));
+    assert_eq!(again["name"], "figures.csv (2)");
+    ok(&mut a, "attachments_describe", json!({"doc":id,"name":"figures.csv (2)","description":"Copy"}));
+    ok(&mut a, "attachments_delete", json!({"doc":id,"name":"figures.csv"}));
+    ok(&mut a, "doc_save", json!({"doc":id,"path":"attached.pdf"}));
+    let re = ok(&mut a, "doc_open", json!({"path":"attached.pdf"}))["doc"].as_u64().unwrap();
+    let list = ok(&mut a, "attachments_list", json!({"doc":re}));
+    assert_eq!(list["attachments"], json!([{"name":"figures.csv (2)","file":"figures.csv","description":"Copy","size":8}]));
+    assert!(a.call("attachments_add", &json!({"doc":re,"path":"../outside.csv"})).is_err(), "outside the root");
+    assert!(a.call("attachments_add", &json!({"doc":re,"path":"missing.csv"})).is_err());
+    assert!(a.call("attachments_delete", &json!({"doc":re,"name":"figures.csv"})).is_err());
+    assert_eq!(ok(&mut a, "attachments_list", json!({"doc":re}))["count"], 1);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
 /// text_edit makes a list, adds paragraph spacing and raises a superscript; bad values change nothing.
 #[test]
 fn text_edit_sets_lists_paragraph_spacing_and_superscript() {

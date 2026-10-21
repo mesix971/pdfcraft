@@ -3362,11 +3362,11 @@ title = "Add file attachments"
 area = "D"
 tier = "P2"
 milestone = "M12"
-status = "planned"
-commands = []
-tools = []
-evidence = []
-notes = ""
+status = "shipped"
+commands = ["edit.attach"]
+tools = ["attachments_add", "attachments_list"]
+evidence = ["crates/organize/src/tests.rs::attachments_are_added_described_and_removed", "crates/engine/src/tests.rs::attachments_are_added_described_deleted_and_undone", "crates/automation/tests/automation.rs::attachments_are_added_listed_described_and_deleted", "crates/ui-egui/src/files.rs::picked_files_are_attached_to_the_active_document"]
+notes = "Edit a PDF ▸ Attach file and the Attachments panel's Attach file… pick any files (several at once, at most 512 MB each); each becomes an EmbeddedFiles entry (Filespec /F and /UF, flate-compressed stream with /Params /Size and /ModDate), a taken name getting \" (2)\". The tree is rewritten flat and sorted; an indirect /Names dictionary keeps its other trees. One undo step per file. Also from the phone's Edit ▸ More. Missing: drag and drop onto the panel, associated-file relationships (PDF/A-3)."
 
 [[feature]]
 id = "organize.attachments-delete"
@@ -3374,11 +3374,11 @@ title = "Delete attachments"
 area = "D"
 tier = "P2"
 milestone = "M12"
-status = "planned"
+status = "shipped"
 commands = []
-tools = []
-evidence = []
-notes = ""
+tools = ["attachments_delete"]
+evidence = ["crates/organize/src/tests.rs::attachments_are_added_described_and_removed", "crates/engine/src/tests.rs::attachments_are_added_described_deleted_and_undone", "crates/automation/tests/automation.rs::attachments_are_added_listed_described_and_deleted"]
+notes = "Attachments panel ▸ trash on a document-level file; undoable. A file a comment holds is removed with its comment. The removed file stays in earlier revisions until a full save."
 
 [[feature]]
 id = "organize.attachments-description"
@@ -3386,11 +3386,11 @@ title = "Edit attachment descriptions"
 area = "D"
 tier = "P2"
 milestone = "M12"
-status = "planned"
+status = "shipped"
 commands = []
-tools = []
-evidence = []
-notes = ""
+tools = ["attachments_describe"]
+evidence = ["crates/organize/src/tests.rs::attachments_are_added_described_and_removed", "crates/engine/src/tests.rs::attachments_are_added_described_deleted_and_undone", "crates/automation/tests/automation.rs::attachments_are_added_listed_described_and_deleted"]
+notes = "Attachments panel ▸ pencil: edit in place, Enter or leaving the field keeps it, Esc drops it; an empty description removes /Desc. Undoable. Only for document-level files."
 
 [[feature]]
 id = "organize.associated-files"

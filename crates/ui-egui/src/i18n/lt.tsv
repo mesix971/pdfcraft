@@ -2837,3 +2837,10 @@ decimal separator	.	,
 	Bulleted list	Ženklinimo sąrašas
 	Numbered list	Numeruotas sąrašas
 	Paragraph spacing	Tarpai tarp pastraipų
+	Attach file…	Pridėti failą…
+	Delete attachment	Ištrinti priedą
+	Edit description	Redaguoti aprašą
+	Attach {name}	Pridėti {name}
+	Delete attachment {name}	Ištrinti priedą {name}
+	Describe attachment {name}	Aprašyti priedą {name}
+	{name} is too large to attach (at most 512 MB).	{name} per didelis pridėti (ne daugiau kaip 512 MB).

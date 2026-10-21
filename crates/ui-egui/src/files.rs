@@ -26,6 +26,8 @@ pub enum FilePurpose {
     CreateMultipleSeparate,
     /// Find text and redact ▸ Import list: a text file with one word or phrase per line.
     RedactWords,
+    /// Edit a PDF ▸ Attach file: any files, attached to the active document.
+    Attach,
 }
 
 /// Discover installed document fonts off the GUI thread, only when the picker is opened.
@@ -66,6 +68,9 @@ fn files_picker(purpose: FilePurpose) -> crate::file_dialog::AsyncFileDialog {
     if purpose == FilePurpose::RedactWords {
         return dialog.add_filter(tl!("Text"), &["txt"]);
     }
+    if purpose == FilePurpose::Attach {
+        return dialog;
+    }
     if !matches!(purpose, FilePurpose::CreateMultiple | FilePurpose::CreateMultipleSeparate | FilePurpose::InsertPages | FilePurpose::Combine) {
         return dialog.add_filter("PDF", &["pdf"]);
     }
@@ -95,7 +100,7 @@ pub struct ReplaceDraft {
 impl FilePurpose {
     /// Insert and Replace edit the active document, at its selection.
     pub(crate) fn edits_active_document(self) -> bool {
-        matches!(self, Self::InsertPages | Self::ReplacePages | Self::TextFont { .. })
+        matches!(self, Self::InsertPages | Self::ReplacePages | Self::TextFont { .. } | Self::Attach)
     }
 }
 
@@ -362,6 +367,10 @@ impl PdfCraftApp {
                 self.notify_fmt("{name} is too large for a word list (at most 1 MB).", &[("name", &name)]);
                 return;
             }
+            if purpose == FilePurpose::Attach && std::fs::metadata(p).is_ok_and(|m| m.len() > pdfcraft_engine::MAX_ATTACHMENT_BYTES as u64) {
+                self.notify_fmt("{name} is too large to attach (at most 512 MB).", &[("name", &name)]);
+                return;
+            }
             let read = if matches!(purpose, FilePurpose::TextFont { .. }) {
                 use std::io::Read;
                 std::fs::File::open(p).and_then(|f| {
@@ -521,6 +530,13 @@ impl PdfCraftApp {
                 }
                 self.redact_search.words = pdfcraft_engine::redact_word_list(&pdfcraft_engine::decode_text(&bytes)).join("\n");
                 self.redact_search.mode = crate::redact_ui::SearchMode::Words;
+            }
+            FilePurpose::Attach => {
+                for (file, bytes) in files {
+                    if !self.apply_edit(Edit::AddAttachment { file, data: Arc::new(bytes), description: String::new() }) {
+                        return;
+                    }
+                }
             }
         }
     }
@@ -1113,5 +1129,25 @@ mod stem_tests {
             if path.is_dir() { out.extend(walk(&path)) } else { out.push(path) }
         }
         out
+    }
+}
+
+#[cfg(test)]
+mod attach_tests {
+    use super::FilePurpose;
+
+    /// Edit a PDF ▸ Attach file: each picked file is attached to the active document, a taken
+    /// name gets " (2)", and the Attachments panel's list follows.
+    #[test]
+    fn picked_files_are_attached_to_the_active_document() {
+        let mut app = crate::PdfCraftApp::new();
+        let bytes = app.session.create_from_text("A", "Body").unwrap();
+        app.open_bytes("a.pdf", None, bytes.as_ref().clone()).unwrap();
+        app.use_files(FilePurpose::Attach, vec![("notes.txt".into(), b"hi".to_vec()), ("notes.txt".into(), b"again".to_vec())]);
+        let doc = app.session.get(app.views[0].id).unwrap();
+        let names: Vec<String> = doc.attachments().into_iter().map(|a| a.name).collect();
+        assert_eq!(names, ["notes.txt", "notes.txt (2)"]);
+        assert_eq!(doc.info.attachments.len(), 2, "the panel lists both");
+        assert!(doc.dirty, "attaching is an unsaved change");
     }
 }

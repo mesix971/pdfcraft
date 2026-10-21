@@ -206,6 +206,36 @@ impl Automation {
                 let edit = Edit::SetInfo { key: a.str("key")?.into(), value: a.str("value")?.into() };
                 self.apply(&a, edit)?
             }
+            "attachments_list" => {
+                let list: Vec<Value> = self
+                    .doc(&a)?
+                    .attachments()
+                    .into_iter()
+                    .map(|x| json!({ "name": x.name, "file": x.file, "description": x.description, "size": x.size }))
+                    .collect();
+                json!({ "count": list.len(), "attachments": list })
+            }
+            "attachments_add" => {
+                let path = self.resolve(a.str("path")?, false)?;
+                let size = std::fs::metadata(&path).map_err(|e| failed(format!("{}: {e}", path.display())))?.len();
+                if usize::try_from(size).map_or(true, |n| n > pdfcraft_engine::MAX_ATTACHMENT_BYTES) {
+                    return Err(ToolError::InvalidArgs(format!("{} is larger than an attachment may be (512 MB)", path.display())));
+                }
+                let data = std::fs::read(&path).map_err(|e| failed(format!("{}: {e}", path.display())))?;
+                let file = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                let before: std::collections::HashSet<String> = self.doc(&a)?.attachments().into_iter().map(|x| x.name).collect();
+                let edit = Edit::AddAttachment { file, data: std::sync::Arc::new(data), description: a.opt_str("description")?.unwrap_or("").into() };
+                let mut out = self.apply(&a, edit)?;
+                let name = self.doc(&a)?.attachments().into_iter().map(|x| x.name).find(|n| !before.contains(n));
+                if let Some(o) = out.as_object_mut() {
+                    o.insert("name".into(), json!(name));
+                }
+                out
+            }
+            "attachments_delete" => self.apply(&a, Edit::DeleteAttachment { name: a.str("name")?.into() })?,
+            "attachments_describe" => {
+                self.apply(&a, Edit::SetAttachmentDescription { name: a.str("name")?.into(), description: a.str("description")?.into() })?
+            }
             "page_render" => return self.page_render(&a).map(|c| vec![c]),
             "comment_image_preview" => return self.comment_image_preview(&a),
             "text_extract" => self.text_extract(&a)?,
