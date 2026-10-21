@@ -52,6 +52,7 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
     let mut split_now: Option<crate::SplitPlan> = None;
     let mut split_ready: Option<crate::SplitPlan> = None;
     let mut extract_now = false;
+    let mut find_replace_now = false;
     let mut rotate_now = false;
     let mut link_now: Option<Edit> = None;
     let mut recover: Option<bool> = None;
@@ -614,6 +615,36 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
                     link_now = Some(crate::link_ui::edit_for(d));
                 }
                 close = ok || cancel;
+                return;
+            }
+            Dialog::FindReplace => {
+                let d = &mut app.find_replace_draft;
+                ui.label(egui::RichText::new(tl!("Find and replace")).font(theme::semibold(18.0)));
+                ui.add_space(8.0);
+                egui::Grid::new("find-replace").num_columns(2).spacing([12.0, 8.0]).show(ui, |ui| {
+                    let l = ui.label(tl!("Find"));
+                    let r = ui.add(egui::TextEdit::singleline(&mut d.find).desired_width(280.0)).labelled_by(l.id);
+                    if d.find.is_empty() && !r.has_focus() {
+                        r.request_focus();
+                    }
+                    ui.end_row();
+                    let l = ui.label(tl!("Replace with"));
+                    ui.add(egui::TextEdit::singleline(&mut d.replace).desired_width(280.0)).labelled_by(l.id);
+                    ui.end_row();
+                });
+                ui.add(widgets::checkbox(&mut d.match_case, tl!("Match case")));
+                ui.add(widgets::checkbox(&mut d.whole_words, tl!("Whole words only")));
+                ui.add_space(12.0);
+                let ready = !d.find.trim().is_empty();
+                widgets::buttons_row(ui, |ui| {
+                    if ui.add_enabled_ui(ready, |ui| widgets::pill_button(ui, tl!("Replace all"), true)).inner.clicked() {
+                        find_replace_now = true;
+                        close = true;
+                    }
+                    if widgets::pill_button(ui, tl!("Cancel"), false).clicked() {
+                        close = true;
+                    }
+                });
                 return;
             }
             Dialog::Extract => {
@@ -1335,6 +1366,9 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
     }
     if extract_now {
         app.extract_selection();
+    }
+    if find_replace_now {
+        app.find_replace_all();
     }
     if let Some(e) = link_now {
         app.apply_edit(e);

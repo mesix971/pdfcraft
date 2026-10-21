@@ -2559,3 +2559,12 @@ decimal separator	.	.
 	Send to back	移至最下層
 	Distribute objects	分佈物件
 	Crop	裁剪
+	Find and replace	尋找與取代
+	Find and replace…	尋找與取代…
+	Find	尋找
+	Replace with	取代為
+	Match case	大小寫須相符
+	Replace all	全部取代
+	Replace {name}	取代 {name}
+	No match for {name}.	找不到 {name}。
+	{n} replaced.	已取代 {n} 處。

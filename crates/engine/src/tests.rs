@@ -6128,3 +6128,21 @@ fn displayed_alignment_follows_the_page_rotation() {
         assert_eq!(gathers(doc.displayed_alignment(0, A::DistributeDown)).0, down, "{degrees}° down");
     }
 }
+
+/// Find and replace is one undoable step over every page; nothing found refuses without a step.
+#[test]
+fn find_and_replace_is_one_undoable_step() {
+    let (mut s, id) = session_with(3);
+    let page_text =
+        |s: &Session| (0..3).map(|p| s.get(id).unwrap().text_blocks(p).into_iter().map(|b| b.text).collect::<Vec<_>>().join("|")).collect::<Vec<_>>();
+    let before = page_text(&s);
+    let options = MatchOptions::default();
+    assert_eq!(s.get(id).unwrap().count_matches(None, "page", options).unwrap(), 3);
+    s.apply(id, Edit::FindReplace { pages: None, find: "page".into(), replace: "sheet".into(), options }).unwrap();
+    let after = page_text(&s);
+    assert!(after.iter().all(|t| t.to_lowercase().contains("sheet") && !t.to_lowercase().contains("page")), "{after:?}");
+    assert_eq!(s.undo(id).unwrap().as_str(), "Replace page");
+    assert_eq!(page_text(&s), before);
+    assert!(s.apply(id, Edit::FindReplace { pages: Some(vec![0]), find: "nowhere".into(), replace: "x".into(), options }).is_err());
+    assert_eq!(s.get(id).unwrap().can_undo(), None);
+}

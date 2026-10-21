@@ -2607,3 +2607,12 @@ decimal separator	.	,
 	Send to back	Артқы қатарға жіберу
 	Distribute objects	Нысандарды бөлу
 	Crop	Қию
+	Find and replace	Табу және ауыстыру
+	Find and replace…	Табу және ауыстыру…
+	Find	Табу
+	Replace with	Мынаған ауыстыру
+	Match case	Регистрді ескеру
+	Replace all	Барлығын ауыстыру
+	Replace {name}	{name} ауыстыру
+	No match for {name}.	{name} табылмады.
+	{n} replaced.	{n} ауыстырылды.

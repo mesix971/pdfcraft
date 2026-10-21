@@ -130,6 +130,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
                 title: "Modify page",
                 items: &[
                     item("Edit text & images", "text-cursor-input", "edit.edit_text", Ready),
+                    item("Find and replace", "replace", "edit.find_replace", Ready),
                     item("Rotate pages", "rotate-cw", "page.rotate", Ready),
                     item("Insert pages", "file-plus-2", "page.insert", Ready),
                     item("Delete pages", "trash-2", "page.delete", Ready),

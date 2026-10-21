@@ -292,6 +292,15 @@ struct GridDrop {
     deadline: f64,
 }
 
+/// Edit a PDF ▸ Find and replace's fields.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct FindReplaceDraft {
+    pub find: String,
+    pub replace: String,
+    pub match_case: bool,
+    pub whole_words: bool,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dialog {
     WordCount,
@@ -335,6 +344,8 @@ pub enum Dialog {
     LinkProps,
     /// Organize ▸ Extract (options), Rotate Pages.
     Extract,
+    /// Edit a PDF ▸ Find and replace.
+    FindReplace,
     RotatePages,
     /// Remove Hidden Information and Sanitize Document.
     RemoveHidden,
@@ -716,6 +727,7 @@ pub struct PdfCraftApp {
     /// Split dialog settings.
     pub split_draft: SplitDraft,
     pub extract_draft: ExtractDraft,
+    pub find_replace_draft: FindReplaceDraft,
     pub rotate_draft: RotateDraft,
     /// Summarize Comments: sort order.
     pub summary_sort: pdfcraft_engine::SummarySort,
@@ -1087,6 +1099,7 @@ impl PdfCraftApp {
             export_dir_override: None,
             split_draft: SplitDraft::default(),
             extract_draft: ExtractDraft::default(),
+            find_replace_draft: FindReplaceDraft::default(),
             rotate_draft: RotateDraft::default(),
             summary_sort: Default::default(),
             sign_draft: None,

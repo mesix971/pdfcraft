@@ -2031,11 +2031,11 @@ title = "Find and replace in edit mode"
 area = "C"
 tier = "P2"
 milestone = "M7"
-status = "planned"
-commands = []
-tools = []
-evidence = []
-notes = ""
+status = "shipped"
+commands = ["edit.find_replace"]
+tools = ["text_replace"]
+evidence = ["crates/edit/src/tests.rs::matches_follow_case_whole_words_and_line_breaks", "crates/edit/src/tests.rs::find_and_replace_rewrites_each_matching_paragraph", "crates/engine/src/tests.rs::find_and_replace_is_one_undoable_step", "crates/automation/tests/automation.rs::text_replace_through_tools", "crates/ui-egui/tests/editing.rs::find_and_replace_replaces_every_page_in_one_step"]
+notes = "Edit a PDF ▸ Find and replace (also under More on the phone): match case, whole words; a space matches any white space, line breaks included. Replace all rewrites each paragraph with a match once (its font, size and colour kept, rewrapped in its box), all pages, one undo step, and says how many; a replacement no font can show refuses the whole change. Missing: replacing one match at a time (Next / Replace), and text inside form fields or comments."
 
 [[feature]]
 id = "edit.rtl-cjk-editing"

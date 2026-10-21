@@ -2750,3 +2750,12 @@ decimal separator	.	,
 	Send to back	Enviar al fondo
 	Distribute objects	Distribuir objetos
 	Crop	Recortar
+	Find and replace	Buscar y reemplazar
+	Find and replace…	Buscar y reemplazar…
+	Find	Buscar
+	Replace with	Reemplazar por
+	Match case	Coincidir mayúsculas y minúsculas
+	Replace all	Reemplazar todo
+	Replace {name}	Reemplazar {name}
+	No match for {name}.	No hay coincidencias para {name}.
+	{n} replaced.	{n} reemplazados.

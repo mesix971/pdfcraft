@@ -5003,3 +5003,43 @@ fn added_items_move_in_the_drawing_order() {
     assert_eq!(texts(&doc).first().map(String::as_str), Some("Under"), "now drawn first");
     assert!(arrange_added(&mut doc, 0, 9, Arrange::Front).is_err());
 }
+
+#[test]
+fn matches_follow_case_whole_words_and_line_breaks() {
+    use crate::replace::{MatchOptions, find_matches};
+    let any = MatchOptions::default();
+    let case = MatchOptions { match_case: true, ..any };
+    let words = MatchOptions { whole_words: true, ..any };
+    assert_eq!(find_matches("Cat cat CAT", "cat", any), vec![0..3, 4..7, 8..11]);
+    assert_eq!(find_matches("Cat cat CAT", "cat", case), vec![4..7]);
+    assert_eq!(find_matches("cat concatenate cat.", "cat", words), vec![0..3, 16..19]);
+    // A space in the phrase matches a paragraph's line break.
+    assert_eq!(find_matches("quick\nbrown fox", "quick brown", any), vec![0..11]);
+    assert_eq!(find_matches("ééé", "é", any), vec![0..2, 2..4, 4..6]);
+    assert!(find_matches("anything", "  ", any).is_empty());
+    assert!(find_matches("", "a", any).is_empty());
+}
+
+/// Find and replace rewrites every paragraph with a match, once, and only those; nothing found
+/// changes nothing.
+#[test]
+fn find_and_replace_rewrites_each_matching_paragraph() {
+    use crate::replace::{MatchOptions, count_matches, find_replace};
+    let original = text_page(
+        "BT /F1 12 Tf 72 700 Td (Invoice 2025 for ACME) Tj ET BT /F1 12 Tf 72 600 Td (Nothing here) Tj ET BT /F1 12 Tf 72 500 Td (Paid in 2025, thanks) Tj ET",
+    );
+    let options = MatchOptions { whole_words: true, ..MatchOptions::default() };
+    assert_eq!(count_matches(&original, &[0], "2025", options).unwrap(), 2);
+    let mut doc = original.clone();
+    assert_eq!(find_replace(&mut doc, &[0], "2025", "2026", options).unwrap(), 2);
+    let texts: Vec<String> = text::text_blocks(&reopen(&doc), 0).unwrap().into_iter().map(|b| b.text).collect();
+    assert_eq!(texts, ["Invoice 2026 for ACME", "Nothing here", "Paid in 2026, thanks"]);
+    let lines = text::text_lines(&reopen(&doc), 0).unwrap();
+    let untouched = lines.iter().find(|l| l.text == "Nothing here").unwrap();
+    let before = text::text_lines(&original, 0).unwrap();
+    assert_eq!(untouched.rect, before.iter().find(|l| l.text == "Nothing here").unwrap().rect, "a paragraph without a match stays");
+    let mut same = original.clone();
+    assert!(find_replace(&mut same, &[0], "1999", "2000", options).is_err());
+    assert!(find_replace(&mut same, &[0], " ", "x", options).is_err());
+    assert_eq!(page_content_bytes(&same, 0), page_content_bytes(&original, 0));
+}

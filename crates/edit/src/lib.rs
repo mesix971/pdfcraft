@@ -816,10 +816,12 @@ pub fn marks_present(doc: &Document) -> Vec<MarkKind> {
 }
 
 pub mod objects;
+pub mod replace;
 pub use objects::{
     Alignment, Arrange, EditableObject, MAX_MOVE_OBJECTS, ObjectKind, ObjectTarget, align_objects, alignment_offsets, arrange_added,
     editable_objects, move_objects,
 };
+pub use replace::{MAX_REPLACEMENTS, MatchOptions, count_matches, find_matches, find_replace};
 
 mod flatten;
 pub use flatten::{flatten, flatten_fill_sign};

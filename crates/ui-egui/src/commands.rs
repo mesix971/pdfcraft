@@ -446,6 +446,13 @@ impl PdfCraftApp {
                 self.reveal_tools();
             }
             "edit.image" => self.add_image_dialog(),
+            "edit.find_replace" => {
+                if self.active.is_none() {
+                    self.notify_tr("Open a document first");
+                } else {
+                    self.dialog = Some(crate::Dialog::FindReplace);
+                }
+            }
             "edit.attach" => {
                 if self.active.is_none() {
                     self.notify_tr("Open a document first");

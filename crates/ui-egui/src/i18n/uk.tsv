@@ -2632,3 +2632,12 @@ decimal separator	.	,
 	Send to back	На задній план
 	Distribute objects	Розподілити об’єкти
 	Crop	Обрізати
+	Find and replace	Знайти й замінити
+	Find and replace…	Знайти й замінити…
+	Find	Знайти
+	Replace with	Замінити на
+	Match case	З урахуванням регістру
+	Replace all	Замінити все
+	Replace {name}	Замінити {name}
+	No match for {name}.	{name} не знайдено.
+	{n} replaced.	Замінено: {n}.

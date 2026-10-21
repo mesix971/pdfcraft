@@ -2586,3 +2586,12 @@ decimal separator	.	,
 	Send to back	Przesuń na spód
 	Distribute objects	Rozłóż obiekty
 	Crop	Przytnij
+	Find and replace	Znajdź i zamień
+	Find and replace…	Znajdź i zamień…
+	Find	Znajdź
+	Replace with	Zamień na
+	Match case	Uwzględniaj wielkość liter
+	Replace all	Zamień wszystko
+	Replace {name}	Zamień {name}
+	No match for {name}.	Brak wyników dla {name}.
+	{n} replaced.	Zamieniono: {n}.

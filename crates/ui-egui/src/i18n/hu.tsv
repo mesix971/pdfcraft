@@ -2608,3 +2608,12 @@ decimal separator	.	,
 	Send to back	Háttérbe küldés
 	Distribute objects	Objektumok elosztása
 	Crop	Körülvágás
+	Find and replace	Keresés és csere
+	Find and replace…	Keresés és csere…
+	Find	Keresés
+	Replace with	Csere erre
+	Match case	Kis- és nagybetűk megkülönböztetése
+	Replace all	Összes cseréje
+	Replace {name}	{name} cseréje
+	No match for {name}.	Nincs találat erre: {name}.
+	{n} replaced.	{n} csere.

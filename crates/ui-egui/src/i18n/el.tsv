@@ -2615,3 +2615,12 @@ decimal separator	.	,
 	Send to back	Μεταφορά στο παρασκήνιο
 	Distribute objects	Κατανομή αντικειμένων
 	Crop	Περικοπή
+	Find and replace	Εύρεση και αντικατάσταση
+	Find and replace…	Εύρεση και αντικατάσταση…
+	Find	Εύρεση
+	Replace with	Αντικατάσταση με
+	Match case	Ταίριασμα πεζών-κεφαλαίων
+	Replace all	Αντικατάσταση όλων
+	Replace {name}	Αντικατάσταση {name}
+	No match for {name}.	Δεν βρέθηκε το {name}.
+	{n} replaced.	Αντικαταστάθηκαν {n}.

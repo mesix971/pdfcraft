@@ -787,6 +787,21 @@ impl Automation {
             "object_list" => self.object_list(&a)?,
             "object_move" => self.object_move(&a)?,
             "object_align" => self.object_align(&a)?,
+            "text_replace" => {
+                let options = pdfcraft_engine::MatchOptions {
+                    match_case: a.opt_bool("match_case")?.unwrap_or(false),
+                    whole_words: a.opt_bool("whole_words")?.unwrap_or(false),
+                };
+                let pages = match a.opt_ints("pages")? {
+                    Some(_) => Some(self.pages(&a, "pages")?),
+                    None => None,
+                };
+                let (find, replace) = (a.str("find")?.to_owned(), a.str("replace")?.to_owned());
+                let count = self.doc(&a)?.count_matches(pages.as_deref(), &find, options).map_err(failed)?;
+                let mut out = self.apply(&a, Edit::FindReplace { pages, find, replace, options })?;
+                out["replaced"] = json!(count);
+                out
+            }
             "object_arrange" => self.object_arrange(&a)?,
             "content_list" => self.content_list(&a)?,
             "page_add_text" => self.page_add_text(&a)?,

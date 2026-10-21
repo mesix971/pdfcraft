@@ -2683,3 +2683,12 @@ decimal separator	.	,
 	Send to back	Přenést do pozadí
 	Distribute objects	Rozmístit objekty
 	Crop	Oříznout
+	Find and replace	Najít a nahradit
+	Find and replace…	Najít a nahradit…
+	Find	Najít
+	Replace with	Nahradit čím
+	Match case	Rozlišovat velikost písmen
+	Replace all	Nahradit vše
+	Replace {name}	Nahradit {name}
+	No match for {name}.	Pro {name} nebyla nalezena shoda.
+	{n} replaced.	Nahrazeno: {n}.

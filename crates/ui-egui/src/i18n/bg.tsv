@@ -2572,3 +2572,12 @@ decimal separator	.	,
 	Send to back	На заден план
 	Distribute objects	Разпределяне на обекти
 	Crop	Изрязване
+	Find and replace	Търсене и замяна
+	Find and replace…	Търсене и замяна…
+	Find	Търсене
+	Replace with	Замяна с
+	Match case	Съвпадение на регистъра
+	Replace all	Замяна на всички
+	Replace {name}	Замяна на {name}
+	No match for {name}.	Няма съвпадения за {name}.
+	{n} replaced.	Заменени: {n}.

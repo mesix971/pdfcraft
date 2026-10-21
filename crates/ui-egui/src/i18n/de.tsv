@@ -2611,3 +2611,12 @@ decimal separator	.	,
 	Send to back	In den Hintergrund
 	Distribute objects	Objekte verteilen
 	Crop	Zuschneiden
+	Find and replace	Suchen und ersetzen
+	Find and replace…	Suchen und ersetzen…
+	Find	Suchen
+	Replace with	Ersetzen durch
+	Match case	Groß-/Kleinschreibung beachten
+	Replace all	Alle ersetzen
+	Replace {name}	{name} ersetzen
+	No match for {name}.	Keine Treffer für {name}.
+	{n} replaced.	{n} ersetzt.

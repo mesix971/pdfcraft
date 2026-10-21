@@ -2886,3 +2886,12 @@ decimal separator	.	.
 	Send to back	إرسال إلى الخلف
 	Distribute objects	توزيع العناصر
 	Crop	اقتصاص
+	Find and replace	بحث واستبدال
+	Find and replace…	بحث واستبدال…
+	Find	بحث
+	Replace with	استبدال بـ
+	Match case	مطابقة حالة الأحرف
+	Replace all	استبدال الكل
+	Replace {name}	استبدال {name}
+	No match for {name}.	لا توجد نتائج لـ {name}.
+	{n} replaced.	تم استبدال {n}.

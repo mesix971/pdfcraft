@@ -2610,3 +2610,12 @@ decimal separator	.	,
 	Send to back	Mettre à l’arrière-plan
 	Distribute objects	Répartir les objets
 	Crop	Recadrer
+	Find and replace	Rechercher et remplacer
+	Find and replace…	Rechercher et remplacer…
+	Find	Rechercher
+	Replace with	Remplacer par
+	Match case	Respecter la casse
+	Replace all	Tout remplacer
+	Replace {name}	Remplacer {name}
+	No match for {name}.	Aucune occurrence de {name}.
+	{n} replaced.	{n} remplacement(s).

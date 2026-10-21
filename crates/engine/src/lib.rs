@@ -68,7 +68,7 @@ pub use pdfcraft_edit::{BlockStyle, List, PageImage, RangeStyle, Script, TextBlo
 pub use pdfcraft_measure as measure;
 pub use pdfcraft_xfa::Report as XfaLayout;
 
-pub use pdfcraft_edit::{Alignment, Arrange, EditableObject, MAX_MOVE_OBJECTS, ObjectKind, ObjectTarget, alignment_offsets};
+pub use pdfcraft_edit::{Alignment, Arrange, EditableObject, MAX_MOVE_OBJECTS, MatchOptions, ObjectKind, ObjectTarget, alignment_offsets};
 
 /// A change to an existing page image.
 #[derive(Clone, Debug, PartialEq)]
@@ -277,6 +277,7 @@ fn scope_of(edit: &Edit) -> Scope {
         Edit::MoveObjects { .. }
         | Edit::AlignObjects { .. }
         | Edit::ArrangeAdded { .. }
+        | Edit::FindReplace { .. }
         | Edit::EditTextLine { .. }
         | Edit::EditTextBlock { .. }
         | Edit::EditPageImage { .. }
@@ -532,6 +533,14 @@ impl Document {
             return Err("the move must be finite and non-zero".into());
         }
         Ok(offset)
+    }
+
+    /// How many matches of `find` the paragraphs of `pages` (all when `None`) hold, for Find and
+    /// replace to say before it changes anything.
+    pub fn count_matches(&self, pages: Option<&[usize]>, find: &str, options: MatchOptions) -> Result<usize, String> {
+        let editor = self.editor.as_ref().ok_or("the document can't be read")?;
+        let all: Vec<usize> = pages.map_or_else(|| (0..self.info.pages.len()).collect(), <[usize]>::to_vec);
+        pdfcraft_edit::count_matches(&editor.cos, &all, find, options).map_err(|e| e.to_string())
     }
 
     /// The alignment in the page's user space that lines objects up as `how` says on screen: a
@@ -1653,6 +1662,14 @@ pub enum Edit {
         objects: Vec<ObjectTarget>,
         offset: [f64; 2],
     },
+    /// Edit a PDF ▸ Find and replace: every match on `pages` (all when `None`) rewritten in its
+    /// paragraph.
+    FindReplace {
+        pages: Option<Vec<usize>>,
+        find: String,
+        replace: String,
+        options: MatchOptions,
+    },
     /// Align or distribute the selected objects (each moved as MoveObjects moves it).
     AlignObjects {
         page: usize,
@@ -2103,6 +2120,7 @@ impl Edit {
             Edit::MoveObjects { objects, .. } => plural("Move object", "Move objects", objects.len()),
             Edit::AlignObjects { how: Alignment::DistributeAcross | Alignment::DistributeDown, .. } => Label::of("Distribute objects"),
             Edit::AlignObjects { .. } => Label::of("Align objects"),
+            Edit::FindReplace { find, .. } => Label::with("Replace {name}", find.as_str()),
             Edit::ArrangeAdded { to, .. } => Label::of(match to {
                 Arrange::Front => "Bring to front",
                 Arrange::Forward => "Bring forward",
@@ -2275,6 +2293,7 @@ fn check_permission(edit: &Edit, p: &pdfcraft_cos::Permissions) -> Result<(), Ed
         | Edit::MoveObjects { .. }
         | Edit::AlignObjects { .. }
         | Edit::ArrangeAdded { .. }
+        | Edit::FindReplace { .. }
         | Edit::DeleteContent { .. }
         | Edit::ReplaceImage { .. }
         | Edit::ClearRedactions
@@ -2650,6 +2669,13 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
         }
         Edit::MoveObjects { page, objects, offset } => pdfcraft_edit::move_objects(doc, *page, objects, *offset)?,
         Edit::AlignObjects { page, objects, how } => pdfcraft_edit::align_objects(doc, *page, objects, *how)?,
+        Edit::FindReplace { pages, find, replace, options } => {
+            let all: Vec<usize> = match pages {
+                Some(p) => p.clone(),
+                None => (0..pdfcraft_model::pages(doc).len()).collect(),
+            };
+            pdfcraft_edit::find_replace(doc, &all, find, replace, *options)?;
+        }
         Edit::ArrangeAdded { page, index, to } => pdfcraft_edit::arrange_added(doc, *page, *index, *to)?,
         Edit::EditTextBlock { page, block, text, style } => {
             pdfcraft_edit::rewrite_block(doc, *page, *block, Some(text), style)?;

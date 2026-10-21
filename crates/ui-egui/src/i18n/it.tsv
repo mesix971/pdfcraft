@@ -2821,3 +2821,12 @@ decimal separator	.	,
 	Send to back	Porta in fondo
 	Distribute objects	Distribuisci oggetti
 	Crop	Ritaglia
+	Find and replace	Trova e sostituisci
+	Find and replace…	Trova e sostituisci…
+	Find	Trova
+	Replace with	Sostituisci con
+	Match case	Maiuscole/minuscole
+	Replace all	Sostituisci tutto
+	Replace {name}	Sostituisci {name}
+	No match for {name}.	Nessuna corrispondenza per {name}.
+	{n} replaced.	{n} sostituiti.

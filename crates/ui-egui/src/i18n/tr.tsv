@@ -2605,3 +2605,12 @@ decimal separator	.	,
 	Send to back	En arkaya gönder
 	Distribute objects	Nesneleri dağıt
 	Crop	Kırp
+	Find and replace	Bul ve değiştir
+	Find and replace…	Bul ve değiştir…
+	Find	Bul
+	Replace with	Şununla değiştir
+	Match case	Büyük/küçük harf duyarlı
+	Replace all	Tümünü değiştir
+	Replace {name}	{name} değiştir
+	No match for {name}.	{name} için eşleşme yok.
+	{n} replaced.	{n} değiştirildi.

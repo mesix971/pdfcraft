@@ -2523,3 +2523,12 @@ decimal separator	.	,
 	Send to back	На задний план
 	Distribute objects	Распределить объекты
 	Crop	Обрезать
+	Find and replace	Найти и заменить
+	Find and replace…	Найти и заменить…
+	Find	Найти
+	Replace with	Заменить на
+	Match case	С учётом регистра
+	Replace all	Заменить все
+	Replace {name}	Заменить {name}
+	No match for {name}.	{name} не найдено.
+	{n} replaced.	Заменено: {n}.

@@ -2614,3 +2614,12 @@ decimal separator	.	,
 	Send to back	Postavi v ozadje
 	Distribute objects	Razporedi predmete
 	Crop	Obreži
+	Find and replace	Najdi in zamenjaj
+	Find and replace…	Najdi in zamenjaj…
+	Find	Najdi
+	Replace with	Zamenjaj z
+	Match case	Razlikuj velike in male črke
+	Replace all	Zamenjaj vse
+	Replace {name}	Zamenjaj {name}
+	No match for {name}.	Za {name} ni zadetkov.
+	{n} replaced.	Zamenjano: {n}.

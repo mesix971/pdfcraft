@@ -2860,3 +2860,12 @@ decimal separator	.	,
 	Send to back	Nukelti į galą
 	Distribute objects	Paskirstyti objektus
 	Crop	Apkarpyti
+	Find and replace	Rasti ir pakeisti
+	Find and replace…	Rasti ir pakeisti…
+	Find	Rasti
+	Replace with	Pakeisti į
+	Match case	Skirti didžiąsias raides
+	Replace all	Pakeisti visus
+	Replace {name}	Pakeisti {name}
+	No match for {name}.	{name} nerasta.
+	{n} replaced.	Pakeista: {n}.

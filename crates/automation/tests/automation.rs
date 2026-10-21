@@ -6154,6 +6154,22 @@ fn mixed_objects_move_through_tools_with_generation_and_one_undo() {
     assert!(page_text(&mut a, reopened)[0].contains("Added label"));
 }
 
+/// text_replace replaces across pages in one step, says how many, and refuses nothing found.
+#[test]
+fn text_replace_through_tools() {
+    let dir = workdir("text-replace");
+    let mut a = auto(&dir);
+    let doc = ok(&mut a, "doc_open", json!({"path":"a.pdf"}))["doc"].as_u64().unwrap();
+    let done = ok(&mut a, "text_replace", json!({"doc":doc,"find":"page","replace":"Sheet"}));
+    assert_eq!(done["replaced"], 3);
+    assert_eq!(page_text(&mut a, doc), ["Sheet 1", "Sheet 2", "Sheet 3"]);
+    let only = ok(&mut a, "text_replace", json!({"doc":doc,"find":"Sheet","replace":"Page","pages":[2],"match_case":true}));
+    assert_eq!(only["replaced"], 1);
+    assert_eq!(page_text(&mut a, doc), ["Sheet 1", "Page 2", "Sheet 3"]);
+    assert!(a.call("text_replace", &json!({"doc":doc,"find":"nowhere","replace":"x"})).is_err());
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
 /// object_align lines objects up as seen, on an upright and a turned page; object_arrange moves an
 /// added item in the drawing order without moving it.
 #[test]

@@ -541,6 +541,28 @@ impl PdfCraftApp {
         }
     }
 
+    /// Find and replace ▸ Replace all, on every page of the active document.
+    pub fn find_replace_all(&mut self) {
+        let Some((_, id)) = self.active_ids() else { return };
+        let d = self.find_replace_draft.clone();
+        let options = pdfcraft_engine::MatchOptions { match_case: d.match_case, whole_words: d.whole_words };
+        let count = match self.session.get(id).map(|doc| doc.count_matches(None, &d.find, options)) {
+            Some(Ok(n)) => n,
+            Some(Err(e)) => {
+                self.notify(e);
+                return;
+            }
+            None => return,
+        };
+        if count == 0 {
+            self.notify_fmt("No match for {name}.", &[("name", d.find.trim())]);
+            return;
+        }
+        if self.apply_edit(Edit::FindReplace { pages: None, find: d.find, replace: d.replace, options }) {
+            self.notify_fmt("{n} replaced.", &[("n", &count.to_string())]);
+        }
+    }
+
     pub fn replace_pages_dialog(&mut self) {
         if self.active.is_none() {
             self.notify_tr("Open a document first");

@@ -2518,3 +2518,12 @@ decimal separator	.	.
 	Send to back	వెనుకకు పంపు
 	Distribute objects	వస్తువులను పంపిణీ చేయి
 	Crop	కత్తిరించు
+	Find and replace	కనుగొని మార్చు
+	Find and replace…	కనుగొని మార్చు…
+	Find	కనుగొను
+	Replace with	దీనితో మార్చు
+	Match case	అక్షర పరిమాణం సరిపోల్చు
+	Replace all	అన్నీ మార్చు
+	Replace {name}	{name}ను మార్చు
+	No match for {name}.	{name} కనబడలేదు.
+	{n} replaced.	{n} మార్చబడ్డాయి.

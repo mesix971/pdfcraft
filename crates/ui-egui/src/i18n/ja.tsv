@@ -2609,3 +2609,12 @@ decimal separator	.	.
 	Send to back	最背面へ移動
 	Distribute objects	オブジェクトを均等配置
 	Crop	トリミング
+	Find and replace	検索と置換
+	Find and replace…	検索と置換…
+	Find	検索
+	Replace with	置換後の文字列
+	Match case	大文字と小文字を区別
+	Replace all	すべて置換
+	Replace {name}	{name} を置換
+	No match for {name}.	{name} は見つかりません。
+	{n} replaced.	{n} 件置換しました。

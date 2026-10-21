@@ -182,6 +182,10 @@ pub fn tools() -> Vec<ToolDef> {
                     "type":"object","properties":{"kind":{"type":"string","enum":["added","text","image"]},"index":{"type":"integer","minimum":1}},"required":["kind","index"],"additionalProperties":false}},
                 "offset":{"type":"array","items":{"type":"number"},"minItems":2,"maxItems":2},
                 "generation":{"type":"integer","minimum":0,"description":"Use generation returned by object_list to reject a stale selection."}}), &["doc","page","objects","offset"])),
+        t("text_replace", "Find and replace text", "Replace every match of `find` with `replace` in the page text (Edit a PDF ▸ Find and replace), on `pages` (default all): each paragraph with a match is rewritten once, keeping its font, size and colour and rewrapped in its box. A space in `find` matches any white space, line breaks included. match_case and whole_words narrow the matches. All or nothing, one undo step; nothing found, or a replacement no font can show, changes nothing. Returns replaced.")
+            .cmd("edit.find_replace")
+            .with(schema(json!({"doc":doc(),"find":{"type":"string","minLength":1},"replace":{"type":"string"},
+                "pages":{"type":"array","items":{"type":"integer","minimum":1}},"match_case":{"type":"boolean"},"whole_words":{"type":"boolean"}}), &["doc","find","replace"])),
         t("object_align", "Align or distribute objects", "Line up 2–1000 mixed references from object_list as seen on the page (turned pages included): left, center, right, top, middle or bottom edges; or spread 3 or more out with equal gaps (distribute_across, distribute_down), the outermost staying put. Each object moves as object_move moves it; one undo step. Refused, with nothing changed, when an object cannot land exactly where it should.")
             .with(schema(json!({"doc":doc(),"page":{"type":"integer","minimum":1},
                 "objects":{"type":"array","minItems":2,"maxItems":1000,"uniqueItems":true,"items":{

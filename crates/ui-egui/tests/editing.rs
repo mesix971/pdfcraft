@@ -4882,3 +4882,26 @@ fn read_mode_shortcut_applies_the_open_paragraph() {
     assert!(s.views[0].line_editor.is_none(), "no editor stays open in Read mode");
     assert_eq!(s.session.get(s.views[0].id).unwrap().text_lines(0)[0].text, "Chapter One", "the edit is applied");
 }
+
+/// Edit a PDF ▸ Find and replace: Replace all changes every page in one undo step and says how
+/// many; the pages are not otherwise touched.
+#[test]
+fn find_and_replace_replaces_every_page_in_one_step() {
+    let mut h = harness(3, |_| {});
+    assert!(h.state_mut().execute("edit.find_replace"));
+    h.run_steps(3);
+    h.get_by_label("Find").focus();
+    h.run_steps(1);
+    h.event(egui::Event::Text("page".into()));
+    h.run_steps(2);
+    h.state_mut().find_replace_draft.replace = "Sheet".into();
+    h.run_steps(2);
+    h.get_by_label("Replace all").click();
+    h.run_steps(4);
+    assert_eq!(page_texts(h.state()), ["Sheet 1", "Sheet 2", "Sheet 3"]);
+    assert_eq!(page_texts(h.state()).len(), 3, "no page replaced or removed");
+    let toast = h.state().toast.clone().map(|t| t.0).unwrap_or_default();
+    assert!(toast.contains('3'), "{toast}");
+    let doc = h.state().session.get(h.state().views[0].id).unwrap();
+    assert_eq!(doc.can_undo(), Some("Replace page"));
+}
