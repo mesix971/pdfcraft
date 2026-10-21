@@ -2869,3 +2869,5 @@ decimal separator	.	,
 	Replace {name}	Pakeisti {name}
 	No match for {name}.	{name} nerasta.
 	{n} replaced.	Pakeista: {n}.
+	Remove Bates numbering	Pašalinti Bates numeraciją
+	This document has no Bates numbers PdfCraft added.	Šiame dokumente nėra PdfCraft pridėtų Bates numerių.

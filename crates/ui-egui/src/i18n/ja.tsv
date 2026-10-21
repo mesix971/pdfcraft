@@ -2618,3 +2618,5 @@ decimal separator	.	.
 	Replace {name}	{name} を置換
 	No match for {name}.	{name} は見つかりません。
 	{n} replaced.	{n} 件置換しました。
+	Remove Bates numbering	ベイツ番号を削除
+	This document has no Bates numbers PdfCraft added.	この文書には PdfCraft が追加したベイツ番号がありません。

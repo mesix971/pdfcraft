@@ -673,6 +673,11 @@ impl Document {
         self.editor.as_ref().map(|e| pdfcraft_organize::initial_view(&e.cos)).unwrap_or_default()
     }
 
+    /// Whether a page carries Bates numbers PdfCraft added (Bates numbering ▸ Remove).
+    pub fn has_bates(&self) -> bool {
+        self.editor.as_ref().is_some_and(|e| pdfcraft_edit::has_bates(&e.cos))
+    }
+
     /// The document's file attachments (the catalog's EmbeddedFiles tree), in its order.
     pub fn attachments(&self) -> Vec<Attachment> {
         self.editor.as_ref().map(|e| pdfcraft_organize::attachments(&e.cos)).unwrap_or_default()
@@ -1367,6 +1372,10 @@ pub enum Edit {
         data: Arc<Vec<u8>>,
         description: String,
     },
+    /// Bates numbering ▸ Remove: the headers and footers carrying Bates numbers, from `pages`.
+    RemoveBates {
+        pages: Vec<usize>,
+    },
     /// Attachments ▸ Delete the attachment listed as `name`.
     DeleteAttachment {
         name: String,
@@ -2051,6 +2060,7 @@ impl Edit {
             },
             Edit::AddAttachment { file, .. } => Label::with("Attach {name}", file.as_str()),
             Edit::DeleteAttachment { name } => Label::with("Delete attachment {name}", name.as_str()),
+            Edit::RemoveBates { .. } => Label::of("Remove Bates numbering"),
             Edit::SetAttachmentDescription { name, .. } => Label::with("Describe attachment {name}", name.as_str()),
             Edit::InsertPagesFrom { name, .. } => Label::with("Insert pages from {name}", name.as_str()),
             Edit::AddBookmark { .. } => Label::of("Add bookmark"),
@@ -2285,6 +2295,7 @@ fn check_permission(edit: &Edit, p: &pdfcraft_cos::Permissions) -> Result<(), Ed
         | Edit::AddWatermark { .. }
         | Edit::AddBackground { .. }
         | Edit::RemoveMarks { .. }
+        | Edit::RemoveBates { .. }
         | Edit::AddField { .. }
         | Edit::ApplyRedactions { .. }
         | Edit::AddText { .. }
@@ -2444,6 +2455,11 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
             pdfcraft_organize::add_attachment(doc, file, data, description, cx.date.as_deref())?;
         }
         Edit::DeleteAttachment { name } => pdfcraft_organize::delete_attachment(doc, name)?,
+        Edit::RemoveBates { pages } => {
+            if pdfcraft_edit::remove_bates(doc, pages)? == 0 {
+                return Err(EditError::Invalid("these pages have no Bates numbers PdfCraft added".into()));
+            }
+        }
         Edit::SetAttachmentDescription { name, description } => pdfcraft_organize::set_attachment_description(doc, name, description)?,
         Edit::DuplicatePages { pages, at } => pdfcraft_organize::duplicate_pages(doc, pages, *at)?,
         Edit::ReplacePages { pages, name, bytes, src_pages } => {
@@ -4103,7 +4119,14 @@ impl Session {
                 || matches!(e, Edit::ArrangeAdded { .. })
         });
         let touches_marks = edit.is_none_or(|e| {
-            matches!(e, Edit::AddHeaderFooter { .. } | Edit::AddWatermark { .. } | Edit::AddBackground { .. } | Edit::RemoveMarks { .. })
+            matches!(
+                e,
+                Edit::AddHeaderFooter { .. }
+                    | Edit::AddWatermark { .. }
+                    | Edit::AddBackground { .. }
+                    | Edit::RemoveMarks { .. }
+                    | Edit::RemoveBates { .. }
+            )
         });
         (touches_added, touches_marks)
     }

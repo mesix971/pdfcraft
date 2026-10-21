@@ -2619,3 +2619,5 @@ decimal separator	.	,
 	Replace {name}	Remplacer {name}
 	No match for {name}.	Aucune occurrence de {name}.
 	{n} replaced.	{n} remplacement(s).
+	Remove Bates numbering	Supprimer la numérotation Bates
+	This document has no Bates numbers PdfCraft added.	Ce document n’a pas de numéros Bates ajoutés par PdfCraft.

@@ -6154,6 +6154,21 @@ fn mixed_objects_move_through_tools_with_generation_and_one_undo() {
     assert!(page_text(&mut a, reopened)[0].contains("Added label"));
 }
 
+/// doc_remove_bates removes Bates-numbered footers and keeps the rest.
+#[test]
+fn bates_numbering_is_removed_through_tools() {
+    let dir = workdir("remove-bates");
+    let mut a = auto(&dir);
+    let doc = ok(&mut a, "doc_open", json!({"path":"a.pdf"}))["doc"].as_u64().unwrap();
+    assert!(a.call("doc_remove_bates", &json!({"doc":doc})).is_err(), "none yet");
+    ok(&mut a, "doc_header_footer", json!({"doc":doc,"footer_right":"<<Bates Number#6#1#X#>>"}));
+    assert!(page_text(&mut a, doc)[0].contains("X000001"));
+    ok(&mut a, "doc_remove_bates", json!({"doc":doc}));
+    assert!(!page_text(&mut a, doc)[0].contains("X000001"));
+    assert!(page_text(&mut a, doc)[0].contains("Page 1"));
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
 /// text_replace replaces across pages in one step, says how many, and refuses nothing found.
 #[test]
 fn text_replace_through_tools() {

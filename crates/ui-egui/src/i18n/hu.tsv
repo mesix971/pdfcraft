@@ -2617,3 +2617,5 @@ decimal separator	.	,
 	Replace {name}	{name} cseréje
 	No match for {name}.	Nincs találat erre: {name}.
 	{n} replaced.	{n} csere.
+	Remove Bates numbering	Bates-számozás eltávolítása
+	This document has no Bates numbers PdfCraft added.	Ebben a dokumentumban nincs a PdfCraft által hozzáadott Bates-szám.

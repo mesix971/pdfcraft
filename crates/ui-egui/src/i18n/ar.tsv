@@ -2895,3 +2895,5 @@ decimal separator	.	.
 	Replace {name}	استبدال {name}
 	No match for {name}.	لا توجد نتائج لـ {name}.
 	{n} replaced.	تم استبدال {n}.
+	Remove Bates numbering	إزالة ترقيم Bates
+	This document has no Bates numbers PdfCraft added.	لا يحتوي هذا المستند على أرقام Bates أضافها PdfCraft.

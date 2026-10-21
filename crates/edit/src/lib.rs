@@ -615,6 +615,7 @@ pub fn add_header_footer(doc: &mut Document, pages: &[usize], hf: &HeaderFooter,
     }
     // The same goes for Bates numbers: the last selected page must still fit in a u64.
     let bates0 = hf.text.iter().find_map(|t| bates_start(t)).unwrap_or(1);
+    let bates_used = hf.text.iter().any(|t| bates_start(t).is_some());
     if bates0.checked_add(pages.len().saturating_sub(1) as u64).is_none() {
         return Err(EditError::Invalid(format!(
             "the Bates start number {bates0} leaves no room for {} pages (Bates numbers stop at {})",
@@ -670,6 +671,13 @@ pub fn add_header_footer(doc: &mut Document, pages: &[usize], hf: &HeaderFooter,
         add_resources(doc, page, None, Some(&content))?;
         let page = &page_list(doc)[i];
         place(doc, page, MarkKind::HeaderFooter, content, false)?;
+        if bates_used {
+            // The mark just placed is the page's last stream.
+            let page = &page_list(doc)[i];
+            if let Some(Object::Ref(r)) = contents(doc, page)?.last().cloned() {
+                doc.update_dict(r, |d| d.set(BATES_FLAG.to_vec(), Object::Bool(true)))?;
+            }
+        }
     }
     Ok(())
 }
@@ -782,6 +790,39 @@ pub fn add_background(doc: &mut Document, pages: &[usize], bg: &Background, repl
 /// nothing after them go too, restoring the original content list; a wrapper that content
 /// after it still relies on (another tool's appended stream) stays.
 pub fn remove_marks(doc: &mut Document, pages: &[usize], kind: MarkKind) -> Result<usize, EditError> {
+    remove_streams(doc, pages, |doc, o| stream_tag(doc, o).as_deref() == Some(kind.tag()))
+}
+
+/// The `/PCBates` flag on the header and footer streams that number pages with Bates numbers.
+const BATES_FLAG: &[u8] = b"PCBates";
+
+/// Bates ▸ Remove: take away the headers and footers that carry Bates numbers from `pages`;
+/// returns how many. Headers and footers without Bates numbers stay.
+pub fn remove_bates(doc: &mut Document, pages: &[usize]) -> Result<usize, EditError> {
+    remove_streams(doc, pages, |doc, o| stream_tag(doc, o).as_deref() == Some(MarkKind::HeaderFooter.tag()) && bates_flagged(doc, o))
+}
+
+/// Whether any page carries Bates-numbered headers or footers (for enabling Bates ▸ Remove).
+pub fn has_bates(doc: &Document) -> bool {
+    page_list(doc).iter().any(|page| {
+        let streams = match page.dict.get(b"Contents").map(|c| doc.resolve(c)) {
+            Some(c) => match &*c {
+                Object::Array(a) => a.clone(),
+                _ => page.dict.get(b"Contents").cloned().into_iter().collect(),
+            },
+            None => Vec::new(),
+        };
+        streams.iter().any(|o| bates_flagged(doc, o))
+    })
+}
+
+/// Whether content stream `o` is a header or footer that numbers pages with Bates numbers.
+fn bates_flagged(doc: &Document, o: &Object) -> bool {
+    o.as_ref().is_some_and(|r| doc.get(r).as_dict().is_some_and(|d| matches!(d.get(BATES_FLAG), Some(Object::Bool(true)))))
+}
+
+/// Remove the content streams `drop` picks from `pages` (see [`remove_marks`] for the wrappers).
+fn remove_streams(doc: &mut Document, pages: &[usize], drop: impl Fn(&Document, &Object) -> bool) -> Result<usize, EditError> {
     let all = page_list(doc);
     check(pages, all.len())?;
     let mut removed = 0;
@@ -789,7 +830,7 @@ pub fn remove_marks(doc: &mut Document, pages: &[usize], kind: MarkKind) -> Resu
         let page = &all[i];
         let list = contents(doc, page)?;
         let before = list.len();
-        let mut kept: Vec<Object> = list.into_iter().filter(|o| stream_tag(doc, o).as_deref() != Some(kind.tag())).collect();
+        let mut kept: Vec<Object> = list.into_iter().filter(|o| !drop(doc, o)).collect();
         removed += before - kept.len();
         // Strip only wrapper pairs whose close ends the list (after stripping the pairs after
         // it): nothing comes after them to need the state they restore. Pairs come from the

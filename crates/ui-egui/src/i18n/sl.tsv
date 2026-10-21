@@ -2623,3 +2623,5 @@ decimal separator	.	,
 	Replace {name}	Zamenjaj {name}
 	No match for {name}.	Za {name} ni zadetkov.
 	{n} replaced.	Zamenjano: {n}.
+	Remove Bates numbering	Odstrani oštevilčenje Bates
+	This document has no Bates numbers PdfCraft added.	Ta dokument nima številk Bates, ki bi jih dodal PdfCraft.

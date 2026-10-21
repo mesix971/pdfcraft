@@ -2581,3 +2581,5 @@ decimal separator	.	,
 	Replace {name}	Замяна на {name}
 	No match for {name}.	Няма съвпадения за {name}.
 	{n} replaced.	Заменени: {n}.
+	Remove Bates numbering	Премахване на номерацията Bates
+	This document has no Bates numbers PdfCraft added.	Този документ няма номера Bates, добавени от PdfCraft.

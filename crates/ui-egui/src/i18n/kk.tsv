@@ -2616,3 +2616,5 @@ decimal separator	.	,
 	Replace {name}	{name} ауыстыру
 	No match for {name}.	{name} табылмады.
 	{n} replaced.	{n} ауыстырылды.
+	Remove Bates numbering	Bates нөмірлеуін жою
+	This document has no Bates numbers PdfCraft added.	Бұл құжатта PdfCraft қосқан Bates нөмірлері жоқ.

@@ -2532,3 +2532,5 @@ decimal separator	.	,
 	Replace {name}	Заменить {name}
 	No match for {name}.	{name} не найдено.
 	{n} replaced.	Заменено: {n}.
+	Remove Bates numbering	Удалить нумерацию Бейтса
+	This document has no Bates numbers PdfCraft added.	В этом документе нет номеров Бейтса, добавленных PdfCraft.

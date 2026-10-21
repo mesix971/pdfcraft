@@ -2870,3 +2870,5 @@ phone bar	Edit	Sửa
 	Replace {name}	Thay {name}
 	No match for {name}.	Không tìm thấy {name}.
 	{n} replaced.	Đã thay {n}.
+	Remove Bates numbering	Xóa đánh số Bates
+	This document has no Bates numbers PdfCraft added.	Tài liệu này không có số Bates do PdfCraft thêm.

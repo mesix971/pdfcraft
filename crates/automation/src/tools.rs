@@ -182,6 +182,9 @@ pub fn tools() -> Vec<ToolDef> {
                     "type":"object","properties":{"kind":{"type":"string","enum":["added","text","image"]},"index":{"type":"integer","minimum":1}},"required":["kind","index"],"additionalProperties":false}},
                 "offset":{"type":"array","items":{"type":"number"},"minItems":2,"maxItems":2},
                 "generation":{"type":"integer","minimum":0,"description":"Use generation returned by object_list to reject a stale selection."}}), &["doc","page","objects","offset"])),
+        t("doc_remove_bates", "Remove Bates numbering", "Remove the headers and footers that carry Bates numbers (added by PdfCraft's Bates numbering or a header with a Bates token) from `pages` (default all); other headers and footers stay. Undoable; refused when there are none.")
+            .cmd("edit.bates.remove")
+            .with(schema(json!({"doc":doc(),"pages":{"type":"array","items":{"type":"integer","minimum":1}}}), &["doc"])),
         t("text_replace", "Find and replace text", "Replace every match of `find` with `replace` in the page text (Edit a PDF ▸ Find and replace), on `pages` (default all): each paragraph with a match is rewritten once, keeping its font, size and colour and rewrapped in its box. A space in `find` matches any white space, line breaks included. match_case and whole_words narrow the matches. All or nothing, one undo step; nothing found, or a replacement no font can show, changes nothing. Returns replaced.")
             .cmd("edit.find_replace")
             .with(schema(json!({"doc":doc(),"find":{"type":"string","minLength":1},"replace":{"type":"string"},

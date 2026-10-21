@@ -258,6 +258,8 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
                     });
                     widgets::row(ui, |ui| {
                         ui.add_enabled_ui(!d.use_file, |ui| font_combo(ui, "watermark-font", &mut d.wm.font));
+                    });
+                    widgets::row(ui, |ui| {
                         ui.add_enabled_ui(!d.use_file, |ui| ui.add(widgets::checkbox(&mut d.fit, tl!("Fit to page"))));
                         ui.add_enabled_ui(!d.fit, |ui| {
                             ui.label(tl!("Size"));

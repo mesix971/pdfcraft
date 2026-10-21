@@ -2692,3 +2692,5 @@ decimal separator	.	,
 	Replace {name}	Nahradit {name}
 	No match for {name}.	Pro {name} nebyla nalezena shoda.
 	{n} replaced.	Nahrazeno: {n}.
+	Remove Bates numbering	Odstranit číslování Bates
+	This document has no Bates numbers PdfCraft added.	Tento dokument nemá čísla Bates přidaná aplikací PdfCraft.

@@ -2624,3 +2624,5 @@ decimal separator	.	,
 	Replace {name}	Αντικατάσταση {name}
 	No match for {name}.	Δεν βρέθηκε το {name}.
 	{n} replaced.	Αντικαταστάθηκαν {n}.
+	Remove Bates numbering	Κατάργηση αρίθμησης Bates
+	This document has no Bates numbers PdfCraft added.	Αυτό το έγγραφο δεν έχει αριθμούς Bates που πρόσθεσε το PdfCraft.

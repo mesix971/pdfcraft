@@ -380,6 +380,16 @@ impl PdfCraftApp {
                 self.marks_draft.replace = id.ends_with(".update");
                 self.dialog = Some(Dialog::Marks(kind));
             }
+            "edit.bates.remove" => {
+                if let Some((_, id)) = self.active_ids() {
+                    let pages: Vec<usize> = (0..self.session.get(id).map_or(0, |d| d.info.pages.len())).collect();
+                    if self.session.get(id).is_some_and(|d| d.has_bates()) {
+                        self.apply_edit(pdfcraft_engine::Edit::RemoveBates { pages });
+                    } else {
+                        self.notify_tr("This document has no Bates numbers PdfCraft added.");
+                    }
+                }
+            }
             "edit.bates" => {
                 // Bates numbering ▸ Add: the header & footer dialog with a Bates number in the
                 // bottom-right box (6 digits from 1), ready to edit.

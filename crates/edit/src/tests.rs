@@ -5079,3 +5079,29 @@ fn headers_and_watermarks_use_the_chosen_standard_font() {
         assert!(mark.contains(&format!("/{resource} ")), "{mark}");
     }
 }
+
+/// Bates ▸ Remove takes away the headers and footers that carry Bates numbers, and only those.
+#[test]
+fn bates_numbers_are_removed_without_other_headers() {
+    let mut doc = fixture();
+    let bates = HeaderFooter {
+        text: [String::new(), String::new(), String::new(), String::new(), String::new(), "<<Bates Number#6#1#ABC#>>".into()],
+        ..HeaderFooter::default()
+    };
+    let plain = HeaderFooter {
+        text: ["Confidential".into(), String::new(), String::new(), String::new(), String::new(), String::new()],
+        ..HeaderFooter::default()
+    };
+    add_header_footer(&mut doc, &[0, 1], &bates, false, &cx()).unwrap();
+    add_header_footer(&mut doc, &[2], &plain, false, &cx()).unwrap();
+    let doc = reopen(&doc);
+    assert!(has_bates(&doc));
+    let mut doc = doc;
+    assert_eq!(remove_bates(&mut doc, &[0, 1, 2]).unwrap(), 2);
+    let doc = reopen(&doc);
+    assert!(!has_bates(&doc));
+    assert!(!streams(&doc, 0).iter().any(|s| s.contains("ABC000001")), "the Bates number is gone");
+    assert!(streams(&doc, 2).iter().any(|s| s.contains("(Confidential) Tj")), "a header without Bates numbers stays");
+    let mut again = doc.clone();
+    assert_eq!(remove_bates(&mut again, &[0, 1, 2]).unwrap(), 0);
+}

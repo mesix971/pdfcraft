@@ -2568,3 +2568,5 @@ decimal separator	.	.
 	Replace {name}	取代 {name}
 	No match for {name}.	找不到 {name}。
 	{n} replaced.	已取代 {n} 處。
+	Remove Bates numbering	移除貝茨編號
+	This document has no Bates numbers PdfCraft added.	此文件沒有 PdfCraft 新增的貝茨編號。

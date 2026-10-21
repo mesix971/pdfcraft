@@ -787,6 +787,13 @@ impl Automation {
             "object_list" => self.object_list(&a)?,
             "object_move" => self.object_move(&a)?,
             "object_align" => self.object_align(&a)?,
+            "doc_remove_bates" => {
+                let pages = match a.opt_ints("pages")? {
+                    Some(_) => self.pages(&a, "pages")?,
+                    None => (0..self.doc(&a)?.info.pages.len()).collect(),
+                };
+                self.apply(&a, Edit::RemoveBates { pages })?
+            }
             "text_replace" => {
                 let options = pdfcraft_engine::MatchOptions {
                     match_case: a.opt_bool("match_case")?.unwrap_or(false),

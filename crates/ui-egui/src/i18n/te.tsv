@@ -2527,3 +2527,5 @@ decimal separator	.	.
 	Replace {name}	{name}ను మార్చు
 	No match for {name}.	{name} కనబడలేదు.
 	{n} replaced.	{n} మార్చబడ్డాయి.
+	Remove Bates numbering	Bates సంఖ్యలను తొలగించు
+	This document has no Bates numbers PdfCraft added.	ఈ పత్రంలో PdfCraft జోడించిన Bates సంఖ్యలు లేవు.

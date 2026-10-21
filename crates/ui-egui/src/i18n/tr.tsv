@@ -2614,3 +2614,5 @@ decimal separator	.	,
 	Replace {name}	{name} değiştir
 	No match for {name}.	{name} için eşleşme yok.
 	{n} replaced.	{n} değiştirildi.
+	Remove Bates numbering	Bates numaralandırmasını kaldır
+	This document has no Bates numbers PdfCraft added.	Bu belgede PdfCraft’ın eklediği Bates numarası yok.
