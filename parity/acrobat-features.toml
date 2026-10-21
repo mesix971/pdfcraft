@@ -2226,8 +2226,8 @@ milestone = "M7"
 status = "shipped"
 commands = ["edit.link"]
 tools = ["link_add"]
-evidence = ["crates/ui-egui/tests/ui_group/pdf_links.rs::drawing_editing_and_deleting_links", "crates/automation/tests/automation.rs::links_through_tools", "crates/annot/src/tests.rs::links_are_added_edited_listed_and_removed"]
-notes = "drag a rectangle; go to a page or open a web page"
+evidence = ["crates/ui-egui/tests/ui_group/pdf_links.rs::drawing_editing_and_deleting_links", "crates/automation/tests/automation.rs::links_through_tools", "crates/annot/src/tests.rs::links_are_added_edited_listed_and_removed", "crates/ui-egui/tests/comments.rs::selected_text_create_link_opens_link_properties_over_the_words"]
+notes = "drag a rectangle, or select words and pick Create link on the selection bar (one link over the box round the selected lines, not per-line quads); go to a page or open a web page"
 
 [[feature]]
 id = "edit.link-properties"

@@ -4274,6 +4274,8 @@ enum SelectionAction {
     Markup(comments::CommentTool),
     Replace,
     Copy,
+    /// A link over the selected words (Link Properties opens for it).
+    Link,
 }
 
 /// Actions on an existing text selection, next to the selected words.
@@ -4327,6 +4329,9 @@ fn selection_actions(
                 if ui.add_enabled(can_copy, egui::Button::new(tl!("Copy"))).clicked() {
                     chosen = Some(SelectionAction::Copy);
                 }
+                if ui.button(tl!("Create link")).clicked() {
+                    chosen = Some(SelectionAction::Link);
+                }
             });
         });
     });
@@ -4363,6 +4368,16 @@ fn selection_actions(
                 contents: String::new(),
                 author: prefs.author.clone(),
             }));
+        }
+        SelectionAction::Link => {
+            // One link over the selected words: the box round every line they are on.
+            let (xs, ys): (Vec<f64>, Vec<f64>) = quads.iter().flat_map(|q| q.chunks(2).map(|p| (p[0], p[1])).collect::<Vec<_>>()).unzip();
+            let lo = |v: &[f64]| v.iter().copied().filter(|n| n.is_finite()).fold(f64::INFINITY, f64::min);
+            let hi = |v: &[f64]| v.iter().copied().filter(|n| n.is_finite()).fold(f64::NEG_INFINITY, f64::max);
+            let rect = [lo(&xs), lo(&ys), hi(&xs), hi(&ys)];
+            if rect.iter().all(|n| n.is_finite()) && rect[2] > rect[0] && rect[3] > rect[1] {
+                view.links.open_new = Some((page, rect));
+            }
         }
         // Copy is dispatched through the app after the view borrow ends.
         SelectionAction::Copy => {}

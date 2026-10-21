@@ -366,6 +366,29 @@ fn selected_text_shows_actions_and_underlines_without_changing_tools() {
     assert_eq!(h.state().quick_tool, QuickTool::Select);
 }
 
+/// Create link on selected words opens Link Properties for a link over just those words; OK adds it.
+#[test]
+fn selected_text_create_link_opens_link_properties_over_the_words() {
+    let mut h = harness(|_| {});
+    h.state_mut().views[0].select_text(0, 4, 8);
+    h.run_steps(3);
+    h.get_by_label("Create link").click();
+    h.run_steps(3);
+    let draft = h.state().link_draft.clone().expect("Link Properties opens");
+    assert_eq!((draft.page, draft.index), (0, None));
+    let [x0, y0, x1, y1] = draft.rect;
+    let page_width = h.state().session.get(h.state().views[0].id).unwrap().info.pages[0].width as f64;
+    assert!(x1 > x0 && y1 > y0 && x1 - x0 < page_width / 2.0, "a box round four characters: {:?}", draft.rect);
+    assert!(h.state().views[0].selected_text().is_none(), "the selection is consumed");
+    h.state_mut().link_draft.as_mut().unwrap().url = "https://example.org".into();
+    h.run_steps(2);
+    h.get_by_label("OK").click();
+    h.run_steps(3);
+    let links = h.state().session.get(h.state().views[0].id).unwrap().links().to_vec();
+    assert_eq!(links.len(), 1);
+    assert_eq!(links[0].rect, draft.rect);
+}
+
 #[test]
 fn selected_text_copy_action_closes_the_bar_and_keeps_the_selection() {
     let mut h = harness(|_| {});
