@@ -2624,3 +2624,6 @@ decimal separator	.	,
 	The picture was updated from your image editor.	Сурет редактордан жаңартылды.
 	The edited picture is too large to put back (at most 256 MB).	Өңделген сурет қайтару үшін тым үлкен (ең көбі 256 МБ).
 	Couldn't open the image editor: {e}	Сурет редакторы ашылмады: {e}
+	Box width	Жиектеме ені
+	Narrower box	Тарырақ жиектеме
+	Wider box	Кеңірек жиектеме

@@ -1174,7 +1174,7 @@ fn edit_goes_straight_to_the_text_and_types_it_on_a_screen_of_its_own() {
     assert!(page_one(&h, "brown").0.iter().any(|t| t.contains("The quick brown fox")), "one undo takes it back");
 }
 
-/// Swipe the typing screen's formats row to the left until the button named `label` is on screen.
+/// Swipe the typing screen's formats row until the button named `label` is on screen.
 fn reveal(h: &mut Harness<'static, PdfCraftApp>, label: &str) {
     for _ in 0..8 {
         let r = h.get_by_label(label).rect();
@@ -1182,7 +1182,12 @@ fn reveal(h: &mut Harness<'static, PdfCraftApp>, label: &str) {
             return;
         }
         let y = r.center().y;
-        finger_drag(h, pos2(380.0, y), pos2(80.0, y));
+        // Towards the button: left when it is off the right edge, right when off the left.
+        if r.left() < 0.0 {
+            finger_drag(h, pos2(80.0, y), pos2(380.0, y));
+        } else {
+            finger_drag(h, pos2(380.0, y), pos2(80.0, y));
+        }
         h.run_steps(4);
     }
     panic!("{label} never came on screen");
@@ -1229,6 +1234,32 @@ fn the_typing_screen_sets_the_family_lists_and_superscript() {
     let lines = h.state().session.get(id).unwrap().text_lines(0);
     let raised = lines.iter().find(|l| l.text.contains("fox")).expect("the line");
     assert!(raised.size < fox.size * 0.7, "{} {}", raised.size, fox.size);
+}
+
+/// On the phone the box a paragraph is typed in can be made narrower or wider: Done rewraps it.
+#[test]
+fn the_typing_screen_narrows_and_widens_the_paragraph_box() {
+    let mut h = harness(true);
+    for phase in [egui::TouchPhase::Start, egui::TouchPhase::End] {
+        h.event(Event::Touch { device_id: egui::TouchDeviceId(0), id: egui::TouchId(0), phase, pos: pos2(4.0, 4.0), force: None });
+    }
+    h.run_steps(2);
+    click(&mut h, "Edit");
+    let p = at(&h, 0, 60.0, 254.0);
+    tap(&mut h, p);
+    let id = h.state().views[0].id;
+    let rows = |h: &Harness<'static, PdfCraftApp>| {
+        h.state().session.get(id).unwrap().text_blocks(0).into_iter().find(|b| b.text.contains("fox")).map(|b| b.rows.len()).unwrap_or(0)
+    };
+    let before = rows(&h);
+    reveal(&mut h, "Narrower box");
+    for _ in 0..6 {
+        click(&mut h, "Narrower box");
+    }
+    let chosen = h.state().views[0].line_editor.as_ref().and_then(|e| e.wrap_width).expect("a width was chosen");
+    click(&mut h, "Done");
+    h.run_steps(4);
+    assert!(rows(&h) > before, "rewrapped onto more lines at {chosen} pt: {before} → {}", rows(&h));
 }
 
 /// Back keeps what was typed; ✕ throws it away.

@@ -3,6 +3,9 @@
 Une ligne par version publiée ([semver](https://semver.org/lang/fr/)) : date et résumé. Avant
 0.8.0, l'historique est dans `ROADMAP.md` et `git log`.
 
+- **0.9.0-fork.4** (2026-10-21) — Le cadre d'un paragraphe s'élargit (ou se rétrécit) pendant la
+  saisie : poignée sur son bord droit sur PC, réglage Largeur du cadre sur téléphone ; le texte
+  se replie à la nouvelle largeur.
 - **0.9.0-fork.3** (2026-10-21) — Modifier un PDF rattrape Acrobat : exposant/indice, listes,
   espace entre paragraphes (aussi sur téléphone, avec police, interligne et couleur libre) ;
   rechercher et remplacer ; pièces jointes (joindre, décrire, supprimer) ; lien sur des mots

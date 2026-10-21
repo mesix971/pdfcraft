@@ -159,6 +159,9 @@ pub struct LineEditor {
     /// Current screen-space size. Recomputed from the current page transform before painting.
     size: f32,
     focus: bool,
+    /// The width (user space) the box was dragged to while typing: the text wraps at it, and
+    /// applying rewraps the paragraph to it. `None`: the paragraph's own.
+    pub wrap_width: Option<f64>,
     /// The Format text panel's values, and what the paragraph had (to send only changes).
     pub look: pdfcraft_engine::AddedText,
     look0: pdfcraft_engine::AddedText,
@@ -239,7 +242,12 @@ pub(crate) fn extras_panel(ui: &mut egui::Ui, e: &mut Extras) -> bool {
 
 impl LineEditor {
     pub(crate) fn has_changes(&self) -> bool {
-        self.text != self.original || self.look != self.look0 || self.extras != self.extras0
+        self.text != self.original || self.look != self.look0 || self.extras != self.extras0 || self.wrap_width.is_some()
+    }
+
+    /// The width (user space) the paragraph wraps at: the one dragged to, else its own.
+    pub(crate) fn box_width(&self) -> f64 {
+        self.wrap_width.unwrap_or_else(|| f64::from((self.source_rect[2] - self.source_rect[0]).abs()))
     }
 
     /// Extra width permitted by the editor. Source containers now remain fixed.
@@ -268,6 +276,7 @@ impl LineEditor {
             scale: (self.extras.scale != self.extras0.scale).then_some(self.extras.scale),
             paragraph_spacing: (self.extras.paragraph_spacing != self.extras0.paragraph_spacing).then_some(self.extras.paragraph_spacing),
             list: (self.extras.list != self.extras0.list).then_some(self.extras.list).flatten(),
+            width: self.wrap_width,
             ..Default::default()
         };
         let script = self.extras.script;
@@ -304,6 +313,8 @@ impl LineEditor {
         self.selection = None;
         self.font_resource = None;
         self.look0 = self.look.clone();
+        // The paragraph now has the width it was dragged to.
+        self.wrap_width = None;
         // Superscript and subscript are actions on the selection, not a state the panel keeps.
         self.extras.script = None;
         self.extras0 = self.extras;
@@ -1044,6 +1055,7 @@ fn open_editor(
         // The phone types it on a screen of its own, in the interface's font.
         fonts: if in_place { install_source_fonts(ui.ctx(), doc, page) } else { BTreeMap::new() },
         overflow: false,
+        wrap_width: None,
         max_width,
         size: (l.size as f32 * scale).clamp(8.0, 72.0),
         focus: true,
@@ -1430,7 +1442,11 @@ pub(crate) fn overlay(ctx: &egui::Context, view: &mut DocView, info: &DocInfo) -
             // source width, and the visible frame grows/shrinks vertically with their rows.
             // An OCR phrase (several stretched words on one scanned line) also grows rightwards.
             let single_run = ed.source.as_ref().is_some_and(|(block, _)| block.rows.len() == 1 || block.invisible);
-            let width = if !ed.multiline && single_run && !ed.text.contains('\n') && ed.has_changes() {
+            // Room to the page's right edge, the most the box can be dragged to.
+            let room = (xf.rect.right() - ed.rect.left() - 4.0).max(12.0);
+            let width = if let Some(w) = ed.wrap_width {
+                (w as f32 * scale).clamp(12.0, room)
+            } else if !ed.multiline && single_run && !ed.text.contains('\n') && ed.has_changes() {
                 let job = editor_job(ui, ed, &ed.text, scale, f32::INFINITY);
                 let natural = ui.fonts_mut(|f| f.layout_job(job)).size().x;
                 natural.max(ed.size * 0.4).min((xf.rect.right() - ed.rect.left() - 36.0 * scale).max(ed.rect.width()))
@@ -1445,6 +1461,27 @@ pub(crate) fn overlay(ctx: &egui::Context, view: &mut DocView, info: &DocInfo) -
             // can differ from the PDF's. Keep every visible row inside the growing frame.
             let live = draft_rect.map_or(visible, |bounds| bounds.union(visible));
             ui.painter().rect_stroke(live.expand(2.0), CornerRadius::ZERO, Stroke::new(1.5, ACCENT), egui::StrokeKind::Outside);
+            // The handle on the frame's right edge widens (or narrows) the box being typed in: the
+            // text wraps at the new width at once, and applying rewraps the paragraph to it.
+            let handle = Rect::from_center_size(
+                Pos2::new(live.expand(2.0).right(), live.center().y),
+                egui::vec2(10.0, (live.height() * 0.6).clamp(10.0, 28.0)),
+            );
+            let grip = ui.interact(handle.expand(4.0), egui::Id::new("edit-text-width-handle"), egui::Sense::drag());
+            grip.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Slider, true, tl!("Box width")));
+            ui.painter().rect(handle, CornerRadius::same(2), Color32::WHITE, Stroke::new(1.0, ACCENT), egui::StrokeKind::Middle);
+            if grip.hovered() || grip.dragged() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+            }
+            if grip.dragged() {
+                let now = (width + grip.drag_delta().x).clamp(12.0, room);
+                ed.wrap_width = Some(f64::from(now / scale));
+                ui.ctx().request_repaint();
+            }
+            if grip.drag_stopped() {
+                // Typing goes on in the field.
+                ed.focus = true;
+            }
             // On the frame, a press takes hold of the box (a click selects it, a drag moves it):
             // the pointer says so there, and reads as text inside.
             if let Some(p) = ui.input(|i| i.pointer.hover_pos())
@@ -1554,6 +1591,7 @@ mod tests {
             source: None,
             fonts: BTreeMap::new(),
             overflow: false,
+            wrap_width: None,
             max_width: 400.0,
             size: block.size as f32,
             focus: true,

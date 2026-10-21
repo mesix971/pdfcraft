@@ -2540,3 +2540,6 @@ decimal separator	.	,
 	The picture was updated from your image editor.	Изображение обновлено из редактора.
 	The edited picture is too large to put back (at most 256 MB).	Изменённое изображение слишком велико (не более 256 МБ).
 	Couldn't open the image editor: {e}	Не удалось открыть редактор изображений: {e}
+	Box width	Ширина рамки
+	Narrower box	Уже рамка
+	Wider box	Шире рамка

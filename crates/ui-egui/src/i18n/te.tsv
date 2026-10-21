@@ -2535,3 +2535,6 @@ decimal separator	.	.
 	The picture was updated from your image editor.	చిత్రం మీ ఎడిటర్ నుండి నవీకరించబడింది.
 	The edited picture is too large to put back (at most 256 MB).	సవరించిన చిత్రం తిరిగి పెట్టడానికి చాలా పెద్దది (గరిష్ఠంగా 256 MB).
 	Couldn't open the image editor: {e}	చిత్ర ఎడిటర్‌ను తెరవలేకపోయాం: {e}
+	Box width	పెట్టె వెడల్పు
+	Narrower box	ఇరుకైన పెట్టె
+	Wider box	వెడల్పైన పెట్టె

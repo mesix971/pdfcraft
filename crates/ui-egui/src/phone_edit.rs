@@ -76,8 +76,14 @@ struct Typing<'a> {
     look: &'a mut pdfcraft_engine::AddedText,
     /// A paragraph's underline, lists, spacing and superscript (added text has none), and its
     /// selection.
-    paragraph: Option<(&'a mut crate::edit_text_ui::Extras, &'a mut Option<std::ops::Range<usize>>)>,
+    paragraph: Option<(&'a mut crate::edit_text_ui::Extras, &'a mut Option<std::ops::Range<usize>>, Width<'a>)>,
     new: bool,
+}
+
+/// A paragraph's box width while it is typed: the one chosen (user space), and the box's own.
+struct Width<'a> {
+    chosen: &'a mut Option<f64>,
+    own: f64,
 }
 
 /// The typing field's id (its selection is read for superscript and subscript).
@@ -99,8 +105,9 @@ pub(crate) fn screen(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, scr
         egui::TextEdit::load_state(ui.ctx(), egui::Id::new(TYPING_INPUT)).and_then(|s| s.cursor.char_range()).map(|r| r.as_sorted_char_range());
     {
         let typing = if let Some(ed) = view.line_editor.as_mut() {
-            let crate::edit_text_ui::LineEditor { text, look, extras, selection, .. } = ed;
-            Typing { text, look, paragraph: Some((extras, selection)), new: false }
+            let own = ed.box_width();
+            let crate::edit_text_ui::LineEditor { text, look, extras, selection, wrap_width, .. } = ed;
+            Typing { text, look, paragraph: Some((extras, selection, Width { chosen: wrap_width, own })), new: false }
         } else if let Some(d) = view.content.draft.as_mut() {
             Typing { text: &mut d.text, look: &mut d.style, paragraph: None, new: d.index.is_none() }
         } else {
@@ -133,10 +140,12 @@ pub(crate) fn screen(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, scr
                 ui.horizontal_centered(|ui| {
                     ui.add_space(12.0);
                     ui.spacing_mut().item_spacing.x = 6.0;
-                    formatted |= format_row(ui, style, paragraph.as_mut().map(|(e, _)| &mut e.underline), &t, &look);
+                    formatted |= format_row(ui, style, paragraph.as_mut().map(|(e, _, _)| &mut e.underline), &t, &look);
                     divider(ui, &look);
                     formatted |= family_button(ui, style, &t, &look);
-                    if let Some((extras, selection)) = paragraph.as_mut() {
+                    if let Some((extras, selection, width)) = paragraph.as_mut() {
+                        divider(ui, &look);
+                        formatted |= width_row(ui, width, &t, &look);
                         divider(ui, &look);
                         let (changed, now) = paragraph_row(ui, extras, &t, &look);
                         formatted |= changed;
@@ -222,6 +231,27 @@ pub(crate) fn screen(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, scr
     } else if done {
         app.finish_phone_text(true);
     }
+}
+
+/// The paragraph's box: narrower and wider by a tenth of its own width each tap (the text
+/// rewraps at it when Done applies). Returns whether it changed.
+fn width_row(ui: &mut egui::Ui, w: &mut Width, t: &Tokens, l: &phone_home::Look) -> bool {
+    let now = w.chosen.unwrap_or(w.own);
+    let step = (w.own * 0.1).max(6.0);
+    let mut changed = false;
+    if format_button(ui, "minus", tl!("Narrower box"), None, now - step >= 12.0, t, l) {
+        *w.chosen = Some((now - step).max(12.0));
+        changed = true;
+    }
+    let shown = format!("\u{2194} {} pt", w.chosen.unwrap_or(w.own).round());
+    let (r, said) = ui.allocate_exact_size(vec2(widgets::text_width(ui, &shown, &theme::semibold(14.0)) + 8.0, TARGET), Sense::hover());
+    said.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, tl!("Box width")));
+    ui.painter().text(r.center(), Align2::CENTER_CENTER, &shown, theme::semibold(14.0), t.text);
+    if format_button(ui, "plus", tl!("Wider box"), None, now + step <= 2000.0, t, l) {
+        *w.chosen = Some((now + step).min(2000.0));
+        changed = true;
+    }
+    changed
 }
 
 /// The font family, one chip that shows it; each tap the next.

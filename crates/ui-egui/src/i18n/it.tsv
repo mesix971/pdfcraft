@@ -2838,3 +2838,6 @@ decimal separator	.	,
 	The picture was updated from your image editor.	L’immagine è stata aggiornata dal tuo editor.
 	The edited picture is too large to put back (at most 256 MB).	L’immagine modificata è troppo grande da reinserire (al massimo 256 MB).
 	Couldn't open the image editor: {e}	Impossibile aprire l’editor di immagini: {e}
+	Box width	Larghezza del riquadro
+	Narrower box	Riquadro più stretto
+	Wider box	Riquadro più largo

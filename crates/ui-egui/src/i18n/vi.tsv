@@ -2878,3 +2878,6 @@ phone bar	Edit	Sửa
 	The picture was updated from your image editor.	Ảnh đã được cập nhật từ trình sửa ảnh.
 	The edited picture is too large to put back (at most 256 MB).	Ảnh đã sửa quá lớn để đưa lại (tối đa 256 MB).
 	Couldn't open the image editor: {e}	Không mở được trình sửa ảnh: {e}
+	Box width	Độ rộng khung
+	Narrower box	Khung hẹp hơn
+	Wider box	Khung rộng hơn

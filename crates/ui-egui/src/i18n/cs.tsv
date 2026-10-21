@@ -2700,3 +2700,6 @@ decimal separator	.	,
 	The picture was updated from your image editor.	Obrázek byl aktualizován z editoru.
 	The edited picture is too large to put back (at most 256 MB).	Upravený obrázek je příliš velký na vrácení (nejvýše 256 MB).
 	Couldn't open the image editor: {e}	Editor obrázků nelze otevřít: {e}
+	Box width	Šířka rámečku
+	Narrower box	Užší rámeček
+	Wider box	Širší rámeček

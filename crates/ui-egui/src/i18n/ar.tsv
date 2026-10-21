@@ -2903,3 +2903,6 @@ decimal separator	.	.
 	The picture was updated from your image editor.	تم تحديث الصورة من محرر الصور.
 	The edited picture is too large to put back (at most 256 MB).	الصورة المعدلة أكبر من أن تُعاد (256 ميغابايت كحد أقصى).
 	Couldn't open the image editor: {e}	تعذّر فتح محرر الصور: {e}
+	Box width	عرض الإطار
+	Narrower box	إطار أضيق
+	Wider box	إطار أعرض

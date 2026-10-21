@@ -4905,3 +4905,31 @@ fn find_and_replace_replaces_every_page_in_one_step() {
     let doc = h.state().session.get(h.state().views[0].id).unwrap();
     assert_eq!(doc.can_undo(), Some("Replace page"));
 }
+
+/// While typing, the handle on the open box's right edge resizes the box being typed in; the
+/// editor stays open, and applying rewraps the paragraph at the new width.
+#[test]
+fn the_open_paragraph_box_is_resized_from_its_handle_while_typing() {
+    let mut h = harness(1, |_| {});
+    assert!(h.state_mut().execute("edit.edit_text"));
+    h.run_steps(2);
+    let r = h.state().views[0].page_screen_rect(0).expect("on screen");
+    let k = r.width() / 200.0;
+    let screen = |x: f64, y: f64| egui::pos2(r.left() + x as f32 * k, r.top() + (300.0 - y as f32) * k);
+    let block = h.state().session.get(h.state().views[0].id).unwrap().text_blocks(0)[0].clone();
+    let mid = screen((block.rect[0] + block.rect[2]) / 2.0, (block.rect[1] + block.rect[3]) / 2.0);
+    click_at(&mut h, mid);
+    assert!(h.state().views[0].line_editor.is_some(), "the paragraph is open for typing");
+    // The handle sits on the frame's right edge, at mid height.
+    let edge = h.get_by_label("Box width").rect().center();
+    let narrower = (block.rect[2] - block.rect[0] - 45.0) as f32 * k;
+    drag(&mut h, edge, edge - egui::vec2(narrower, 0.0));
+    let ed = h.state().views[0].line_editor.clone().expect("still open after dragging its handle");
+    let w = ed.wrap_width.expect("the box got a width");
+    assert!((w - 45.0).abs() < 4.0, "about 45 pt: {w}");
+    h.key_press_modifiers(Modifiers::COMMAND, Key::Enter);
+    h.run_steps(4);
+    let doc = h.state().session.get(h.state().views[0].id).unwrap();
+    let lines: Vec<String> = doc.text_lines(0).iter().map(|l| l.text.clone()).collect();
+    assert_eq!(lines, ["Page", "1"], "rewrapped to the dragged width");
+}
