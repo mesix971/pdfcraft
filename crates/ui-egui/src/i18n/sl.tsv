@@ -2600,3 +2600,17 @@ decimal separator	.	,
 	{name} is too large to attach (at most 512 MB).	{name} je prevelika za prilogo (največ 512 MB).
 	Font family	Družina pisav
 	Other colour	Druga barva
+	Align objects	Poravnaj predmete
+	Align centre	Poravnaj na sredino
+	Align top	Poravnaj na vrh
+	Align middle	Poravnaj na sredino navpično
+	Align bottom	Poravnaj na dno
+	Distribute horizontally	Razporedi vodoravno
+	Distribute vertically	Razporedi navpično
+	Arrange	Razporeditev
+	Bring to front	Postavi v ospredje
+	Bring forward	Premakni naprej
+	Send backward	Premakni nazaj
+	Send to back	Postavi v ozadje
+	Distribute objects	Razporedi predmete
+	Crop	Obreži

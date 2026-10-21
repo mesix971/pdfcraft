@@ -2558,3 +2558,17 @@ decimal separator	.	,
 	{name} is too large to attach (at most 512 MB).	{name} е твърде голям за прикачване (най-много 512 MB).
 	Font family	Семейство шрифтове
 	Other colour	Друг цвят
+	Align objects	Подравняване на обекти
+	Align centre	Подравняване по центъра
+	Align top	Подравняване отгоре
+	Align middle	Подравняване по средата
+	Align bottom	Подравняване отдолу
+	Distribute horizontally	Разпределяне хоризонтално
+	Distribute vertically	Разпределяне вертикално
+	Arrange	Подреждане
+	Bring to front	На преден план
+	Bring forward	Една стъпка напред
+	Send backward	Една стъпка назад
+	Send to back	На заден план
+	Distribute objects	Разпределяне на обекти
+	Crop	Изрязване

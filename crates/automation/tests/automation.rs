@@ -6154,6 +6154,52 @@ fn mixed_objects_move_through_tools_with_generation_and_one_undo() {
     assert!(page_text(&mut a, reopened)[0].contains("Added label"));
 }
 
+/// object_align lines objects up as seen, on an upright and a turned page; object_arrange moves an
+/// added item in the drawing order without moving it.
+#[test]
+fn objects_align_as_seen_and_added_items_arrange_through_tools() {
+    let dir = workdir("object-align");
+    let mut a = auto(&dir);
+    let doc = ok(&mut a, "doc_open", json!({"path":"a.pdf"}))["doc"].as_u64().unwrap();
+    ok(&mut a, "page_add_text", json!({"doc":doc,"page":1,"text":"Label","rect":[90,40,170,60]}));
+    ok(&mut a, "page_add_text", json!({"doc":doc,"page":2,"text":"Label","rect":[90,40,170,60]}));
+    ok(&mut a, "page_rotate", json!({"doc":doc,"pages":[2],"degrees":90}));
+    for page in [1, 2] {
+        let inventory = ok(&mut a, "object_list", json!({"doc":doc,"page":page}));
+        let objects: Vec<_> = inventory["objects"].as_array().unwrap().iter().map(|o| json!({"kind":o["kind"],"index":o["index"]})).collect();
+        assert_eq!(objects.len(), 2, "{inventory}");
+        let done = ok(&mut a, "object_align", json!({"doc":doc,"page":page,"generation":inventory["generation"],"objects":objects,"how":"left"}));
+        assert_eq!(done["aligned"], 2);
+        let after = ok(&mut a, "object_list", json!({"doc":doc,"page":page}));
+        let lefts: Vec<f64> = after["objects"].as_array().unwrap().iter().map(|o| o["rect"][0].as_f64().unwrap()).collect();
+        let min = inventory["objects"].as_array().unwrap().iter().map(|o| o["rect"][0].as_f64().unwrap()).fold(f64::INFINITY, f64::min);
+        assert!(lefts.iter().all(|x| (x - min).abs() < 0.05), "page {page}: {lefts:?} to {min}");
+    }
+    assert!(a.call("object_align", &json!({"doc":doc,"page":1,"objects":[{"kind":"text","index":1}],"how":"left"})).is_err(), "one object");
+    assert!(
+        a.call("object_align", &json!({"doc":doc,"page":1,"objects":[{"kind":"text","index":1},{"kind":"added","index":1}],"how":"sideways"}))
+            .is_err()
+    );
+
+    ok(&mut a, "page_add_text", json!({"doc":doc,"page":1,"text":"Second","rect":[90,80,170,100]}));
+    let texts = |a: &mut _| -> Vec<String> {
+        ok(a, "content_list", json!({"doc":doc}))["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|i| i["page"] == 1)
+            .map(|i| i["text"].as_str().unwrap_or("").to_owned())
+            .collect()
+    };
+    let before = texts(&mut a);
+    let first = before.iter().position(|t| t == "Label").unwrap() + 1;
+    ok(&mut a, "object_arrange", json!({"doc":doc,"page":1,"index":first,"to":"front"}));
+    assert_eq!(texts(&mut a).last().map(String::as_str), Some("Label"), "drawn last: {:?}", texts(&mut a));
+    assert!(a.call("object_arrange", &json!({"doc":doc,"page":1,"index":9,"to":"front"})).is_err());
+    assert!(a.call("object_arrange", &json!({"doc":doc,"page":1,"index":1,"to":"up"})).is_err());
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
 #[test]
 fn object_move_rejects_invalid_nested_references_without_any_change() {
     let dir = workdir("object-move-refusals");

@@ -2807,3 +2807,17 @@ decimal separator	.	,
 	{name} is too large to attach (at most 512 MB).	{name} è troppo grande da allegare (al massimo 512 MB).
 	Font family	Famiglia di caratteri
 	Other colour	Altro colore
+	Align objects	Allinea oggetti
+	Align centre	Allinea al centro
+	Align top	Allinea in alto
+	Align middle	Allinea al centro verticale
+	Align bottom	Allinea in basso
+	Distribute horizontally	Distribuisci orizzontalmente
+	Distribute vertically	Distribuisci verticalmente
+	Arrange	Disponi
+	Bring to front	Porta in primo piano
+	Bring forward	Porta avanti
+	Send backward	Porta indietro
+	Send to back	Porta in fondo
+	Distribute objects	Distribuisci oggetti
+	Crop	Ritaglia

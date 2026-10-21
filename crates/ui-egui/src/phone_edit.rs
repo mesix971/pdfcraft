@@ -577,8 +577,12 @@ enum Pick {
     Picture(ImageEdit),
     Replace,
     SavePicture,
+    /// Trim the picture: its crop handles, then Done or Cancel on the page.
+    Crop,
     Retype,
     DeleteAdded,
+    /// Move the added item selected in the drawing order.
+    ArrangeAdded(pdfcraft_engine::Arrange),
     Deselect,
 }
 
@@ -607,6 +611,7 @@ pub(crate) fn bottom_bar(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui,
                     true,
                     Pick::Picture(ImageEdit::Flip { horizontal: true }),
                 ),
+                ("crop", tl!("Crop"), Color32::from_rgb(0x0E, 0xA5, 0xA5), false, true, Pick::Crop),
                 ("replace", tl!("Replace"), Color32::from_rgb(0xF2, 0x9F, 0x05), false, raster, Pick::Replace),
                 ("save", tl!("Save"), Color32::from_rgb(0x16, 0xA3, 0x4A), false, raster, Pick::SavePicture),
                 ("trash-2", tl!("Delete"), Color32::from_rgb(0xE5, 0x48, 0x4D), false, true, Pick::Picture(ImageEdit::Delete)),
@@ -617,6 +622,9 @@ pub(crate) fn bottom_bar(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui,
             if added_text {
                 items.push(("pencil", tl!("Edit text"), phone::tool_hue(t, "edit"), false, true, Pick::Retype));
             }
+            let arrange = Color32::from_rgb(0x8B, 0x5C, 0xF6);
+            items.push(("chevron-up", tl!("Bring to front"), arrange, false, true, Pick::ArrangeAdded(pdfcraft_engine::Arrange::Front)));
+            items.push(("chevron-down", tl!("Send to back"), arrange, false, true, Pick::ArrangeAdded(pdfcraft_engine::Arrange::Back)));
             items.push(("trash-2", tl!("Delete"), Color32::from_rgb(0xE5, 0x48, 0x4D), false, true, Pick::DeleteAdded));
             items.push(("x", tl!("Close"), t.text_muted, false, true, Pick::Deselect));
             items
@@ -674,6 +682,24 @@ pub(crate) fn bottom_bar(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui,
         Pick::SavePicture => {
             if let Some((page, i)) = picture {
                 app.save_page_image(page, i);
+            }
+        }
+        Pick::Crop => {
+            let frame = picture
+                .and_then(|(page, i)| view.edit_images.get(&page).and_then(|(_, images)| images.get(i)).map(|im| im.visible_rect.unwrap_or(im.rect)));
+            if let (Some(frame), Some(s)) = (frame, view.image_selection.as_mut()) {
+                s.crop = Some(crate::edit_text_ui::CropMode::new(frame));
+            }
+        }
+        Pick::ArrangeAdded(to) => {
+            if let Some((page, i)) = view.content.selected {
+                let count = app.session.get(view.id).map_or(0, |d| d.added().iter().filter(|a| a.page == page).count());
+                if app.apply_edit(Edit::ArrangeAdded { page, index: i, to }) {
+                    let now = if to == pdfcraft_engine::Arrange::Back { 0 } else { count.saturating_sub(1) };
+                    if let Some(view) = app.views.get_mut(index) {
+                        view.content.selected = Some((page, now));
+                    }
+                }
             }
         }
         Pick::Retype => crate::content_ui::retype_selected(app, index),

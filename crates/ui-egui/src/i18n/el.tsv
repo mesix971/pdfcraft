@@ -2601,3 +2601,17 @@ decimal separator	.	,
 	{name} is too large to attach (at most 512 MB).	Το {name} είναι πολύ μεγάλο για επισύναψη (έως 512 MB).
 	Font family	Οικογένεια γραμματοσειράς
 	Other colour	Άλλο χρώμα
+	Align objects	Στοίχιση αντικειμένων
+	Align centre	Στοίχιση στο κέντρο
+	Align top	Στοίχιση επάνω
+	Align middle	Στοίχιση στη μέση
+	Align bottom	Στοίχιση κάτω
+	Distribute horizontally	Κατανομή οριζόντια
+	Distribute vertically	Κατανομή κάθετα
+	Arrange	Τακτοποίηση
+	Bring to front	Μεταφορά σε πρώτο πλάνο
+	Bring forward	Μεταφορά ένα επίπεδο μπροστά
+	Send backward	Αποστολή ένα επίπεδο πίσω
+	Send to back	Μεταφορά στο παρασκήνιο
+	Distribute objects	Κατανομή αντικειμένων
+	Crop	Περικοπή

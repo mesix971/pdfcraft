@@ -2669,3 +2669,17 @@ decimal separator	.	,
 	{name} is too large to attach (at most 512 MB).	{name} je příliš velký k připojení (nejvýše 512 MB).
 	Font family	Rodina písma
 	Other colour	Jiná barva
+	Align objects	Zarovnat objekty
+	Align centre	Zarovnat na střed
+	Align top	Zarovnat nahoru
+	Align middle	Zarovnat doprostřed
+	Align bottom	Zarovnat dolů
+	Distribute horizontally	Rozmístit vodorovně
+	Distribute vertically	Rozmístit svisle
+	Arrange	Uspořádat
+	Bring to front	Přenést do popředí
+	Bring forward	Přenést dopředu
+	Send backward	Posunout dozadu
+	Send to back	Přenést do pozadí
+	Distribute objects	Rozmístit objekty
+	Crop	Oříznout

@@ -2594,3 +2594,17 @@ decimal separator	.	,
 	{name} is too large to attach (at most 512 MB).	{name} túl nagy a csatoláshoz (legfeljebb 512 MB).
 	Font family	Betűcsalád
 	Other colour	Más szín
+	Align objects	Objektumok igazítása
+	Align centre	Középre igazítás
+	Align top	Felülre igazítás
+	Align middle	Középvonalra igazítás
+	Align bottom	Alulra igazítás
+	Distribute horizontally	Elosztás vízszintesen
+	Distribute vertically	Elosztás függőlegesen
+	Arrange	Elrendezés
+	Bring to front	Előtérbe hozás
+	Bring forward	Előrébb hozás
+	Send backward	Hátrébb küldés
+	Send to back	Háttérbe küldés
+	Distribute objects	Objektumok elosztása
+	Crop	Körülvágás

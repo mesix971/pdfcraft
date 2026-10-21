@@ -2572,3 +2572,17 @@ decimal separator	.	,
 	{name} is too large to attach (at most 512 MB).	{name} jest za duży, by go dołączyć (najwyżej 512 MB).
 	Font family	Rodzina czcionek
 	Other colour	Inny kolor
+	Align objects	Wyrównaj obiekty
+	Align centre	Wyrównaj do środka
+	Align top	Wyrównaj do góry
+	Align middle	Wyrównaj do środka w pionie
+	Align bottom	Wyrównaj do dołu
+	Distribute horizontally	Rozłóż poziomo
+	Distribute vertically	Rozłóż pionowo
+	Arrange	Rozmieść
+	Bring to front	Przesuń na wierzch
+	Bring forward	Przesuń do przodu
+	Send backward	Przesuń do tyłu
+	Send to back	Przesuń na spód
+	Distribute objects	Rozłóż obiekty
+	Crop	Przytnij

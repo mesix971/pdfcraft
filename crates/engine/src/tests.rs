@@ -6090,3 +6090,41 @@ fn attachments_are_added_described_deleted_and_undone() {
     assert!(names(&s).is_empty() && s.get(id).unwrap().info.attachments.is_empty());
     assert!(s.apply(id, Edit::DeleteAttachment { name: "nothing.txt".into() }).is_err());
 }
+
+/// On a turned page, aligning objects "left" or "top" as seen lines them up along the user-space
+/// axis that reads across or down the screen, at its seen end (checked against the displayed
+/// moves of object_move_offset).
+#[test]
+fn displayed_alignment_follows_the_page_rotation() {
+    use Alignment as A;
+    // The user-space axis (0 = x, 1 = y) a displayed direction moves along, and whether it moves
+    // towards larger values.
+    let axis = |offset: [f64; 2]| if offset[0].abs() > offset[1].abs() { (0, offset[0] > 0.0) } else { (1, offset[1] > 0.0) };
+    // What an alignment does in user space: which axis, and whether it gathers at the low end.
+    let gathers = |how: A| match how {
+        A::Left => (0, Some(true)),
+        A::Right => (0, Some(false)),
+        A::Bottom => (1, Some(true)),
+        A::Top => (1, Some(false)),
+        A::Centre | A::DistributeAcross => (0, None),
+        A::Middle | A::DistributeDown => (1, None),
+    };
+    for degrees in [0, 90, 180, 270] {
+        let (mut s, id) = session_with(1);
+        if degrees != 0 {
+            s.apply(id, Edit::RotatePages { pages: vec![0], degrees }).unwrap();
+        }
+        let doc = s.get(id).unwrap();
+        let (across, right_grows) = axis(doc.object_move_offset(0, [1.0, 0.0]).unwrap());
+        let (down, down_grows) = axis(doc.object_move_offset(0, [0.0, 1.0]).unwrap());
+        // Left gathers at the low end of what reads rightwards; Top at the low end of what reads downwards.
+        assert_eq!(gathers(doc.displayed_alignment(0, A::Left)), (across, Some(right_grows)), "{degrees}° left");
+        assert_eq!(gathers(doc.displayed_alignment(0, A::Right)), (across, Some(!right_grows)), "{degrees}° right");
+        assert_eq!(gathers(doc.displayed_alignment(0, A::Top)), (down, Some(down_grows)), "{degrees}° top");
+        assert_eq!(gathers(doc.displayed_alignment(0, A::Bottom)), (down, Some(!down_grows)), "{degrees}° bottom");
+        assert_eq!(gathers(doc.displayed_alignment(0, A::Centre)).0, across, "{degrees}° centre");
+        assert_eq!(gathers(doc.displayed_alignment(0, A::Middle)).0, down, "{degrees}° middle");
+        assert_eq!(gathers(doc.displayed_alignment(0, A::DistributeAcross)).0, across, "{degrees}° across");
+        assert_eq!(gathers(doc.displayed_alignment(0, A::DistributeDown)).0, down, "{degrees}° down");
+    }
+}

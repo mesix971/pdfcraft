@@ -450,6 +450,43 @@ fn stamp_palette(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
 /// Edit a PDF ▸ Format text: for the selected added text (one undoable change), or the style
 /// new text gets.
 fn format_section(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
+    // Several objects selected together: line them up.
+    if let Some((i, id)) = app.active_ids()
+        && app.views[i].objects.count() >= 2
+    {
+        use pdfcraft_engine::Alignment as A;
+        ui.label(egui::RichText::new(tl!("Align objects")).font(theme::medium(13.0)));
+        let mut pick = None;
+        ui.horizontal_wrapped(|ui| {
+            for (label, how) in [
+                (tl!("Align left"), A::Left),
+                (tl!("Align centre"), A::Centre),
+                (tl!("Align right"), A::Right),
+                (tl!("Align top"), A::Top),
+                (tl!("Align middle"), A::Middle),
+                (tl!("Align bottom"), A::Bottom),
+            ] {
+                if ui.button(label).clicked() {
+                    pick = Some(how);
+                }
+            }
+            let three = app.views[i].objects.count() >= 3;
+            for (label, how) in [(tl!("Distribute horizontally"), A::DistributeAcross), (tl!("Distribute vertically"), A::DistributeDown)] {
+                if ui.add_enabled(three, egui::Button::new(label)).clicked() {
+                    pick = Some(how);
+                }
+            }
+        });
+        if let Some(how) = pick
+            && let Some(doc) = app.session.get(id)
+            && let Some(edit) = app.views[i].objects.align(doc, how)
+        {
+            app.apply_edit(edit);
+        }
+        ui.add_space(6.0);
+        ui.separator();
+        return;
+    }
     // Editing a paragraph of existing text: its formatting, applied as it changes.
     if let Some((i, _)) = app.active_ids()
         && let Some(ed) = app.views[i].line_editor.clone()
@@ -509,6 +546,7 @@ fn format_section(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
         }
     });
     if let Some((page, index, img)) = image {
+        arrange_row(app, ui, page, index);
         match crate::content_ui::image_panel(ui, t, &img) {
             Some(crate::content_ui::ImageAction::Update(content)) => {
                 app.apply_edit(pdfcraft_engine::Edit::UpdateContent { page, index, content });
@@ -531,6 +569,7 @@ fn format_section(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
     });
     match selected {
         Some((page, index, text)) => {
+            arrange_row(app, ui, page, index);
             if let Some(style) = crate::content_ui::format_panel(ui, t, &text) {
                 app.text_style = pdfcraft_engine::AddedText { text: String::new(), rect: [0.0; 4], ..style.clone() };
                 app.apply_edit(pdfcraft_engine::Edit::UpdateContent { page, index, content: pdfcraft_engine::AddedContent::Text(style) });
@@ -546,6 +585,39 @@ fn format_section(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
     }
     ui.add_space(6.0);
     ui.separator();
+}
+
+/// Arrange for the added item selected (`index` among the page's added items): where it is drawn
+/// among the page's content. The selection follows the item to its new place in the list.
+fn arrange_row(app: &mut PdfCraftApp, ui: &mut egui::Ui, page: usize, index: usize) {
+    use pdfcraft_engine::Arrange;
+    let Some((i, id)) = app.active_ids() else { return };
+    let count = app.session.get(id).map_or(0, |d| d.added().iter().filter(|a| a.page == page).count());
+    let mut pick = None;
+    ui.label(egui::RichText::new(tl!("Arrange")).font(theme::medium(13.0)));
+    ui.horizontal_wrapped(|ui| {
+        for (label, to, enabled) in [
+            (tl!("Bring to front"), Arrange::Front, index + 1 < count),
+            (tl!("Bring forward"), Arrange::Forward, index + 1 < count),
+            (tl!("Send backward"), Arrange::Backward, true),
+            (tl!("Send to back"), Arrange::Back, true),
+        ] {
+            if ui.add_enabled(enabled, egui::Button::new(label)).clicked() {
+                pick = Some(to);
+            }
+        }
+    });
+    let Some(to) = pick else { return };
+    if app.apply_edit(pdfcraft_engine::Edit::ArrangeAdded { page, index, to }) {
+        let last = count.saturating_sub(1);
+        let now = match to {
+            Arrange::Front => last,
+            Arrange::Forward => (index + 1).min(last),
+            Arrange::Backward => index.saturating_sub(1),
+            Arrange::Back => 0,
+        };
+        app.views[i].content.selected = Some((page, now));
+    }
 }
 
 impl PdfCraftApp {

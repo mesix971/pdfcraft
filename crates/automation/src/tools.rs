@@ -182,6 +182,16 @@ pub fn tools() -> Vec<ToolDef> {
                     "type":"object","properties":{"kind":{"type":"string","enum":["added","text","image"]},"index":{"type":"integer","minimum":1}},"required":["kind","index"],"additionalProperties":false}},
                 "offset":{"type":"array","items":{"type":"number"},"minItems":2,"maxItems":2},
                 "generation":{"type":"integer","minimum":0,"description":"Use generation returned by object_list to reject a stale selection."}}), &["doc","page","objects","offset"])),
+        t("object_align", "Align or distribute objects", "Line up 2–1000 mixed references from object_list as seen on the page (turned pages included): left, center, right, top, middle or bottom edges; or spread 3 or more out with equal gaps (distribute_across, distribute_down), the outermost staying put. Each object moves as object_move moves it; one undo step. Refused, with nothing changed, when an object cannot land exactly where it should.")
+            .with(schema(json!({"doc":doc(),"page":{"type":"integer","minimum":1},
+                "objects":{"type":"array","minItems":2,"maxItems":1000,"uniqueItems":true,"items":{
+                    "type":"object","properties":{"kind":{"type":"string","enum":["added","text","image"]},"index":{"type":"integer","minimum":1}},"required":["kind","index"],"additionalProperties":false}},
+                "how":{"type":"string","enum":["left","center","right","top","middle","bottom","distribute_across","distribute_down"]},
+                "generation":{"type":"integer","minimum":0,"description":"Use generation returned by object_list to reject a stale selection."}}), &["doc","page","objects","how"])),
+        t("object_arrange", "Arrange an added item", "Move an added item (its added index from object_list) in the page's drawing order: front (over everything), forward, backward, or back (under the page's own content). The item stays where it is on the page; refused when that cannot be kept. One undo step. The page's own paragraphs and images are not reordered.")
+            .with(schema(json!({"doc":doc(),"page":{"type":"integer","minimum":1},"index":{"type":"integer","minimum":1},
+                "to":{"type":"string","enum":["front","forward","backward","back"]},
+                "generation":{"type":"integer","minimum":0}}), &["doc","page","index","to"])),
         t("text_word_count", "Word count", "Count Unicode words and characters on selected pages (default all), with totals and per-page counts. Table/code exclusions use PDF structure tags, not visual guesses; unclassified text is retained. Image exclusion removes Figure-tagged and invisible/OCR text. Does not run OCR. Copy permission is required. Fails rather than returning a partial total when a page cannot be read.")
             .ro()
             .cmd("file.word_count")

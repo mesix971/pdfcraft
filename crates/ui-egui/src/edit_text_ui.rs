@@ -438,14 +438,20 @@ fn crop_input(
     let painter = ui.painter();
     let Some(mode) = view.image_selection.as_mut().and_then(|s| s.crop.as_mut()) else { return false };
     let hover_pos = ui.input(|inp| inp.pointer.hover_pos());
+    // A finger needs more room than a pointer to take hold of a handle or a button.
+    let touch = ui.input(|inp| inp.has_touch_screen());
+    let reach = if touch { 22.0 } else { 8.0 };
     let keep_screen = |keep: [f64; 4]| xf.user_rect(info, page, keep.map(|v| v as f32)).intersect(b);
     // A drag in progress moves a grip; the box stays inside the picture and at least 6 px.
+    // On a phone the page answers taps, not drags: a finger that goes down on a grip holds it.
+    let pressed = resp.drag_started() || (touch && mode.drag.is_none() && ui.input(|inp| inp.pointer.primary_pressed()));
     if allow_interaction
-        && resp.drag_started()
+        && pressed
         && let Some(o) = ui.input(|inp| inp.pointer.press_origin())
+        && xf.rect.contains(o)
     {
         let k = keep_screen(mode.keep);
-        let grip = crop_handles(k).iter().position(|h| h.distance(o) < 8.0).or_else(|| k.contains(o).then_some(8));
+        let grip = crop_handles(k).iter().position(|h| h.distance(o) < reach).or_else(|| k.contains(o).then_some(8));
         if let Some(g) = grip {
             mode.drag = Some((g, o, mode.keep));
         }
@@ -507,9 +513,10 @@ fn crop_input(
         }
     }
     painter.rect_stroke(k, CornerRadius::ZERO, Stroke::new(1.5, ACCENT), egui::StrokeKind::Outside);
+    let dot = if touch { 14.0 } else { 8.0 };
     for h in crop_handles(k) {
         painter.rect(
-            Rect::from_center_size(h, egui::vec2(8.0, 8.0)),
+            Rect::from_center_size(h, egui::vec2(dot, dot)),
             CornerRadius::ZERO,
             Color32::WHITE,
             Stroke::new(1.0, ACCENT),
@@ -517,21 +524,22 @@ fn crop_input(
         );
     }
     // Done and Cancel, painted under the box (above it near the bottom of the view).
-    let font = egui::FontId::proportional(12.5);
+    let font = egui::FontId::proportional(if touch { 15.0 } else { 12.5 });
+    let tall = if touch { 40.0 } else { 22.0 };
     let pill = |label: &str, right: f32, y: f32| -> Rect {
-        let w = painter.layout_no_wrap(label.to_string(), font.clone(), Color32::WHITE).size().x + 20.0;
-        Rect::from_min_size(Pos2::new(right - w, y), egui::vec2(w, 22.0))
+        let w = painter.layout_no_wrap(label.to_string(), font.clone(), Color32::WHITE).size().x + if touch { 32.0 } else { 20.0 };
+        Rect::from_min_size(Pos2::new(right - w, y), egui::vec2(w, tall))
     };
-    let y = if k.max.y + 30.0 < xf.rect.max.y { k.max.y + 6.0 } else { k.min.y - 28.0 };
+    let y = if k.max.y + tall + 8.0 < xf.rect.max.y { k.max.y + 6.0 } else { k.min.y - tall - 6.0 };
     let done = pill(tl!("Done"), k.max.x, y);
     let cancel = pill(tl!("Cancel"), done.min.x - 6.0, y);
     let t = crate::theme::Tokens::get(ui.ctx());
-    painter.rect_filled(done, CornerRadius::same(11), ACCENT);
+    painter.rect_filled(done, CornerRadius::same(if touch { 20 } else { 11 }), ACCENT);
     painter.text(done.center(), egui::Align2::CENTER_CENTER, tl!("Done"), font.clone(), Color32::WHITE);
-    painter.rect(cancel, CornerRadius::same(11), t.panel, Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
+    painter.rect(cancel, CornerRadius::same(if touch { 20 } else { 11 }), t.panel, Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
     painter.text(cancel.center(), egui::Align2::CENTER_CENTER, tl!("Cancel"), font, t.text);
     if let Some(p) = hover_pos {
-        let icon = if let Some(g) = crop_handles(k).iter().position(|h| h.distance(p) < 8.0) {
+        let icon = if let Some(g) = crop_handles(k).iter().position(|h| h.distance(p) < reach) {
             match g {
                 0 | 3 => egui::CursorIcon::ResizeNwSe,
                 1 | 2 => egui::CursorIcon::ResizeNeSw,

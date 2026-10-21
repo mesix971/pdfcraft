@@ -2595,3 +2595,17 @@ decimal separator	.	.
 	{name} is too large to attach (at most 512 MB).	{name} は大きすぎて添付できません (最大 512 MB)。
 	Font family	フォントファミリー
 	Other colour	その他の色
+	Align objects	オブジェクトを整列
+	Align centre	中央揃え
+	Align top	上揃え
+	Align middle	上下中央揃え
+	Align bottom	下揃え
+	Distribute horizontally	左右に均等配置
+	Distribute vertically	上下に均等配置
+	Arrange	重ね順
+	Bring to front	最前面へ移動
+	Bring forward	前面へ移動
+	Send backward	背面へ移動
+	Send to back	最背面へ移動
+	Distribute objects	オブジェクトを均等配置
+	Crop	トリミング

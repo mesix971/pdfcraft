@@ -68,7 +68,7 @@ pub use pdfcraft_edit::{BlockStyle, List, PageImage, RangeStyle, Script, TextBlo
 pub use pdfcraft_measure as measure;
 pub use pdfcraft_xfa::Report as XfaLayout;
 
-pub use pdfcraft_edit::{EditableObject, MAX_MOVE_OBJECTS, ObjectKind, ObjectTarget};
+pub use pdfcraft_edit::{Alignment, Arrange, EditableObject, MAX_MOVE_OBJECTS, ObjectKind, ObjectTarget, alignment_offsets};
 
 /// A change to an existing page image.
 #[derive(Clone, Debug, PartialEq)]
@@ -275,6 +275,8 @@ fn scope_of(edit: &Edit) -> Scope {
         // Page content, resources and added content/marks only: the page tree, annotations,
         // fields, links and document metadata are untouched (see `refresh_content`).
         Edit::MoveObjects { .. }
+        | Edit::AlignObjects { .. }
+        | Edit::ArrangeAdded { .. }
         | Edit::EditTextLine { .. }
         | Edit::EditTextBlock { .. }
         | Edit::EditPageImage { .. }
@@ -530,6 +532,34 @@ impl Document {
             return Err("the move must be finite and non-zero".into());
         }
         Ok(offset)
+    }
+
+    /// The alignment in the page's user space that lines objects up as `how` says on screen: a
+    /// turned page (`/Rotate`) shows its user space's axes turned too.
+    pub fn displayed_alignment(&self, page: usize, how: Alignment) -> Alignment {
+        use Alignment as A;
+        let rotation = self.info.pages.get(page).map_or(0, |p| p.rotation);
+        // Turned 90°, user +x reads down the screen and +y to the right (see object_move_offset);
+        // turned 270°, +x reads up and +y to the left.
+        match (rotation, how) {
+            (90, A::Left) => A::Bottom,
+            (90, A::Right) => A::Top,
+            (90, A::Top) => A::Left,
+            (90, A::Bottom) => A::Right,
+            (270, A::Left) => A::Top,
+            (270, A::Right) => A::Bottom,
+            (270, A::Top) => A::Right,
+            (270, A::Bottom) => A::Left,
+            (90 | 270, A::Centre) => A::Middle,
+            (90 | 270, A::Middle) => A::Centre,
+            (90 | 270, A::DistributeAcross) => A::DistributeDown,
+            (90 | 270, A::DistributeDown) => A::DistributeAcross,
+            (180, A::Left) => A::Right,
+            (180, A::Right) => A::Left,
+            (180, A::Top) => A::Bottom,
+            (180, A::Bottom) => A::Top,
+            (_, how) => how,
+        }
     }
 
     /// Save image as: image `index` on `page` as a file (extension, bytes).
@@ -1623,6 +1653,18 @@ pub enum Edit {
         objects: Vec<ObjectTarget>,
         offset: [f64; 2],
     },
+    /// Align or distribute the selected objects (each moved as MoveObjects moves it).
+    AlignObjects {
+        page: usize,
+        objects: Vec<ObjectTarget>,
+        how: Alignment,
+    },
+    /// Move an added item (by its place among the page's added items) in the drawing order.
+    ArrangeAdded {
+        page: usize,
+        index: usize,
+        to: Arrange,
+    },
     /// Edit text in a paragraph box: replace paragraph `block` (from `Document::text_blocks`),
     /// rewrapped to the box's width.
     EditTextBlock {
@@ -2059,6 +2101,14 @@ impl Edit {
             Edit::EditTextLine { .. } | Edit::EditTextBlock { .. } => Label::of("Edit text"),
             Edit::RegisterTextFont { .. } => Label::of("Load document font"),
             Edit::MoveObjects { objects, .. } => plural("Move object", "Move objects", objects.len()),
+            Edit::AlignObjects { how: Alignment::DistributeAcross | Alignment::DistributeDown, .. } => Label::of("Distribute objects"),
+            Edit::AlignObjects { .. } => Label::of("Align objects"),
+            Edit::ArrangeAdded { to, .. } => Label::of(match to {
+                Arrange::Front => "Bring to front",
+                Arrange::Forward => "Bring forward",
+                Arrange::Backward => "Send backward",
+                Arrange::Back => "Send to back",
+            }),
             Edit::EditPageImage { change, .. } => Label::of(match change {
                 ImageEdit::Move(_) => "Move image",
                 ImageEdit::Rotate(_) => "Rotate image",
@@ -2223,6 +2273,8 @@ fn check_permission(edit: &Edit, p: &pdfcraft_cos::Permissions) -> Result<(), Ed
         | Edit::AddImage { .. }
         | Edit::UpdateContent { .. }
         | Edit::MoveObjects { .. }
+        | Edit::AlignObjects { .. }
+        | Edit::ArrangeAdded { .. }
         | Edit::DeleteContent { .. }
         | Edit::ReplaceImage { .. }
         | Edit::ClearRedactions
@@ -2597,6 +2649,8 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
             pdfcraft_edit::change_image(doc, *page, *index, &c)?;
         }
         Edit::MoveObjects { page, objects, offset } => pdfcraft_edit::move_objects(doc, *page, objects, *offset)?,
+        Edit::AlignObjects { page, objects, how } => pdfcraft_edit::align_objects(doc, *page, objects, *how)?,
+        Edit::ArrangeAdded { page, index, to } => pdfcraft_edit::arrange_added(doc, *page, *index, *to)?,
         Edit::EditTextBlock { page, block, text, style } => {
             pdfcraft_edit::rewrite_block(doc, *page, *block, Some(text), style)?;
         }
@@ -4019,7 +4073,8 @@ impl Session {
             matches!(
                 e,
                 Edit::AddText { .. } | Edit::AddImage { .. } | Edit::UpdateContent { .. } | Edit::DeleteContent { .. } | Edit::ReplaceImage { .. }
-            ) || matches!(e, Edit::MoveObjects { objects, .. } if objects.iter().any(|o| o.kind == ObjectKind::Added))
+            ) || matches!(e, Edit::MoveObjects { objects, .. } | Edit::AlignObjects { objects, .. } if objects.iter().any(|o| o.kind == ObjectKind::Added))
+                || matches!(e, Edit::ArrangeAdded { .. })
         });
         let touches_marks = edit.is_none_or(|e| {
             matches!(e, Edit::AddHeaderFooter { .. } | Edit::AddWatermark { .. } | Edit::AddBackground { .. } | Edit::RemoveMarks { .. })

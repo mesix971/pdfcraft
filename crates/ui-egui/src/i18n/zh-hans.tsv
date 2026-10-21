@@ -2559,3 +2559,17 @@ decimal separator	.	.
 	{name} is too large to attach (at most 512 MB).	{name} 太大，无法附加（最多 512 MB）。
 	Font family	字体系列
 	Other colour	其他颜色
+	Align objects	对齐对象
+	Align centre	居中对齐
+	Align top	顶端对齐
+	Align middle	垂直居中对齐
+	Align bottom	底端对齐
+	Distribute horizontally	水平分布
+	Distribute vertically	垂直分布
+	Arrange	排列
+	Bring to front	置于顶层
+	Bring forward	上移一层
+	Send backward	下移一层
+	Send to back	置于底层
+	Distribute objects	分布对象
+	Crop	裁剪

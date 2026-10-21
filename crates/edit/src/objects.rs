@@ -337,3 +337,166 @@ fn checked_streams(doc: &Document, page: usize) -> Result<Vec<(Object, Vec<u8>)>
     }
     Ok(streams)
 }
+
+/// How selected objects line up (Acrobat's Align Objects and Distribute).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Alignment {
+    Left,
+    /// Centred on one vertical line.
+    Centre,
+    Right,
+    Top,
+    /// Centred on one horizontal line.
+    Middle,
+    Bottom,
+    /// Equal gaps between neighbours from left to right; the outermost stay put.
+    DistributeAcross,
+    /// Equal gaps between neighbours from top to bottom; the outermost stay put.
+    DistributeDown,
+}
+
+/// The user-space move each object needs for `how`, by its place in `rects`.
+pub fn alignment_offsets(rects: &[[f64; 4]], how: Alignment) -> Vec<[f64; 2]> {
+    let lo = |i: usize| rects.iter().map(|r| r[i]).fold(f64::INFINITY, f64::min);
+    let hi = |i: usize| rects.iter().map(|r| r[i]).fold(f64::NEG_INFINITY, f64::max);
+    let distribute = |axis: usize| {
+        // Neighbours by their leading edge; the gaps share out the room between the first and last.
+        let mut order: Vec<usize> = (0..rects.len()).collect();
+        order.sort_by(|a, b| rects[*a][axis].total_cmp(&rects[*b][axis]).then(a.cmp(b)));
+        let mut out = vec![[0.0, 0.0]; rects.len()];
+        let (Some(&first), Some(&last)) = (order.first(), order.last()) else { return out };
+        let span = rects[last][axis + 2] - rects[first][axis];
+        let sizes: f64 = rects.iter().map(|r| r[axis + 2] - r[axis]).sum();
+        let gap = (span - sizes) / (rects.len().max(2) - 1) as f64;
+        let mut at = rects[first][axis];
+        for i in order {
+            let mut d = [0.0, 0.0];
+            d[axis] = at - rects[i][axis];
+            out[i] = d;
+            at += rects[i][axis + 2] - rects[i][axis] + gap;
+        }
+        out
+    };
+    match how {
+        Alignment::Left => rects.iter().map(|r| [lo(0) - r[0], 0.0]).collect(),
+        Alignment::Right => rects.iter().map(|r| [hi(2) - r[2], 0.0]).collect(),
+        Alignment::Centre => {
+            let c = (lo(0) + hi(2)) / 2.0;
+            rects.iter().map(|r| [c - (r[0] + r[2]) / 2.0, 0.0]).collect()
+        }
+        Alignment::Bottom => rects.iter().map(|r| [0.0, lo(1) - r[1]]).collect(),
+        Alignment::Top => rects.iter().map(|r| [0.0, hi(3) - r[3]]).collect(),
+        Alignment::Middle => {
+            let c = (lo(1) + hi(3)) / 2.0;
+            rects.iter().map(|r| [0.0, c - (r[1] + r[3]) / 2.0]).collect()
+        }
+        Alignment::DistributeAcross => distribute(0),
+        Alignment::DistributeDown => distribute(1),
+    }
+}
+
+/// Line up (or spread out) the selected objects, each moved as [`move_objects`] moves it, as one
+/// atomic change. Alignment needs two objects, distribution three. Refused, with nothing
+/// changed, when a moved object would not land exactly where it should.
+pub fn align_objects(doc: &mut Document, page: usize, targets: &[ObjectTarget], how: Alignment) -> Result<(), EditError> {
+    let least = if matches!(how, Alignment::DistributeAcross | Alignment::DistributeDown) { 3 } else { 2 };
+    if targets.len() < least || targets.len() > MAX_MOVE_OBJECTS {
+        let verb = if least == 3 { "distribute" } else { "align" };
+        return Err(EditError::Invalid(format!("select between {least} and 1000 objects to {verb}")));
+    }
+    let inventory: BTreeMap<_, _> = editable_objects(doc, page)?.into_iter().map(|o| (o.target, o.rect)).collect();
+    let mut unique = BTreeSet::new();
+    let mut rects = Vec::with_capacity(targets.len());
+    for target in targets {
+        if !unique.insert(*target) {
+            return Err(EditError::Invalid("an object was selected more than once".into()));
+        }
+        let rect = inventory.get(target).ok_or_else(|| EditError::Invalid("a selected object no longer exists; select the objects again".into()))?;
+        rects.push(*rect);
+    }
+    let offsets = alignment_offsets(&rects, how);
+    let mut work = doc.clone();
+    for (target, offset) in targets.iter().zip(&offsets) {
+        if !offset.iter().all(|v| v.is_finite() && v.abs() <= MAX_COORDINATE) {
+            return Err(EditError::Invalid("the objects could not be aligned".into()));
+        }
+        if offset[0].abs() < 1e-9 && offset[1].abs() < 1e-9 {
+            continue;
+        }
+        let one = [target.index];
+        match target.kind {
+            ObjectKind::Text => crate::text::translate_blocks(&mut work, page, &one, *offset)?,
+            ObjectKind::Image => crate::images::translate_images(&mut work, page, &one, *offset)?,
+            ObjectKind::Added => translate_added(&mut work, page, &one, *offset)?,
+        }
+    }
+    // Moving one object must not renumber another: check every one landed where it should.
+    let after: BTreeMap<_, _> = editable_objects(&work, page)?.into_iter().map(|o| (o.target, o.rect)).collect();
+    for ((target, rect), offset) in targets.iter().zip(&rects).zip(&offsets) {
+        let want = [rect[0] + offset[0], rect[1] + offset[1], rect[2] + offset[0], rect[3] + offset[1]];
+        let got = after.get(target).ok_or_else(|| EditError::Invalid("the objects could not be aligned in place".into()))?;
+        if got.iter().zip(&want).any(|(a, b)| (a - b).abs() > 0.05) {
+            return Err(EditError::Invalid("the objects could not be aligned in place".into()));
+        }
+    }
+    *doc = work;
+    Ok(())
+}
+
+/// Where an added item goes in the page's drawing order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Arrange {
+    /// Drawn last, over everything.
+    Front,
+    /// One step later.
+    Forward,
+    /// One step earlier.
+    Backward,
+    /// Drawn first, under the page's own content.
+    Back,
+}
+
+/// Move added item `index` (in [`crate::list_added`] order on the page) in the drawing order: its
+/// content stream moves in the page's `/Contents`. Refused, with nothing changed, if any added
+/// item would then be drawn somewhere else (a stream before it that leaves its transform on).
+pub fn arrange_added(doc: &mut Document, page: usize, index: usize, to: Arrange) -> Result<(), EditError> {
+    let p = pdfcraft_model::pages(doc).into_iter().nth(page).ok_or(EditError::NoSuchPage(page))?;
+    let (_, geometry) = added_geometry(doc, page)?;
+    let g = geometry.get(index).ok_or_else(|| EditError::Invalid("the added item no longer exists".into()))?;
+    let mut before: Vec<[f64; 4]> = geometry.iter().map(|g| g.rect).collect();
+    let mut contents = match p.dict.get(b"Contents") {
+        Some(c) => match &*doc.resolve(c) {
+            Object::Array(a) => a.clone(),
+            _ => vec![c.clone()],
+        },
+        None => Vec::new(),
+    };
+    let from = g.stream;
+    let last = contents.len().checked_sub(1).ok_or_else(|| EditError::Invalid("the page has no content".into()))?;
+    if from > last {
+        return Err(EditError::Invalid("the added item stream is missing".into()));
+    }
+    let to_at = match to {
+        Arrange::Front => last,
+        Arrange::Back => 0,
+        Arrange::Forward => (from + 1).min(last),
+        Arrange::Backward => from.saturating_sub(1),
+    };
+    if to_at == from {
+        return Ok(());
+    }
+    let stream = contents.remove(from);
+    contents.insert(to_at, stream);
+    let mut work = doc.clone();
+    work.update_dict(p.obj, |d| d.set(b"Contents".to_vec(), Object::Array(contents)))?;
+    let (_, after) = added_geometry(&work, page)?;
+    let mut moved: Vec<[f64; 4]> = after.iter().map(|g| g.rect).collect();
+    let order = |a: &[f64; 4], b: &[f64; 4]| a.iter().zip(b).map(|(x, y)| x.total_cmp(y)).find(|o| o.is_ne()).unwrap_or(std::cmp::Ordering::Equal);
+    moved.sort_by(order);
+    before.sort_by(order);
+    if moved.len() != before.len() || moved.iter().zip(&before).any(|(a, b)| a.iter().zip(b).any(|(x, y)| (x - y).abs() > 0.05)) {
+        return Err(EditError::Invalid("the item can't be moved in the drawing order without moving it on the page".into()));
+    }
+    *doc = work;
+    Ok(())
+}

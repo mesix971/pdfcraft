@@ -2593,3 +2593,17 @@ decimal separator	.	,
 	{name} is too large to attach (at most 512 MB).	{name} тіркеу үшін тым үлкен (ең көбі 512 МБ).
 	Font family	Қаріп тобы
 	Other colour	Басқа түс
+	Align objects	Нысандарды туралау
+	Align centre	Ортаға туралау
+	Align top	Жоғарыға туралау
+	Align middle	Тігінен ортаға туралау
+	Align bottom	Төменге туралау
+	Distribute horizontally	Көлденең бөлу
+	Distribute vertically	Тігінен бөлу
+	Arrange	Реттеу
+	Bring to front	Алдыңғы қатарға шығару
+	Bring forward	Бір қабат алға
+	Send backward	Бір қабат артқа
+	Send to back	Артқы қатарға жіберу
+	Distribute objects	Нысандарды бөлу
+	Crop	Қию

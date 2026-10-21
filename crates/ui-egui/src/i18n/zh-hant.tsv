@@ -2545,3 +2545,17 @@ decimal separator	.	.
 	{name} is too large to attach (at most 512 MB).	{name} 太大，無法附加（最多 512 MB）。
 	Font family	字型系列
 	Other colour	其他顏色
+	Align objects	對齊物件
+	Align centre	置中對齊
+	Align top	頂端對齊
+	Align middle	垂直置中對齊
+	Align bottom	底端對齊
+	Distribute horizontally	水平分佈
+	Distribute vertically	垂直分佈
+	Arrange	排列
+	Bring to front	移至最上層
+	Bring forward	上移一層
+	Send backward	下移一層
+	Send to back	移至最下層
+	Distribute objects	分佈物件
+	Crop	裁剪

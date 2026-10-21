@@ -2872,3 +2872,17 @@ decimal separator	.	.
 	{name} is too large to attach (at most 512 MB).	{name} أكبر من أن يُرفق (512 ميغابايت كحد أقصى).
 	Font family	عائلة الخط
 	Other colour	لون آخر
+	Align objects	محاذاة العناصر
+	Align centre	محاذاة إلى الوسط
+	Align top	محاذاة إلى الأعلى
+	Align middle	محاذاة إلى المنتصف عموديًا
+	Align bottom	محاذاة إلى الأسفل
+	Distribute horizontally	توزيع أفقي
+	Distribute vertically	توزيع عمودي
+	Arrange	ترتيب
+	Bring to front	إحضار إلى الأمام
+	Bring forward	إحضار للأمام خطوة
+	Send backward	إرسال للخلف خطوة
+	Send to back	إرسال إلى الخلف
+	Distribute objects	توزيع العناصر
+	Crop	اقتصاص

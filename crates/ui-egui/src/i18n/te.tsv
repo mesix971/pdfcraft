@@ -2504,3 +2504,17 @@ decimal separator	.	.
 	{name} is too large to attach (at most 512 MB).	{name} జోడించడానికి చాలా పెద్దది (గరిష్ఠంగా 512 MB).
 	Font family	ఫాంట్ కుటుంబం
 	Other colour	ఇతర రంగు
+	Align objects	వస్తువులను సమలేఖనం చేయి
+	Align centre	మధ్యకు సమలేఖనం
+	Align top	పైకి సమలేఖనం
+	Align middle	నిలువుగా మధ్యకు సమలేఖనం
+	Align bottom	కిందికి సమలేఖనం
+	Distribute horizontally	అడ్డంగా పంపిణీ చేయి
+	Distribute vertically	నిలువుగా పంపిణీ చేయి
+	Arrange	అమర్చు
+	Bring to front	ముందుకు తీసుకురా
+	Bring forward	ఒక అడుగు ముందుకు
+	Send backward	ఒక అడుగు వెనక్కి
+	Send to back	వెనుకకు పంపు
+	Distribute objects	వస్తువులను పంపిణీ చేయి
+	Crop	కత్తిరించు

@@ -2847,3 +2847,17 @@ phone bar	Edit	Sửa
 	{name} is too large to attach (at most 512 MB).	{name} quá lớn để đính kèm (tối đa 512 MB).
 	Font family	Họ phông chữ
 	Other colour	Màu khác
+	Align objects	Căn đối tượng
+	Align centre	Căn giữa
+	Align top	Căn trên
+	Align middle	Căn giữa theo chiều dọc
+	Align bottom	Căn dưới
+	Distribute horizontally	Phân bố theo chiều ngang
+	Distribute vertically	Phân bố theo chiều dọc
+	Arrange	Sắp xếp
+	Bring to front	Đưa lên trên cùng
+	Bring forward	Đưa lên một lớp
+	Send backward	Đưa xuống một lớp
+	Send to back	Đưa xuống dưới cùng
+	Distribute objects	Phân bố đối tượng
+	Crop	Cắt

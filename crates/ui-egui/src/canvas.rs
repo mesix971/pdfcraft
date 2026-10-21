@@ -1530,9 +1530,7 @@ impl DocView {
 
     /// Something is being moved on the page: a paragraph, an added item or a picture.
     pub(crate) fn carrying(&self) -> bool {
-        self.block_drag.is_some()
-            || self.content.grabbing()
-            || self.image_selection.as_ref().is_some_and(crate::edit_text_ui::ImageSelection::dragging)
+        self.block_drag.is_some() || self.content.grabbing() || self.image_selection.as_ref().is_some_and(|s| s.dragging() || s.crop.is_some())
     }
 
     /// How large the page grid draws its pages (1.0 = the usual thumbnails).

@@ -2591,3 +2591,17 @@ decimal separator	.	,
 	{name} is too large to attach (at most 512 MB).	{name} eklemek için çok büyük (en fazla 512 MB).
 	Font family	Yazı tipi ailesi
 	Other colour	Başka renk
+	Align objects	Nesneleri hizala
+	Align centre	Ortaya hizala
+	Align top	Üste hizala
+	Align middle	Ortaya dikey hizala
+	Align bottom	Alta hizala
+	Distribute horizontally	Yatay dağıt
+	Distribute vertically	Dikey dağıt
+	Arrange	Düzenle
+	Bring to front	En öne getir
+	Bring forward	Öne getir
+	Send backward	Geriye gönder
+	Send to back	En arkaya gönder
+	Distribute objects	Nesneleri dağıt
+	Crop	Kırp

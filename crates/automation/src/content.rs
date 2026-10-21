@@ -222,9 +222,9 @@ impl Automation {
         Ok(json!({"page":page+1,"generation":doc.edit_generation(),"count":items.len(),"objects":items}))
     }
 
-    pub(crate) fn object_move(&mut self, a: &Args) -> Result<Value> {
+    /// The `objects` references (from object_list) a tool acts on, and the stale-selection check.
+    fn object_targets(&self, a: &Args) -> Result<Vec<pdfcraft_engine::ObjectTarget>> {
         use pdfcraft_engine::{MAX_MOVE_OBJECTS, ObjectKind, ObjectTarget};
-        let page = self.page(a)?;
         let rows = a
             .get("objects")
             .and_then(Value::as_array)
@@ -250,6 +250,66 @@ impl Automation {
                 .ok_or_else(|| bad("object index must be a positive integer from object_list"))?;
             targets.push(ObjectTarget { kind, index });
         }
+        self.check_generation(a)?;
+        Ok(targets)
+    }
+
+    /// A `generation` from object_list must still be the document's.
+    fn check_generation(&self, a: &Args) -> Result<()> {
+        if let Some(g) = a.get("generation") {
+            let g = g.as_u64().ok_or_else(|| bad("generation must be a non-negative integer from object_list"))?;
+            if g != self.doc(a)?.edit_generation() {
+                return Err(failed("the document changed; call object_list again before changing objects"));
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn object_align(&mut self, a: &Args) -> Result<Value> {
+        use pdfcraft_engine::Alignment as A;
+        let page = self.page(a)?;
+        let targets = self.object_targets(a)?;
+        let how = match a.str("how")? {
+            "left" => A::Left,
+            "center" => A::Centre,
+            "right" => A::Right,
+            "top" => A::Top,
+            "middle" => A::Middle,
+            "bottom" => A::Bottom,
+            "distribute_across" => A::DistributeAcross,
+            "distribute_down" => A::DistributeDown,
+            _ => return Err(bad("how must be left, center, right, top, middle, bottom, distribute_across or distribute_down")),
+        };
+        let how = self.doc(a)?.displayed_alignment(page, how);
+        let count = targets.len();
+        let mut result = self.apply(a, Edit::AlignObjects { page, objects: targets, how })?;
+        result["aligned"] = json!(count);
+        Ok(result)
+    }
+
+    pub(crate) fn object_arrange(&mut self, a: &Args) -> Result<Value> {
+        use pdfcraft_engine::Arrange;
+        let page = self.page(a)?;
+        let index = a
+            .get("index")
+            .and_then(Value::as_u64)
+            .and_then(|i| i.checked_sub(1))
+            .and_then(|i| usize::try_from(i).ok())
+            .ok_or_else(|| bad("index must be a positive added-item index from object_list"))?;
+        let to = match a.str("to")? {
+            "front" => Arrange::Front,
+            "forward" => Arrange::Forward,
+            "backward" => Arrange::Backward,
+            "back" => Arrange::Back,
+            _ => return Err(bad("to must be front, forward, backward or back")),
+        };
+        self.check_generation(a)?;
+        self.apply(a, Edit::ArrangeAdded { page, index, to })
+    }
+
+    pub(crate) fn object_move(&mut self, a: &Args) -> Result<Value> {
+        let page = self.page(a)?;
+        let targets = self.object_targets(a)?;
         let delta = a
             .get("offset")
             .and_then(Value::as_array)
@@ -257,14 +317,7 @@ impl Automation {
             .and_then(|v| Some([v.first()?.as_f64()?, v.get(1)?.as_f64()?]))
             .filter(|v| v.iter().all(|n| n.is_finite() && n.abs() <= 1e9))
             .ok_or_else(|| bad("offset must contain two finite numbers [dx, dy] in displayed points"))?;
-        let doc = self.doc(a)?;
-        if let Some(g) = a.get("generation") {
-            let g = g.as_u64().ok_or_else(|| bad("generation must be a non-negative integer from object_list"))?;
-            if g != doc.edit_generation() {
-                return Err(failed("the document changed; call object_list again before moving"));
-            }
-        }
-        let offset = doc.object_move_offset(page, delta).map_err(failed)?;
+        let offset = self.doc(a)?.object_move_offset(page, delta).map_err(failed)?;
         let count = targets.len();
         let mut result = self.apply(a, Edit::MoveObjects { page, objects: targets, offset })?;
         result["moved"] = json!(count);

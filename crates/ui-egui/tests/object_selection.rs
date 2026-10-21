@@ -152,6 +152,48 @@ fn marquee_and_mixed_group_drag_move_once_and_undo_together() {
     assert_eq!(objects(&h), after);
 }
 
+/// Format ▸ Align objects lines the selected group up in one undo step; the selection follows.
+#[test]
+fn a_selected_group_is_aligned_from_the_panel_in_one_step() {
+    let mut h = harness();
+    let before = objects(&h);
+    marquee(&mut h);
+    h.get_by_label("Align left").click();
+    h.run_steps(4);
+    let after = objects(&h);
+    let moved: Vec<&EditableObject> = after.iter().filter(|o| o.text.as_deref() != Some("Keep here")).collect();
+    let left = before.iter().filter(|o| o.text.as_deref() != Some("Keep here")).map(|o| o.rect[0]).fold(f64::INFINITY, f64::min);
+    assert_eq!(moved.len(), 3);
+    assert!(moved.iter().all(|o| (o.rect[0] - left).abs() < 0.05), "{moved:?}");
+    let keep = |v: &[EditableObject]| v.iter().find(|o| o.text.as_deref() == Some("Keep here")).map(|o| o.rect);
+    assert_eq!(keep(&after), keep(&before), "an unselected object stays");
+    h.get_by_label("3 objects selected");
+    let app = h.state();
+    assert_eq!(app.session.get(app.views[0].id).unwrap().can_undo(), Some("Align objects"));
+    h.get_by_label("Distribute vertically").click();
+    h.run_steps(4);
+    assert_eq!(h.state().session.get(h.state().views[0].id).unwrap().can_undo(), Some("Distribute objects"));
+}
+
+/// Format ▸ Arrange sends the selected added item under the page's content; it stays selected
+/// and does not move on the page.
+#[test]
+fn a_selected_added_item_is_sent_to_the_back() {
+    let mut h = harness();
+    let before = objects(&h);
+    let p = at(&h, 180.0, 145.0);
+    click(&mut h, p, Modifiers::NONE);
+    assert!(h.state().views[0].content.selected.is_some(), "the added note is selected");
+    h.get_by_label("Send to back").click();
+    h.run_steps(4);
+    let app = h.state();
+    let doc = app.session.get(app.views[0].id).unwrap();
+    assert_eq!(doc.can_undo(), Some("Send to back"));
+    assert_eq!(app.views[0].content.selected, Some((0, 0)), "the selection follows it");
+    let rect = |v: &[EditableObject]| v.iter().find(|o| o.text.as_deref() == Some("Added note")).map(|o| o.rect);
+    assert_eq!(rect(&objects(&h)), rect(&before), "it stays where it was");
+}
+
 #[test]
 fn modifier_clicks_extend_an_ordinary_selection_and_toggle_objects() {
     let mut h = harness();

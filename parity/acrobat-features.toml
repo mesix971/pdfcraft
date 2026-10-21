@@ -2106,8 +2106,8 @@ milestone = "M7"
 status = "shipped"
 commands = ["edit.image"]
 tools = ["content_update", "image_edit"]
-evidence = ["crates/ui-egui/tests/editing.rs::cropping_a_picture_with_its_handles", "crates/engine/src/tests.rs::cropping_an_existing_image_clips_it_and_moves_with_it", "crates/automation/tests/automation.rs::editing_page_images_through_tools", "crates/engine/src/tests.rs::added_images_rotate_flip_and_crop_as_drawn", "crates/automation/tests/automation.rs::adding_content_through_tools"]
-notes = "Existing page images: right-click ▸ Crop Image puts the picture in crop mode: its eight handles trim (the inside pans), the part that will go is dimmed, Enter or Done applies, Esc or Cancel leaves it; Remove Crop shows the whole picture again. The pixels stay where they are (a clipping path inside the picture's own scope, so a later move or resize carries it along; cropping again replaces the earlier crop, so it can grow back); image_edit crop. Added images: trim each side by percent in Edit image, clipped. Not yet: cropping grouped Form artwork by handles is allowed the same way (it is a clip), but a shared clip of the original file is not changed."
+evidence = ["crates/ui-egui/tests/editing.rs::cropping_a_picture_with_its_handles", "crates/engine/src/tests.rs::cropping_an_existing_image_clips_it_and_moves_with_it", "crates/automation/tests/automation.rs::editing_page_images_through_tools", "crates/engine/src/tests.rs::added_images_rotate_flip_and_crop_as_drawn", "crates/automation/tests/automation.rs::adding_content_through_tools", "crates/ui-egui/tests/phone.rs::a_picture_is_cropped_with_a_finger"]
+notes = "Existing page images: right-click ▸ Crop Image puts the picture in crop mode: its eight handles trim (the inside pans), the part that will go is dimmed, Enter or Done applies, Esc or Cancel leaves it; Remove Crop shows the whole picture again. The pixels stay where they are (a clipping path inside the picture's own scope, so a later move or resize carries it along; cropping again replaces the earlier crop, so it can grow back); image_edit crop. Added images: trim each side by percent in Edit image, clipped. On the phone: Crop on the picture's bar, finger-sized handles (the pages stay put while cropping), Done or Enter. Not yet: cropping grouped Form artwork by handles is allowed the same way (it is a clip), but a shared clip of the original file is not changed."
 
 [[feature]]
 id = "edit.image-rotate-flip"
@@ -2163,11 +2163,11 @@ title = "Arrange objects (bring forward, send backward)"
 area = "C"
 tier = "P1"
 milestone = "M7"
-status = "planned"
+status = "partial"
 commands = []
-tools = []
-evidence = []
-notes = ""
+tools = ["object_arrange"]
+evidence = ["crates/edit/src/tests.rs::added_items_move_in_the_drawing_order", "crates/automation/tests/automation.rs::objects_align_as_seen_and_added_items_arrange_through_tools", "crates/ui-egui/tests/object_selection.rs::a_selected_added_item_is_sent_to_the_back"]
+notes = "Items PdfCraft added (text boxes, pictures): Format ▸ Arrange (Bring to front, Bring forward, Send backward, Send to back), the phone's added-item bar (front, back), object_arrange. Its content stream moves in /Contents; refused when an earlier stream leaves a transform on that would move it. Missing: reordering the page's own paragraphs, images and vector art (their graphics state, clips and transparency would have to travel with them)."
 
 [[feature]]
 id = "edit.align-distribute-objects"
@@ -2175,11 +2175,11 @@ title = "Align and distribute objects"
 area = "C"
 tier = "P1"
 milestone = "M7"
-status = "planned"
+status = "shipped"
 commands = []
-tools = []
-evidence = []
-notes = ""
+tools = ["object_align"]
+evidence = ["crates/edit/src/tests.rs::objects_are_aligned_and_distributed", "crates/engine/src/tests.rs::displayed_alignment_follows_the_page_rotation", "crates/automation/tests/automation.rs::objects_align_as_seen_and_added_items_arrange_through_tools", "crates/ui-egui/tests/object_selection.rs::a_selected_group_is_aligned_from_the_panel_in_one_step"]
+notes = "Select two or more objects (paragraphs, page images and Form artwork, added items; Shift-click or a marquee): Format ▸ Align objects lines up left, centre, right, top, middle or bottom edges as seen (turned pages included), or distributes three or more with equal gaps, the outermost staying put. Each object moves as a group move does (glyph codes and image data kept); one undo step; refused with nothing changed when an object cannot land exactly. object_align. Not on the phone (no multiple selection there)."
 
 [[feature]]
 id = "edit.vector-edit"

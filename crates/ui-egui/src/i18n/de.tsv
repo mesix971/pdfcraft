@@ -2597,3 +2597,17 @@ decimal separator	.	,
 	{name} is too large to attach (at most 512 MB).	{name} ist zu groß zum Anhängen (höchstens 512 MB).
 	Font family	Schriftfamilie
 	Other colour	Andere Farbe
+	Align objects	Objekte ausrichten
+	Align centre	Zentriert ausrichten
+	Align top	Oben ausrichten
+	Align middle	Mittig ausrichten
+	Align bottom	Unten ausrichten
+	Distribute horizontally	Horizontal verteilen
+	Distribute vertically	Vertikal verteilen
+	Arrange	Anordnen
+	Bring to front	In den Vordergrund
+	Bring forward	Eine Ebene nach vorne
+	Send backward	Eine Ebene nach hinten
+	Send to back	In den Hintergrund
+	Distribute objects	Objekte verteilen
+	Crop	Zuschneiden

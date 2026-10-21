@@ -111,6 +111,25 @@ impl ObjectSelection {
         Edit::MoveObjects { page, objects: self.selected.iter().map(|o| o.target).collect(), offset }
     }
 
+    /// Align or distribute the selection as `how` reads on screen. The selection follows it.
+    /// `None` with fewer objects than it needs (two; three to distribute).
+    pub fn align(&mut self, doc: &Document, how: pdfcraft_engine::Alignment) -> Option<Edit> {
+        use pdfcraft_engine::Alignment as A;
+        let page = self.page?;
+        let least = if matches!(how, A::DistributeAcross | A::DistributeDown) { 3 } else { 2 };
+        if self.selected.len() < least {
+            return None;
+        }
+        let how = doc.displayed_alignment(page, how);
+        let rects: Vec<[f64; 4]> = self.selected.iter().map(|o| o.rect).collect();
+        let mut expected = self.selected.clone();
+        for (object, d) in expected.iter_mut().zip(pdfcraft_engine::alignment_offsets(&rects, how)) {
+            object.rect = [object.rect[0] + d[0], object.rect[1] + d[1], object.rect[2] + d[0], object.rect[3] + d[1]];
+        }
+        self.pending = Some(expected);
+        Some(Edit::AlignObjects { page, objects: self.selected.iter().map(|o| o.target).collect(), how })
+    }
+
     fn inventory(&mut self, doc: &Document, page: usize) -> Result<Vec<EditableObject>, String> {
         if self.cache.len() >= 8 && !self.cache.contains_key(&page) {
             self.cache.clear();

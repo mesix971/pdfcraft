@@ -1344,6 +1344,38 @@ fn a_picture_tapped_in_edit_gets_a_bar_of_what_can_be_done_to_it() {
     assert!(h.query_by_label("Edit text").is_some(), "the tools are back");
 }
 
+/// Crop on a picture's bar: a finger drags a corner handle in (the pages stay put) and Enter keeps
+/// what is inside.
+#[test]
+fn a_picture_is_cropped_with_a_finger() {
+    let mut png = Vec::new();
+    image::RgbImage::from_pixel(80, 40, image::Rgb([200, 40, 40])).write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
+    let mut h = harness_with(None, move |app| {
+        app.open_bytes("picture.png", None, png.clone()).expect("a picture opens as a page");
+    });
+    for phase in [egui::TouchPhase::Start, egui::TouchPhase::End] {
+        h.event(Event::Touch { device_id: egui::TouchDeviceId(0), id: egui::TouchId(0), phase, pos: pos2(4.0, 4.0), force: None });
+    }
+    h.run_steps(2);
+    let id = h.state().views[0].id;
+    let visible = |h: &Harness<'static, PdfCraftApp>| h.state().session.get(id).unwrap().page_images(0).first().and_then(|i| i.visible_rect);
+    let before = visible(&h).expect("the picture");
+    click(&mut h, "Edit");
+    let page = h.state().views[0].page_screen_rect(0).unwrap();
+    tap(&mut h, page.center());
+    click(&mut h, "Crop");
+    assert!(h.state().views[0].image_selection.as_ref().is_some_and(|s| s.crop.is_some()), "crop handles are up");
+    // A little off the corner: a finger is not that precise.
+    let corner = page.right_top() + vec2(-10.0, 10.0);
+    finger_drag(&mut h, corner, corner + vec2(-page.width() / 4.0, page.height() / 4.0));
+    h.run_steps(4);
+    h.key_press(Key::Enter);
+    h.run_steps(6);
+    let after = visible(&h).expect("still there");
+    assert!(after[2] < before[2] - 1.0 && after[3] < before[3] - 1.0, "trimmed from the top right: {before:?} → {after:?}");
+    assert!((after[0] - before[0]).abs() < 0.5 && (after[1] - before[1]).abs() < 0.5, "the opposite corner stays");
+}
+
 /// Text added earlier, tapped in Edit: its own bar (Edit text, Delete), and the typing screen's
 /// formats reach it as well as its words.
 #[test]

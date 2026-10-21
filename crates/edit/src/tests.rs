@@ -4905,3 +4905,101 @@ fn list_markers_are_recognised_only_before_a_space() {
     assert_eq!(text::list_text("- a\n12) b\n\n• c", List::Numbered), ("1. a\n2. b\n\n3. c".to_owned(), vec![3, 3, 0, 3]));
     assert_eq!(text::list_text("", List::Bullet).0, "");
 }
+
+/// Align and distribute move each selected object (text, page image, added item) to its place,
+/// in one step; the rest of the page stays where it was.
+#[test]
+fn objects_are_aligned_and_distributed() {
+    let page = || {
+        image_page_with(
+            "q 200 0 0 100 300 100 cm /Im0 Do Q BT /F1 12 Tf 72 700 Td (First) Tj ET BT /F1 12 Tf 150 600 Td (Second) Tj ET BT /F1 12 Tf 230 500 Td (Third) Tj ET",
+        )
+    };
+    let rect_of = |doc: &Document, t: ObjectTarget| editable_objects(doc, 0).unwrap().into_iter().find(|o| o.target == t).unwrap().rect;
+    let base = page();
+    let all: Vec<ObjectTarget> = editable_objects(&base, 0).unwrap().into_iter().map(|o| o.target).collect();
+    assert_eq!(all.len(), 4, "three paragraphs and the image");
+    let before: Vec<[f64; 4]> = all.iter().map(|t| rect_of(&base, *t)).collect();
+    let left = before.iter().map(|r| r[0]).fold(f64::INFINITY, f64::min);
+
+    let mut doc = base.clone();
+    align_objects(&mut doc, 0, &all, Alignment::Left).unwrap();
+    let doc = reopen(&doc);
+    for (t, old) in all.iter().zip(&before) {
+        let r = rect_of(&doc, *t);
+        assert!((r[0] - left).abs() < 0.01 && (r[1] - old[1]).abs() < 0.01, "{t:?}: {r:?} from {old:?}");
+    }
+
+    let mut doc = base.clone();
+    align_objects(&mut doc, 0, &all, Alignment::Top).unwrap();
+    let top = before.iter().map(|r| r[3]).fold(f64::NEG_INFINITY, f64::max);
+    for t in &all {
+        assert!((rect_of(&doc, *t)[3] - top).abs() < 0.01);
+    }
+
+    // Three paragraphs spread across: the outer ones stay, the gaps are equal.
+    let texts: Vec<ObjectTarget> = all.iter().copied().filter(|t| t.kind == ObjectKind::Text).collect();
+    let mut doc = base.clone();
+    align_objects(&mut doc, 0, &texts, Alignment::DistributeAcross).unwrap();
+    let mut rs: Vec<[f64; 4]> = texts.iter().map(|t| rect_of(&doc, *t)).collect();
+    rs.sort_by(|a, b| a[0].total_cmp(&b[0]));
+    let (g1, g2) = (rs[1][0] - rs[0][2], rs[2][0] - rs[1][2]);
+    assert!((g1 - g2).abs() < 0.01, "{g1} {g2}");
+    let mut old: Vec<[f64; 4]> = texts.iter().map(|t| rect_of(&base, *t)).collect();
+    old.sort_by(|a, b| a[0].total_cmp(&b[0]));
+    assert!((rs[0][0] - old[0][0]).abs() < 0.01 && (rs[2][2] - old[2][2]).abs() < 0.01, "outermost stay");
+
+    // Too few, repeated or vanished objects change nothing.
+    let mut doc = base.clone();
+    assert!(align_objects(&mut doc, 0, &all[..1], Alignment::Left).is_err());
+    assert!(align_objects(&mut doc, 0, &texts[..2], Alignment::DistributeDown).is_err());
+    assert!(align_objects(&mut doc, 0, &[all[0], all[0]], Alignment::Left).is_err());
+    let gone = ObjectTarget { kind: ObjectKind::Text, index: 99 };
+    assert!(align_objects(&mut doc, 0, &[all[0], gone], Alignment::Left).is_err());
+    assert_eq!(page_content_bytes(&doc, 0), page_content_bytes(&base, 0));
+}
+
+/// An added item moves in the drawing order (its stream in /Contents) without moving on the page.
+#[test]
+fn added_items_move_in_the_drawing_order() {
+    let mut doc = image_page();
+    let a = AddedText { rect: [72.0, 600.0, 300.0, 700.0], text: "Under".into(), size: 14.0, ..AddedText::default() };
+    let b = AddedText { rect: [80.0, 610.0, 300.0, 700.0], text: "Over".into(), size: 14.0, ..AddedText::default() };
+    add_content(&mut doc, 0, &Content::Text(a)).unwrap();
+    add_content(&mut doc, 0, &Content::Text(b)).unwrap();
+    let streams = |doc: &Document| match doc.resolve(pdfcraft_model::pages(doc)[0].dict.get(b"Contents").unwrap()).as_ref() {
+        Object::Array(a) => a.clone(),
+        other => vec![other.clone()],
+    };
+    let texts = |doc: &Document| {
+        list_added(doc)
+            .into_iter()
+            .map(|x| match x.content {
+                Content::Text(t) => t.text,
+                Content::Image(_) => String::new(),
+            })
+            .collect::<Vec<_>>()
+    };
+    let rects = |doc: &Document| {
+        editable_objects(doc, 0).unwrap().into_iter().filter(|o| o.target.kind == ObjectKind::Added).map(|o| o.rect).collect::<Vec<_>>()
+    };
+    let before = streams(&doc);
+    let placed = rects(&doc);
+    let first = texts(&doc).iter().position(|t| t == "Under").unwrap();
+    arrange_added(&mut doc, 0, first, Arrange::Front).unwrap();
+    let after = streams(&doc);
+    assert_eq!(after.len(), before.len());
+    assert_ne!(after, before, "its stream moved");
+    let doc = reopen(&doc);
+    assert_eq!(texts(&doc).last().map(String::as_str), Some("Under"), "now drawn last");
+    let mut a = rects(&doc);
+    let mut b = placed.clone();
+    a.sort_by(|x, y| x[0].total_cmp(&y[0]));
+    b.sort_by(|x, y| x[0].total_cmp(&y[0]));
+    assert!(a.iter().zip(&b).all(|(x, y)| close(*x, *y)), "nothing moved on the page: {a:?} {b:?}");
+    let mut doc = doc;
+    let last = texts(&doc).len() - 1;
+    arrange_added(&mut doc, 0, last, Arrange::Back).unwrap();
+    assert_eq!(texts(&doc).first().map(String::as_str), Some("Under"), "now drawn first");
+    assert!(arrange_added(&mut doc, 0, 9, Arrange::Front).is_err());
+}

@@ -2596,3 +2596,17 @@ decimal separator	.	,
 	{name} is too large to attach (at most 512 MB).	{name} est trop volumineux pour être joint (512 Mo au plus).
 	Font family	Famille de police
 	Other colour	Autre couleur
+	Align objects	Aligner les objets
+	Align centre	Aligner au centre
+	Align top	Aligner en haut
+	Align middle	Aligner au milieu
+	Align bottom	Aligner en bas
+	Distribute horizontally	Répartir horizontalement
+	Distribute vertically	Répartir verticalement
+	Arrange	Disposition
+	Bring to front	Mettre au premier plan
+	Bring forward	Avancer d’un plan
+	Send backward	Reculer d’un plan
+	Send to back	Mettre à l’arrière-plan
+	Distribute objects	Répartir les objets
+	Crop	Recadrer
