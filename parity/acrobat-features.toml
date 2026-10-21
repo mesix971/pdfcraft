@@ -2401,7 +2401,7 @@ milestone = "M7"
 status = "shipped"
 commands = ["edit.header_footer"]
 tools = ["doc_header_footer"]
-evidence = ["crates/ui-egui/tests/ui_group/marks.rs::header_and_footer_dialog_inserts_tokens_and_applies_to_a_subset", "crates/edit/src/tests.rs::header_and_footer_are_drawn_in_display_space_and_wrap_the_original_content", "crates/engine/src/tests.rs::headers_footers_watermarks_and_backgrounds_show_update_and_remove"]
+evidence = ["crates/edit/src/tests.rs::headers_and_watermarks_use_the_chosen_standard_font", "crates/ui-egui/tests/ui_group/marks.rs::header_and_footer_dialog_inserts_tokens_and_applies_to_a_subset", "crates/edit/src/tests.rs::header_and_footer_are_drawn_in_display_space_and_wrap_the_original_content", "crates/engine/src/tests.rs::headers_footers_watermarks_and_backgrounds_show_update_and_remove"]
 notes = "Helvetica, Times or Courier (regular; doc_header_footer font), measured with that face's widths; drawn in display space on rotated pages; artifact-tagged. Not yet: bold or italic, or a document or installed font"
 
 [[feature]]
